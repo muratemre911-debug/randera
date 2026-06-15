@@ -7,6 +7,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Trash2,
+  Edit2,
   CalendarDays,
   Clock,
   TrendingUp,
@@ -14,9 +15,12 @@ import {
 import { createClient } from "@/utils/supabase/client";
 
 
-const MOCK_CUSTOMER_ID = "22222222-2222-2222-2222-222222222222";
-
 const HOURS = Array.from({ length: 10 }, (_, i) => i + 9);
+
+interface Profile {
+  id: string;
+  full_name: string;
+}
 
 type ViewMode = "today" | "weekly" | "monthly";
 
@@ -38,31 +42,7 @@ interface Appointment {
   services?: Service;
 }
 
-interface SampleAppointment {
-  dayIndex: number;
-  hour: number;
-  service: string;
-  customer: string;
-  color: string;
-}
 
-const SAMPLE_APPOINTMENTS: SampleAppointment[] = [
-  { dayIndex: 0, hour: 9, service: "Saç Kesimi", customer: "Ahmet Y.", color: "violet" },
-  { dayIndex: 1, hour: 10, service: "Boyama", customer: "Elif K.", color: "orange" },
-  { dayIndex: 2, hour: 11, service: "Kesim", customer: "Murat", color: "violet" },
-  { dayIndex: 3, hour: 14, service: "Fön", customer: "Ayşe", color: "violet" },
-  { dayIndex: 4, hour: 9, service: "Manikür", customer: "Zeynep", color: "teal" },
-  { dayIndex: 5, hour: 13, service: "Saç Boyama", customer: "Can", color: "orange" },
-];
-
-const COLOR_MAP: Record<string, string> = {
-  violet:
-    "bg-indigo-100 text-indigo-900 border border-indigo-200 shadow-sm dark:bg-indigo-500/20 dark:text-indigo-300 dark:border-indigo-500/30",
-  orange:
-    "bg-amber-100 text-amber-900 border border-amber-200 shadow-sm dark:bg-amber-500/20 dark:text-amber-300 dark:border-amber-500/30",
-  teal:
-    "bg-emerald-100 text-emerald-900 border border-emerald-200 shadow-sm dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-500/30",
-};
 
 function getWeekDays(date: Date) {
   const start = new Date(date);
@@ -110,6 +90,7 @@ export default function TakvimPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [services, setServices] = useState<Service[]>([]);
+  const [customers, setCustomers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [tenantId, setTenantId] = useState<string | null>(null);
 
@@ -121,8 +102,14 @@ export default function TakvimPage() {
     useState<Appointment | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const [formName, setFormName] = useState("");
+  const [formCustomer, setFormCustomer] = useState("");
   const [formService, setFormService] = useState("");
+  const [editingApptId, setEditingApptId] = useState<string | null>(null);
+
+  const getCustomerName = (app: Appointment) => {
+    const cust = customers.find(c => c.id === app.customer_id);
+    return cust ? cust.full_name : (app.custom_fields?.customer_name || "Müşteri");
+  };
 
   const [highlightedCell, setHighlightedCell] = useState<string | null>(null);
 
@@ -146,6 +133,16 @@ export default function TakvimPage() {
     return { start: start.toISOString(), end: end.toISOString() };
   }, [days]);
 
+  const todayApptsCount = appointments.filter(a => isSameDay(new Date(a.start_time), new Date())).length;
+  const pendingCount = appointments.filter(a => a.status === "confirmed" && new Date(a.start_time) > new Date()).length;
+  
+  const occupancyPercent = useMemo(() => {
+    if (days.length === 0) return 0;
+    const totalSlots = days.length * HOURS.length;
+    const filledSlots = appointments.filter(a => days.some(d => isSameDay(d, new Date(a.start_time)))).length;
+    return Math.round((filledSlots / totalSlots) * 100);
+  }, [days, appointments]);
+
   const fetchData = async () => {
     setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
@@ -153,13 +150,19 @@ export default function TakvimPage() {
       setLoading(false);
       return;
     }
-    setTenantId(user.id);
+    
+    const { data: profile } = await supabase.from("profiles").select("tenant_id").eq("id", user.id).single();
+    if (!profile) {
+      setLoading(false);
+      return;
+    }
+    setTenantId(profile.tenant_id);
 
-    const [apptRes, svcRes] = await Promise.all([
+    const [apptRes, svcRes, custRes] = await Promise.all([
       supabase
         .from("appointments")
         .select("*, services(name, duration, price)")
-        .eq("tenant_id", user.id)
+        .eq("tenant_id", profile.tenant_id)
         .neq("status", "cancelled")
         .gte("start_time", dateRange.start)
         .lte("start_time", dateRange.end)
@@ -167,12 +170,19 @@ export default function TakvimPage() {
       supabase
         .from("services")
         .select("id, name, duration, price")
-        .eq("tenant_id", user.id)
+        .eq("tenant_id", profile.tenant_id)
         .eq("is_active", true)
         .order("name"),
+      supabase
+        .from("profiles")
+        .select("id, full_name")
+        .eq("tenant_id", profile.tenant_id)
+        .eq("role", "customer")
+        .order("full_name"),
     ]);
     if (apptRes.data) setAppointments(apptRes.data as Appointment[]);
     if (svcRes.data) setServices(svcRes.data);
+    if (custRes.data) setCustomers(custRes.data);
     setLoading(false);
   };
 
@@ -207,12 +217,7 @@ export default function TakvimPage() {
       return isSameDay(start, day) && start.getHours() === hour;
     });
 
-  const getSampleForSlot = (day: Date, hour: number) => {
-    const dayIndex = days.findIndex((d) => isSameDay(d, day));
-    return SAMPLE_APPOINTMENTS.find(
-      (s) => s.dayIndex === dayIndex && s.hour === hour,
-    );
-  };
+
 
   const scrollToAppointment = useCallback(
     (targetDayIndex: number, targetHour: number) => {
@@ -231,7 +236,7 @@ export default function TakvimPage() {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedSlot || !formService) return;
+    if (!selectedSlot || !formService || !formCustomer) return;
     setSaving(true);
 
     const service = services.find((s) => s.id === formService);
@@ -242,30 +247,48 @@ export default function TakvimPage() {
     const end = new Date(start);
     end.setMinutes(end.getMinutes() + service.duration);
 
-    const { error } = await supabase.from("appointments").insert({
-      tenant_id: tenantId,
-      customer_id: MOCK_CUSTOMER_ID,
-      service_id: formService,
-      start_time: start.toISOString(),
-      end_time: end.toISOString(),
-      status: "confirmed",
-      custom_fields: { customer_name: formName },
-    });
+    if (editingApptId) {
+      const { error } = await supabase.from("appointments").update({
+        customer_id: formCustomer,
+        service_id: formService,
+        start_time: start.toISOString(),
+        end_time: end.toISOString(),
+      }).eq("id", editingApptId);
 
-    if (!error) {
-      setSelectedSlot(null);
-      setFormName("");
-      setFormService("");
-      fetchData();
+      if (!error) {
+        setSelectedSlot(null);
+        setEditingApptId(null);
+        setFormCustomer("");
+        setFormService("");
+        fetchData();
+      }
+    } else {
+      const { error } = await supabase.from("appointments").insert({
+        tenant_id: tenantId,
+        customer_id: formCustomer,
+        service_id: formService,
+        start_time: start.toISOString(),
+        end_time: end.toISOString(),
+        status: "confirmed",
+        custom_fields: {},
+      });
+
+      if (!error) {
+        setSelectedSlot(null);
+        setFormCustomer("");
+        setFormService("");
+        fetchData();
+      }
     }
     setSaving(false);
   };
 
   const handleCancel = async () => {
     if (!selectedAppointment) return;
+    if (!confirm("Bu randevuyu silmek istediğinize emin misiniz?")) return;
     const { error } = await supabase
       .from("appointments")
-      .update({ status: "cancelled" })
+      .delete()
       .eq("id", selectedAppointment.id);
 
     if (!error) {
@@ -329,7 +352,7 @@ export default function TakvimPage() {
                     onClick={() => setSelectedAppointment(a)}
                     className="w-full truncate rounded-lg bg-indigo-100/80 px-2 py-1 text-[11px] font-semibold text-indigo-800 backdrop-blur-md hover:bg-indigo-200 dark:bg-indigo-500/20 dark:text-indigo-200 dark:hover:bg-indigo-500/30 transition-colors"
                   >
-                    {formatTime(a.start_time)} {a.custom_fields?.customer_name || ""}
+                    {formatTime(a.start_time)} {getCustomerName(a)}
                   </button>
                 ))}
               </div>
@@ -351,7 +374,7 @@ export default function TakvimPage() {
             </div>
             <div>
               <p className="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-slate-400">Bugün Randevu</p>
-              <p className="text-3xl font-extrabold text-gray-900 dark:text-white">3</p>
+              <p className="text-3xl font-extrabold text-gray-900 dark:text-white">{todayApptsCount}</p>
             </div>
           </div>
         </div>
@@ -364,13 +387,7 @@ export default function TakvimPage() {
             <div>
               <p className="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-slate-400">Bekleyen</p>
               <div className="flex items-baseline gap-2">
-                <p className="text-3xl font-extrabold text-gray-900 dark:text-white">1</p>
-                <button
-                  onClick={() => scrollToAppointment(1, 10)}
-                  className="text-xs font-semibold text-amber-600 underline-offset-2 hover:underline dark:text-amber-400"
-                >
-                  Onay bekliyor
-                </button>
+                <p className="text-3xl font-extrabold text-gray-900 dark:text-white">{pendingCount}</p>
               </div>
             </div>
           </div>
@@ -383,7 +400,7 @@ export default function TakvimPage() {
             </div>
             <div>
               <p className="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-slate-400">Doluluk</p>
-              <p className="text-3xl font-extrabold text-gray-900 dark:text-white">%85</p>
+              <p className="text-3xl font-extrabold text-gray-900 dark:text-white">%{occupancyPercent}</p>
             </div>
           </div>
         </div>
@@ -438,9 +455,12 @@ export default function TakvimPage() {
             ))}
           </div>
           <button
-            onClick={() =>
-              setSelectedSlot({ day: new Date(), hour: new Date().getHours() })
-            }
+            onClick={() => {
+              setEditingApptId(null);
+              setFormCustomer("");
+              setFormService("");
+              setSelectedSlot({ day: new Date(), hour: new Date().getHours() });
+            }}
             className="flex items-center justify-center rounded-full bg-indigo-600 h-11 w-11 text-white shadow-lg shadow-indigo-500/30 transition-all hover:bg-indigo-500 active:scale-90"
           >
             <Plus size={24} strokeWidth={3} />
@@ -501,9 +521,8 @@ export default function TakvimPage() {
                 </div>
                 {days.map((day, dayIndex) => {
                   const cellId = `${dayIndex}-${hour}`;
-                  const sample = getSampleForSlot(day, hour);
                   const realApps = getApptsForSlot(day, hour);
-                  const hasContent = sample || realApps.length > 0;
+                  const hasContent = realApps.length > 0;
                   const isHighlighted = highlightedCell === cellId;
 
                   return (
@@ -517,6 +536,9 @@ export default function TakvimPage() {
                       } ${isHighlighted ? "ring-2 ring-inset ring-amber-400 bg-amber-50 dark:bg-amber-900/20" : ""}`}
                       onClick={(e) => {
                          if (e.target === e.currentTarget) {
+                            setEditingApptId(null);
+                            setFormCustomer("");
+                            setFormService("");
                             setSelectedSlot({ day, hour });
                          }
                       }}
@@ -525,27 +547,15 @@ export default function TakvimPage() {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (realApps.length > 0) {
-                              setSelectedAppointment(realApps[0]);
-                            } else if (sample) {
-                              setSelectedSlot({ day, hour });
-                            }
+                            setSelectedAppointment(realApps[0]);
                           }}
-                          className={`w-full rounded-2xl p-2.5 text-left transition-all hover:scale-[0.98] ${
-                            sample
-                              ? COLOR_MAP[sample.color]
-                              : "bg-indigo-100/90 text-indigo-900 border border-indigo-200 shadow-sm backdrop-blur-md dark:bg-indigo-500/20 dark:text-indigo-200 dark:border-indigo-500/30"
-                          }`}
+                          className="w-full rounded-2xl p-2.5 text-left transition-all hover:scale-[0.98] bg-indigo-100/90 text-indigo-900 border border-indigo-200 shadow-sm backdrop-blur-md dark:bg-indigo-500/20 dark:text-indigo-200 dark:border-indigo-500/30"
                         >
                           <p className="text-[13px] font-bold mb-0.5 leading-tight">
-                            {sample
-                              ? sample.service
-                              : realApps[0]?.services?.name || "Randevu"}
+                            {realApps[0]?.services?.name || "Randevu"}
                           </p>
                           <p className="text-[11px] font-medium opacity-80 leading-tight">
-                            {sample
-                              ? sample.customer
-                              : realApps[0]?.custom_fields?.customer_name || ""}
+                            {getCustomerName(realApps[0])}
                           </p>
                         </button>
                       )}
@@ -569,7 +579,7 @@ export default function TakvimPage() {
           <div className="relative w-full max-w-md rounded-[32px] border border-white/40 bg-white/80 p-8 shadow-2xl backdrop-blur-3xl dark:border-slate-700/50 dark:bg-slate-900/80 animate-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                Yeni Etkinlik
+                {editingApptId ? "Randevuyu Düzenle" : "Yeni Etkinlik"}
               </h2>
               <button
                 onClick={() => setSelectedSlot(null)}
@@ -591,16 +601,21 @@ export default function TakvimPage() {
             <form onSubmit={handleCreate} className="space-y-5">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-1.5">
-                  Müşteri Adı
+                  Müşteri Seçimi
                 </label>
-                <input
-                  type="text"
+                <select
                   required
-                  value={formName}
-                  onChange={(e) => setFormName(e.target.value)}
+                  value={formCustomer}
+                  onChange={(e) => setFormCustomer(e.target.value)}
                   className="block w-full rounded-2xl border-0 bg-white/50 px-4 py-3.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300/50 backdrop-blur-xl focus:ring-2 focus:ring-inset focus:ring-indigo-600 dark:bg-slate-800/50 dark:text-white dark:ring-slate-700/50 dark:focus:ring-indigo-500 transition-all"
-                  placeholder="İsim girin..."
-                />
+                >
+                  <option value="">Müşteri seçin...</option>
+                  {customers.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.full_name}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-1.5">
@@ -626,7 +641,7 @@ export default function TakvimPage() {
                   disabled={saving}
                   className="w-full rounded-full bg-indigo-600 px-4 py-3.5 text-base font-bold text-white shadow-lg shadow-indigo-500/30 transition-all hover:bg-indigo-500 active:scale-95 disabled:opacity-50"
                 >
-                  {saving ? "Ekleniyor..." : "Ekle"}
+                  {saving ? "Kaydediliyor..." : (editingApptId ? "Güncelle" : "Ekle")}
                 </button>
               </div>
             </form>
@@ -657,9 +672,7 @@ export default function TakvimPage() {
             <div className="space-y-6">
               <div className="flex items-center gap-4 rounded-3xl bg-indigo-50 p-4 dark:bg-indigo-500/10">
                 <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-2xl bg-indigo-600 text-xl font-bold text-white shadow-md shadow-indigo-500/30">
-                  {(
-                    selectedAppointment.custom_fields?.customer_name || "M"
-                  )
+                  {getCustomerName(selectedAppointment)
                     .split(" ")
                     .map((n) => n[0])
                     .slice(0, 2)
@@ -667,8 +680,7 @@ export default function TakvimPage() {
                 </div>
                 <div>
                   <p className="text-lg font-bold text-gray-900 dark:text-slate-100">
-                    {selectedAppointment.custom_fields?.customer_name ||
-                      "Müşteri"}
+                    {getCustomerName(selectedAppointment)}
                   </p>
                   <p className="text-sm font-medium text-indigo-600 dark:text-indigo-400">
                     {selectedAppointment.services?.name || "Hizmet"}
@@ -698,13 +710,27 @@ export default function TakvimPage() {
                 </div>
               </div>
 
-              <div className="mt-8">
+              <div className="mt-8 flex gap-3">
+                <button
+                  onClick={() => {
+                    const start = new Date(selectedAppointment.start_time);
+                    setEditingApptId(selectedAppointment.id);
+                    setFormCustomer(selectedAppointment.customer_id);
+                    setFormService(selectedAppointment.service_id);
+                    setSelectedSlot({ day: start, hour: start.getHours() });
+                    setSelectedAppointment(null);
+                  }}
+                  className="w-full flex items-center justify-center gap-2 rounded-full bg-indigo-500/10 px-4 py-3.5 text-base font-bold text-indigo-600 transition-colors hover:bg-indigo-500/20 dark:text-indigo-400"
+                >
+                  <Edit2 size={18} strokeWidth={2.5} />
+                  Düzenle
+                </button>
                 <button
                   onClick={handleCancel}
                   className="w-full flex items-center justify-center gap-2 rounded-full bg-red-500/10 px-4 py-3.5 text-base font-bold text-red-600 transition-colors hover:bg-red-500/20 dark:text-red-400"
                 >
                   <Trash2 size={18} strokeWidth={2.5} />
-                  Randevuyu İptal Et
+                  Sil
                 </button>
               </div>
             </div>

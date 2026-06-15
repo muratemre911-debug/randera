@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, X, Clock, Banknote, Scissors } from "lucide-react";
+import { Plus, X, Clock, Banknote, Scissors, Trash2, Edit2 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 
 interface Service {
@@ -20,6 +20,7 @@ export default function HizmetlerPage() {
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
+  const [editingService, setEditingService] = useState<Service | null>(null);
   const [saving, setSaving] = useState(false);
   const [tenantId, setTenantId] = useState<string | null>(null);
   const [form, setForm] = useState({
@@ -31,16 +32,22 @@ export default function HizmetlerPage() {
 
   const fetchServices = async () => {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    setTenantId(user.id);
-
-    const { data } = await supabase
-      .from("services")
-      .select("*")
-      .eq("tenant_id", user.id)
-      .order("name");
-
-    if (data) setServices(data);
+    if (user) {
+      const { data: profile, error: profileErr } = await supabase.from("profiles").select("tenant_id").eq("id", user.id).single();
+      if (profileErr) {
+        alert("Profil çekilirken veritabanı hatası: " + profileErr.message);
+      }
+      if (profile) {
+        setTenantId(profile.tenant_id);
+        const { data } = await supabase
+          .from("services")
+          .select("*")
+          .eq("tenant_id", profile.tenant_id)
+          .eq("is_active", true)
+          .order("created_at", { ascending: false });
+        if (data) setServices(data as Service[]);
+      }
+    }
     setLoading(false);
   };
 
@@ -50,24 +57,53 @@ export default function HizmetlerPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!tenantId) return;
+    if (!tenantId) {
+      alert("Hata: İşletme kimliğiniz (Tenant ID) bulunamadı! Lütfen SQL kodunu başarıyla çalıştırdığınızdan emin olun.");
+      return;
+    }
     setSaving(true);
 
-    const { error } = await supabase.from("services").insert({
-      tenant_id: tenantId,
-      name: form.name,
-      description: form.description || null,
-      duration: parseInt(form.duration),
-      price: parseFloat(form.price),
-    });
+    if (editingService) {
+      const { error } = await supabase.from("services").update({
+        name: form.name,
+        description: form.description || null,
+        duration: parseInt(form.duration),
+        price: parseFloat(form.price),
+      }).eq("id", editingService.id);
 
-    if (!error) {
-      setModalOpen(false);
-      setForm({ name: "", description: "", duration: "", price: "" });
-      fetchServices();
+      if (!error) {
+        setModalOpen(false);
+        setEditingService(null);
+        setForm({ name: "", description: "", duration: "", price: "" });
+        fetchServices();
+      } else {
+        alert("Güncelleme hatası: " + error.message);
+      }
+    } else {
+      const { error } = await supabase.from("services").insert({
+        tenant_id: tenantId,
+        name: form.name,
+        description: form.description || null,
+        duration: parseInt(form.duration),
+        price: parseFloat(form.price),
+      });
+
+      if (!error) {
+        setModalOpen(false);
+        setForm({ name: "", description: "", duration: "", price: "" });
+        fetchServices();
+      } else {
+        alert("Ekleme hatası: " + error.message);
+      }
     }
 
     setSaving(false);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Bu hizmeti silmek istediğinize emin misiniz? (Mevcut randevular bu hizmeti kullanamaz hale gelebilir)")) return;
+    await supabase.from("services").delete().eq("id", id);
+    fetchServices();
   };
 
   return (
@@ -78,7 +114,11 @@ export default function HizmetlerPage() {
           <h1 className="text-4xl font-extrabold tracking-tight text-gray-900 dark:text-white">Hizmetler</h1>
         </div>
         <button
-          onClick={() => setModalOpen(true)}
+          onClick={() => {
+            setEditingService(null);
+            setForm({ name: "", description: "", duration: "", price: "" });
+            setModalOpen(true);
+          }}
           className="flex items-center gap-2 rounded-full bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-indigo-500/30 transition-all hover:bg-indigo-500 active:scale-95"
         >
           <Plus size={20} strokeWidth={2.5} />
@@ -130,16 +170,33 @@ export default function HizmetlerPage() {
                       ₺{service.price.toFixed(2)}
                     </div>
                   </div>
-                  <div
-                    className={`flex h-6 w-11 items-center rounded-full p-1 transition-colors ${
-                      service.is_active ? "bg-emerald-500" : "bg-gray-300 dark:bg-slate-700"
-                    }`}
-                  >
-                    <div
-                      className={`h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${
-                        service.is_active ? "translate-x-5" : "translate-x-0"
-                      }`}
-                    />
+                  
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingService(service);
+                        setForm({
+                          name: service.name,
+                          description: service.description || "",
+                          duration: service.duration.toString(),
+                          price: service.price.toString(),
+                        });
+                        setModalOpen(true);
+                      }}
+                      className="rounded-full p-2 text-gray-400 hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-indigo-500/10 dark:hover:text-indigo-400 transition-colors"
+                    >
+                      <Edit2 size={18} />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(service.id);
+                      }}
+                      className="rounded-full p-2 text-gray-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10 dark:hover:text-red-400 transition-colors"
+                    >
+                      <Trash2 size={18} />
+                    </button>
                   </div>
                 </div>
               </div>
@@ -158,7 +215,7 @@ export default function HizmetlerPage() {
           <div className="relative w-full max-w-md rounded-[32px] border border-white/40 bg-white/80 p-8 shadow-2xl backdrop-blur-3xl dark:border-slate-700/50 dark:bg-slate-900/80 animate-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                Yeni Hizmet
+                {editingService ? "Hizmet Düzenle" : "Yeni Hizmet"}
               </h2>
               <button
                 onClick={() => setModalOpen(false)}

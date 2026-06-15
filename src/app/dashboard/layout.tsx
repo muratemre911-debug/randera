@@ -99,11 +99,11 @@ export default function DashboardLayout({
         <div className="flex h-20 items-center justify-between px-6 pt-2">
           <Link href="/dashboard" className="flex items-center gap-3 group">
             <div className="relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl shadow-md transition-transform duration-300 group-hover:scale-105 border border-gray-200/50 dark:border-slate-700/50">
-              <img src="/logo-light.png" alt="Randeo Logo" className="h-full w-full object-cover dark:hidden" />
-              <img src="/logo-dark.png" alt="Randeo Logo" className="hidden h-full w-full object-cover dark:block" />
+              <img src="/logo-light.png" alt="Randera Logo" className="h-full w-full object-cover dark:hidden" />
+              <img src="/logo-dark.png" alt="Randera Logo" className="hidden h-full w-full object-cover dark:block" />
             </div>
             <span className="text-xl font-bold tracking-tight text-gray-800 dark:text-slate-100">
-              Randeo
+              Randera
             </span>
           </Link>
           <button
