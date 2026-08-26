@@ -481,89 +481,93 @@ export default function TakvimPage() {
 
         {viewMode !== "monthly" && (
         <div className="overflow-hidden rounded-[32px] border border-white/50 bg-white/70 backdrop-blur-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:border-slate-700/50 dark:bg-slate-900/60 dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)]">
-          {/* Day headers */}
-          <div className="flex border-b border-gray-200/50 dark:border-slate-700/50">
-            <div className="w-16 shrink-0" />
-            {days.map((day, i) => {
-              const isToday = isSameDay(day, new Date());
-              return (
-                <div
-                  key={i}
-                  className={`flex flex-1 flex-col items-center border-l border-gray-200/50 py-4 dark:border-slate-700/50 ${
-                    isToday ? "bg-indigo-50/50 dark:bg-indigo-900/10" : ""
-                  }`}
-                >
-                  <span className={`text-[11px] font-bold uppercase tracking-widest ${isToday ? "text-indigo-600 dark:text-indigo-400" : "text-gray-400 dark:text-slate-500"}`}>
-                    {TR_LABELS[day.getDay()]}
-                  </span>
-                  <span
-                    className={`mt-1.5 flex h-10 w-10 items-center justify-center rounded-full text-xl font-bold transition-all ${
-                      isToday
-                        ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/30"
-                        : "text-gray-900 dark:text-white"
-                    }`}
-                  >
-                    {day.getDate()}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Time slots */}
-          <div className="divide-y divide-gray-200/50 dark:divide-slate-700/50 relative">
-            {HOURS.map((hour) => (
-              <div key={hour} className="flex min-h-[80px]">
-                <div className="flex w-16 shrink-0 items-start justify-center pt-3">
-                  <span className="text-[13px] font-semibold text-gray-400 dark:text-slate-500">
-                    {hour.toString().padStart(2, "0")}:00
-                  </span>
-                </div>
-                {days.map((day, dayIndex) => {
-                  const cellId = `${dayIndex}-${hour}`;
-                  const realApps = getApptsForSlot(day, hour);
-                  const hasContent = realApps.length > 0;
-                  const isHighlighted = highlightedCell === cellId;
-
+          <div className="overflow-x-auto custom-scrollbar">
+            <div className="min-w-[700px] md:min-w-full">
+              {/* Day headers */}
+              <div className="flex border-b border-gray-200/50 dark:border-slate-700/50">
+                <div className="w-16 shrink-0" />
+                {days.map((day, i) => {
+                  const isToday = isSameDay(day, new Date());
                   return (
                     <div
-                      key={dayIndex}
-                      data-cell={cellId}
-                      className={`flex flex-1 border-l border-gray-200/50 p-1 transition-all dark:border-slate-700/50 hover:bg-white/40 dark:hover:bg-slate-800/40 cursor-pointer ${
-                        isSameDay(day, new Date())
-                          ? "bg-indigo-50/30 dark:bg-indigo-900/5"
-                          : ""
-                      } ${isHighlighted ? "ring-2 ring-inset ring-amber-400 bg-amber-50 dark:bg-amber-900/20" : ""}`}
-                      onClick={(e) => {
-                         if (e.target === e.currentTarget) {
-                            setEditingApptId(null);
-                            setFormCustomer("");
-                            setFormService("");
-                            setSelectedSlot({ day, hour });
-                         }
-                      }}
+                      key={i}
+                      className={`flex flex-1 flex-col items-center border-l border-gray-200/50 py-4 dark:border-slate-700/50 ${
+                        isToday ? "bg-indigo-50/50 dark:bg-indigo-900/10" : ""
+                      }`}
                     >
-                      {hasContent && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedAppointment(realApps[0]);
-                          }}
-                          className="w-full rounded-2xl p-2.5 text-left transition-all hover:scale-[0.98] bg-indigo-100/90 text-indigo-900 border border-indigo-200 shadow-sm backdrop-blur-md dark:bg-indigo-500/20 dark:text-indigo-200 dark:border-indigo-500/30"
-                        >
-                          <p className="text-[13px] font-bold mb-0.5 leading-tight">
-                            {realApps[0]?.services?.name || "Randevu"}
-                          </p>
-                          <p className="text-[11px] font-medium opacity-80 leading-tight">
-                            {getCustomerName(realApps[0])}
-                          </p>
-                        </button>
-                      )}
+                      <span className={`text-[11px] font-bold uppercase tracking-widest ${isToday ? "text-indigo-600 dark:text-indigo-400" : "text-gray-400 dark:text-slate-500"}`}>
+                        {TR_LABELS[day.getDay()]}
+                      </span>
+                      <span
+                        className={`mt-1.5 flex h-10 w-10 items-center justify-center rounded-full text-xl font-bold transition-all ${
+                          isToday
+                            ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/30"
+                            : "text-gray-900 dark:text-white"
+                        }`}
+                      >
+                        {day.getDate()}
+                      </span>
                     </div>
                   );
                 })}
               </div>
-            ))}
+
+              {/* Time slots */}
+              <div className="divide-y divide-gray-200/50 dark:divide-slate-700/50 relative">
+                {HOURS.map((hour) => (
+                  <div key={hour} className="flex min-h-[80px]">
+                    <div className="flex w-16 shrink-0 items-start justify-center pt-3">
+                      <span className="text-[13px] font-semibold text-gray-400 dark:text-slate-500">
+                        {hour.toString().padStart(2, "0")}:00
+                      </span>
+                    </div>
+                    {days.map((day, dayIndex) => {
+                      const cellId = `${dayIndex}-${hour}`;
+                      const realApps = getApptsForSlot(day, hour);
+                      const hasContent = realApps.length > 0;
+                      const isHighlighted = highlightedCell === cellId;
+
+                      return (
+                        <div
+                          key={dayIndex}
+                          data-cell={cellId}
+                          className={`flex flex-1 border-l border-gray-200/50 p-1 transition-all dark:border-slate-700/50 hover:bg-white/40 dark:hover:bg-slate-800/40 cursor-pointer ${
+                            isSameDay(day, new Date())
+                              ? "bg-indigo-50/30 dark:bg-indigo-900/5"
+                              : ""
+                          } ${isHighlighted ? "ring-2 ring-inset ring-amber-400 bg-amber-50 dark:bg-amber-900/20" : ""}`}
+                          onClick={(e) => {
+                            if (e.target === e.currentTarget) {
+                                setEditingApptId(null);
+                                setFormCustomer("");
+                                setFormService("");
+                                setSelectedSlot({ day, hour });
+                            }
+                          }}
+                        >
+                          {hasContent && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedAppointment(realApps[0]);
+                              }}
+                              className="w-full h-full rounded-xl p-2 text-left transition-all hover:scale-[0.98] bg-indigo-100/90 text-indigo-900 border border-indigo-200 shadow-sm backdrop-blur-md dark:bg-indigo-500/20 dark:text-indigo-200 dark:border-indigo-500/30 overflow-hidden"
+                            >
+                              <p className="text-[12px] font-bold mb-0.5 leading-tight truncate">
+                                {realApps[0]?.services?.name || "Randevu"}
+                              </p>
+                              <p className="text-[11px] font-medium opacity-80 leading-tight truncate">
+                                {getCustomerName(realApps[0])}
+                              </p>
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -573,10 +577,10 @@ export default function TakvimPage() {
       {selectedSlot && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
-            className="absolute inset-0 backdrop-blur-md bg-black/20 dark:bg-black/40 transition-opacity"
+            className="absolute inset-0 backdrop-blur-md bg-black/20 dark:bg-black/40 animate-backdrop-in"
             onClick={() => setSelectedSlot(null)}
           />
-          <div className="relative w-full max-w-md rounded-[32px] border border-white/40 bg-white/80 p-8 shadow-2xl backdrop-blur-3xl dark:border-slate-700/50 dark:bg-slate-900/80 animate-in zoom-in-95 duration-200">
+          <div className="relative w-full max-w-md rounded-[32px] border border-white/40 bg-white/80 p-8 shadow-2xl backdrop-blur-3xl dark:border-slate-700/50 dark:bg-slate-900/80 animate-modal-in">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
                 {editingApptId ? "Randevuyu Düzenle" : "Yeni Etkinlik"}

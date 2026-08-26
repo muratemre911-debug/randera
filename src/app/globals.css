@@ -29,6 +29,26 @@
       transform: translate(0px, 0px) scale(1);
     }
   }
+
+  /* Modal Animations */
+  --animate-modal-in: modalIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  --animate-backdrop-in: backdropIn 0.25s ease-out forwards;
+
+  @keyframes modalIn {
+    0% {
+      opacity: 0;
+      transform: scale(0.92) translateY(10px);
+    }
+    100% {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+  }
+
+  @keyframes backdropIn {
+    0% { opacity: 0; }
+    100% { opacity: 1; }
+  }
 }
 
 html, body {
@@ -36,3 +56,10 @@ html, body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+/* Placeholder Font: SF Pro */
+::placeholder {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", sans-serif !important;
+  opacity: 0.6;
+}
+
