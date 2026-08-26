@@ -407,24 +407,32 @@ export default function TakvimPage() {
       </div>
 
       {/* Navigation Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-2">
-        <div className="flex items-center gap-3">
-          <h1 className="text-3xl font-extrabold tracking-tight text-gray-900 dark:text-white min-w-[200px]">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between mb-6">
+        
+        {/* Sol Taraf: Başlık */}
+        <div className="lg:w-1/3 flex justify-start">
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-gray-900 dark:text-white">
             {headerLabel}
           </h1>
-          <div className="flex items-center gap-1 rounded-full border border-white/50 bg-white/50 p-1 backdrop-blur-xl dark:border-slate-700/50 dark:bg-slate-800/50">
+        </div>
+
+        {/* Orta Kısım: Yön Okları (Sabit Konum) */}
+        <div className="lg:w-1/3 flex justify-start lg:justify-center">
+          <div className="flex items-center gap-1 rounded-full border border-gray-200/50 bg-white/50 p-1 backdrop-blur-xl dark:border-slate-700/50 dark:bg-slate-800/50 shadow-sm">
             <button
               onClick={() => navigate(-1)}
               className="rounded-full p-2 text-gray-600 transition-colors hover:bg-white/80 active:scale-90 dark:text-slate-300 dark:hover:bg-slate-700"
             >
               <ChevronLeft size={20} strokeWidth={2.5} />
             </button>
+            <div className="w-px h-4 bg-gray-300 dark:bg-slate-600 mx-1"></div>
             <button
               onClick={goToday}
               className="rounded-full px-4 py-1.5 text-sm font-bold text-gray-700 transition-colors hover:bg-white/80 active:scale-95 dark:text-slate-200 dark:hover:bg-slate-700"
             >
-              Bugün
+              Bugüne Dön
             </button>
+            <div className="w-px h-4 bg-gray-300 dark:bg-slate-600 mx-1"></div>
             <button
               onClick={() => navigate(1)}
               className="rounded-full p-2 text-gray-600 transition-colors hover:bg-white/80 active:scale-90 dark:text-slate-300 dark:hover:bg-slate-700"
@@ -434,8 +442,9 @@ export default function TakvimPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="flex rounded-full border border-white/50 bg-white/50 p-1 backdrop-blur-xl dark:border-slate-700/50 dark:bg-slate-800/50">
+        {/* Sağ Taraf: Sekmeler ve Ekle Butonu */}
+        <div className="lg:w-1/3 flex items-center justify-start lg:justify-end gap-3">
+          <div className="flex rounded-full border border-gray-200/50 bg-white/50 p-1 backdrop-blur-xl dark:border-slate-700/50 dark:bg-slate-800/50 shadow-sm">
             {(["today", "weekly", "monthly"] as const).map((mode) => (
               <button
                 key={mode}

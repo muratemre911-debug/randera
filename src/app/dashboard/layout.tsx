@@ -18,6 +18,7 @@ import {
   LogOut,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
+import NotificationBell from "@/components/NotificationBell";
 
 const navItems = [
   { label: "Genel Bakış", href: "/dashboard", icon: LayoutDashboard },
@@ -187,10 +188,7 @@ export default function DashboardLayout({
             </button>
 
             {/* Notification bell */}
-            <button className="relative rounded-full p-2.5 text-gray-500 transition-all hover:bg-black/5 active:scale-90 dark:text-slate-400 dark:hover:bg-white/10">
-              <Bell size={20} strokeWidth={2.5} />
-              <span className="absolute right-2.5 top-2.5 flex h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white dark:ring-slate-900" />
-            </button>
+            <NotificationBell />
           </div>
         </header>
 
