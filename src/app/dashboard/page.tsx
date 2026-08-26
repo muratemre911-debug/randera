@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Users, CalendarDays, TrendingUp, DollarSign, Clock, CheckCircle2 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
+import { useLanguage } from "@/context/LanguageContext";
 
 export default function DashboardPage() {
   const [stats, setStats] = useState({
@@ -13,6 +14,7 @@ export default function DashboardPage() {
   });
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
+  const { t, lang } = useLanguage();
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -76,7 +78,7 @@ export default function DashboardPage() {
           .select("full_name")
           .eq("id", nextAppt.customer_id)
           .single();
-        nextAppt.customer_name = custData?.full_name || nextAppt.custom_fields?.customer_name || "Müşteri";
+        nextAppt.customer_name = custData?.full_name || nextAppt.custom_fields?.customer_name || t("dashboard.customer");
       }
 
       setStats({
@@ -89,10 +91,10 @@ export default function DashboardPage() {
     };
 
     fetchStats();
-  }, []);
+  }, [t]);
 
   const formatTime = (isoString: string) => {
-    return new Date(isoString).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
+    return new Date(isoString).toLocaleTimeString(lang === "tr" ? "tr-TR" : "en-US", { hour: "2-digit", minute: "2-digit" });
   };
 
   const getMinutesLeft = (isoString: string) => {
@@ -103,8 +105,8 @@ export default function DashboardPage() {
   return (
     <div className={`space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 ${loading ? "opacity-50" : ""}`}>
       <div>
-        <h1 className="text-4xl font-extrabold tracking-tight text-gray-900 dark:text-white">Genel Bakış</h1>
-        <p className="mt-2 text-lg text-gray-500 dark:text-slate-400">İşletmenizin bugünkü özeti.</p>
+        <h1 className="text-4xl font-extrabold tracking-tight text-gray-900 dark:text-white">{t("nav.overview")}</h1>
+        <p className="mt-2 text-lg text-gray-500 dark:text-slate-400">{t("dashboard.today_appointments")}</p>
       </div>
 
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4 md:gap-6">
@@ -115,13 +117,13 @@ export default function DashboardPage() {
               <DollarSign size={28} />
             </div>
             <div>
-              <p className="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-slate-400">Günlük Ciro</p>
-              <p className="text-3xl font-extrabold text-gray-900 dark:text-white">₺{stats.dailyRevenue.toLocaleString('tr-TR')}</p>
+              <p className="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-slate-400">{t("dashboard.occupancy")} (₺)</p>
+              <p className="text-3xl font-extrabold text-gray-900 dark:text-white">₺{stats.dailyRevenue.toLocaleString(lang === "tr" ? "tr-TR" : "en-US")}</p>
             </div>
           </div>
           <div className="mt-6 flex items-center gap-2 text-sm font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 w-fit px-3 py-1.5 rounded-full">
             <CheckCircle2 size={16} />
-            <span>Bugün için hesaplandı</span>
+            <span>{t("dashboard.today_appointments")}</span>
           </div>
         </div>
 
@@ -131,7 +133,7 @@ export default function DashboardPage() {
             <CalendarDays size={20} />
           </div>
           <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.pendingAppointments}</p>
-          <p className="text-sm font-medium text-gray-500 dark:text-slate-400">İleri Tarihli Randevu</p>
+          <p className="text-sm font-medium text-gray-500 dark:text-slate-400">{t("dashboard.pending")}</p>
         </div>
 
         {/* Widget 3: New Clients */}
@@ -140,7 +142,7 @@ export default function DashboardPage() {
             <Users size={20} />
           </div>
           <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.newCustomers}</p>
-          <p className="text-sm font-medium text-gray-500 dark:text-slate-400">Son 30 Gün Yeni Müşteri</p>
+          <p className="text-sm font-medium text-gray-500 dark:text-slate-400">{t("dashboard.new_customer")}</p>
         </div>
 
         {/* Widget 4: Upcoming Next */}
@@ -149,20 +151,20 @@ export default function DashboardPage() {
             <Clock size={24} />
           </div>
           <div className="flex-1">
-            <p className="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-slate-400">Sıradaki Randevu</p>
+            <p className="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-slate-400">{t("dashboard.recent_appointments")}</p>
             {stats.nextAppointment ? (
               <p className="text-lg font-bold text-gray-900 dark:text-white truncate max-w-[200px] sm:max-w-[250px]">
-                {stats.nextAppointment.customer_name} • {stats.nextAppointment.services?.name || "Hizmet"}
+                {stats.nextAppointment.customer_name} • {stats.nextAppointment.services?.name || t("dashboard.service")}
               </p>
             ) : (
-              <p className="text-lg font-bold text-gray-400 dark:text-slate-500">Randevu yok</p>
+              <p className="text-lg font-bold text-gray-400 dark:text-slate-500">{t("dashboard.no_upcoming")}</p>
             )}
           </div>
           <div className="text-right shrink-0">
             {stats.nextAppointment ? (
               <>
                 <p className="text-xl font-extrabold text-amber-500">{formatTime(stats.nextAppointment.start_time)}</p>
-                <p className="text-sm font-medium text-gray-400">{getMinutesLeft(stats.nextAppointment.start_time)} dk kaldı</p>
+                <p className="text-sm font-medium text-gray-400">{getMinutesLeft(stats.nextAppointment.start_time)} {lang === "tr" ? "dk kaldı" : "mins left"}</p>
               </>
             ) : (
               <p className="text-xl font-extrabold text-gray-300 dark:text-slate-600">--:--</p>

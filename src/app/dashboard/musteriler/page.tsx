@@ -6,6 +6,8 @@ import { createClient } from "@/utils/supabase/client";
 
 
 
+import { useLanguage } from "@/context/LanguageContext";
+
 interface Profile {
   id: string;
   full_name: string;
@@ -16,6 +18,7 @@ interface Profile {
 
 export default function MusterilerPage() {
   const supabase = createClient();
+  const { t } = useLanguage();
   const [customers, setCustomers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -132,10 +135,10 @@ export default function MusterilerPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-4xl font-extrabold tracking-tight text-gray-900 dark:text-white">
-              Kişiler
+              {t("customers.title")}
             </h1>
             <p className="mt-1 text-sm font-medium text-gray-500 dark:text-slate-400">
-              {customers.length} müşteri kayıtlı
+              {customers.length}
             </p>
           </div>
           <button
@@ -147,7 +150,7 @@ export default function MusterilerPage() {
             className="flex items-center gap-2 rounded-full bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-indigo-500/30 transition-all hover:bg-indigo-500 active:scale-95"
           >
             <Plus size={20} strokeWidth={2.5} />
-            Yeni Müşteri
+            {t("customers.add_new")}
           </button>
         </div>
         
@@ -160,7 +163,7 @@ export default function MusterilerPage() {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Ara..."
+            placeholder=""
             className="w-full rounded-2xl border-0 bg-white/60 py-3.5 pl-11 pr-4 text-base text-gray-900 placeholder-gray-400 shadow-[0_4px_20px_rgb(0,0,0,0.03)] backdrop-blur-3xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 dark:bg-slate-900/60 dark:text-slate-100 dark:placeholder-slate-500 transition-all"
           />
         </div>
@@ -171,7 +174,7 @@ export default function MusterilerPage() {
         <div className="flex flex-col">
           {loading ? (
             <div className="p-8 text-center text-sm font-medium text-gray-500 dark:text-slate-400">
-              Yükleniyor...
+              {t("header.loading")}
             </div>
           ) : filtered.length === 0 ? (
             <div className="p-12 text-center">
@@ -179,7 +182,7 @@ export default function MusterilerPage() {
                 <User className="h-8 w-8 text-gray-400" />
               </div>
               <p className="text-lg font-medium text-gray-900 dark:text-white">
-                {search ? "Sonuç bulunamadı" : "Kişi yok"}
+                {search ? "Sonuç bulunamadı" : t("customers.empty")}
               </p>
             </div>
           ) : (
@@ -258,7 +261,7 @@ export default function MusterilerPage() {
           <div className="relative w-full max-w-md rounded-[32px] border border-white/40 bg-white/80 p-8 shadow-2xl backdrop-blur-3xl dark:border-slate-700/50 dark:bg-slate-900/80 animate-modal-in">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                {editingCustomer ? "Müşteri Düzenle" : "Yeni Müşteri"}
+                {editingCustomer ? t("customers.edit") : t("customers.add_new")}
               </h2>
               <button
                 onClick={() => setModalOpen(false)}
@@ -271,7 +274,7 @@ export default function MusterilerPage() {
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-1.5">
-                  Ad Soyad
+                  {t("customers.name")}
                 </label>
                 <input
                   type="text"
@@ -279,30 +282,37 @@ export default function MusterilerPage() {
                   value={form.full_name}
                   onChange={(e) => setForm({ ...form, full_name: e.target.value })}
                   className="block w-full rounded-2xl border-0 bg-white/50 px-4 py-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300/50 backdrop-blur-xl focus:ring-2 focus:ring-inset focus:ring-indigo-600 dark:bg-slate-800/50 dark:text-white dark:ring-slate-700/50 dark:focus:ring-indigo-500 transition-all"
-                  placeholder="Örn: Ahmet Yılmaz"
+                  placeholder=""
                 />
               </div>
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-1.5">
-                  Telefon Numarası
+                  {t("customers.phone")}
                 </label>
                 <input
                   type="tel"
                   value={form.phone}
                   onChange={(e) => setForm({ ...form, phone: e.target.value })}
                   className="block w-full rounded-2xl border-0 bg-white/50 px-4 py-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300/50 backdrop-blur-xl focus:ring-2 focus:ring-inset focus:ring-indigo-600 dark:bg-slate-800/50 dark:text-white dark:ring-slate-700/50 dark:focus:ring-indigo-500 transition-all"
-                  placeholder="Örn: 0555 555 5555"
+                  placeholder=""
                 />
               </div>
 
-              <div className="mt-8 pt-4">
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setModalOpen(false)}
+                  className="flex-1 rounded-2xl bg-white px-4 py-3 text-sm font-bold text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300/50 hover:bg-gray-50 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700/50 dark:hover:bg-slate-700 transition-colors"
+                >
+                  {t("btn.cancel")}
+                </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="w-full rounded-full bg-indigo-600 px-4 py-3.5 text-base font-bold text-white shadow-lg shadow-indigo-500/30 transition-all hover:bg-indigo-500 active:scale-95 disabled:opacity-50"
+                  className="flex-1 rounded-2xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-indigo-500/30 hover:bg-indigo-500 disabled:opacity-50 transition-all active:scale-95"
                 >
-                  {saving ? "Kaydediliyor..." : "Kaydet"}
+                  {saving ? t("header.loading") : t("btn.save")}
                 </button>
               </div>
             </form>

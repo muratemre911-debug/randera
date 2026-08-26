@@ -4,10 +4,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { LogIn } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
+import { useLanguage } from "@/context/LanguageContext";
 
 export default function LoginPage() {
   const router = useRouter();
   const supabase = createClient();
+  const { t } = useLanguage();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -25,7 +27,9 @@ export default function LoginPage() {
     });
 
     if (error) {
-      setError(error.message);
+      // In production, error messages from Supabase are in English. 
+      // We can genericize it or pass it.
+      setError(t("login.error"));
       setLoading(false);
       return;
     }
@@ -49,10 +53,10 @@ export default function LoginPage() {
             <img src="/logo-light.png" alt="Randera Logo" className="h-full w-full object-cover" />
           </div>
           <h1 className="mt-4 text-2xl font-semibold text-gray-800">
-            Randera
+            {t("login.title")}
           </h1>
           <p className="mt-1 text-sm text-gray-500">
-            İşletmenizi yönetmek için giriş yapın
+            {t("login.subtitle")}
           </p>
         </div>
 
@@ -64,7 +68,7 @@ export default function LoginPage() {
                 htmlFor="email"
                 className="block text-sm font-medium text-gray-600"
               >
-                E-posta
+                {t("login.email")}
               </label>
               <input
                 id="email"
@@ -82,7 +86,7 @@ export default function LoginPage() {
                 htmlFor="password"
                 className="block text-sm font-medium text-gray-600"
               >
-                Şifre
+                {t("login.password")}
               </label>
               <input
                 id="password"
@@ -107,7 +111,7 @@ export default function LoginPage() {
               className="flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-indigo-500 to-purple-600 px-4 py-2.5 text-sm font-medium text-white shadow-lg shadow-indigo-200 transition-all hover:from-indigo-600 hover:to-purple-700 hover:shadow-xl disabled:opacity-50"
             >
               <LogIn size={18} />
-              {loading ? "Giriş yapılıyor..." : "Giriş Yap"}
+              {loading ? t("login.logging_in") : t("login.signin")}
             </button>
           </form>
         </div>

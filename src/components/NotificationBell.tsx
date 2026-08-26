@@ -4,12 +4,16 @@ import { useState, useEffect } from "react";
 import { Bell, Loader2, Check } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 
+import { useLanguage } from "@/context/LanguageContext";
+
 export default function NotificationBell() {
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const supabase = createClient();
+  const { t } = useLanguage();
 
+// (Keeping all effect code)
   useEffect(() => {
     // Service Worker Kaydet ve İzin İste
     if ("serviceWorker" in navigator && "PushManager" in window) {
@@ -29,7 +33,6 @@ export default function NotificationBell() {
 
     fetchNotifications();
 
-    // Saniyede bir veya socket ile yenilemek yerine 30sn polling (Basitlik için)
     const interval = setInterval(fetchNotifications, 30000);
     return () => clearInterval(interval);
   }, []);
@@ -111,13 +114,13 @@ export default function NotificationBell() {
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div className="absolute right-0 top-14 z-50 w-80 rounded-3xl border border-gray-100 bg-white/90 p-4 shadow-2xl backdrop-blur-xl dark:border-slate-700/50 dark:bg-slate-900/90 animate-modal-in">
             <h3 className="mb-4 text-lg font-bold text-gray-900 dark:text-white flex items-center justify-between">
-              Bildirimler
-              {unreadCount > 0 && <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded-lg">{unreadCount} Yeni</span>}
+              {t("notifications.title")}
+              {unreadCount > 0 && <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded-lg">{unreadCount} {t("notifications.new")}</span>}
             </h3>
             
             <div className="flex max-h-96 flex-col gap-2 overflow-y-auto custom-scrollbar">
               {notifications.length === 0 ? (
-                <div className="py-8 text-center text-sm text-gray-500">Henüz bildiriminiz yok.</div>
+                <div className="py-8 text-center text-sm text-gray-500">{t("notifications.empty")}</div>
               ) : (
                 notifications.map(n => (
                   <div 

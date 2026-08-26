@@ -36,10 +36,14 @@ export default function SuperAdminPage() {
   const [saveLoading, setSaveLoading] = useState(false);
 
   // Bildirim Gönderimi
-  const [notifForm, setNotifForm] = useState({ title: "", message: "", targetType: "all", targetId: "", sectorValue: "" });
+  const [notifForm, setNotifForm] = useState({ title: "", message: "", targetType: "all", targetId: "", sectorValue: "", targetValue: "" });
   const [notifLoading, setNotifLoading] = useState(false);
   const [notifSuccess, setNotifSuccess] = useState("");
   const [notifError, setNotifError] = useState("");
+  
+  // Bildirim Geçmişi (Silme)
+  const [notifHistory, setNotifHistory] = useState<any[]>([]);
+  const [notifHistoryLoading, setNotifHistoryLoading] = useState(false);
 
   useEffect(() => {
     async function checkAuthAndLoadData() {
@@ -58,7 +62,33 @@ export default function SuperAdminPage() {
     if ((activeTab === "manage" || activeTab === "notifications") && tenants.length === 0) {
       fetchTenants();
     }
+    if (activeTab === "notifications") {
+      fetchNotificationHistory();
+    }
   }, [activeTab]);
+
+  const fetchNotificationHistory = async () => {
+    setNotifHistoryLoading(true);
+    try {
+      const res = await fetch("/api/admin/notifications");
+      const data = await res.json();
+      if (Array.isArray(data)) setNotifHistory(data);
+    } finally {
+      setNotifHistoryLoading(false);
+    }
+  };
+
+  const handleDeleteNotification = async (id: string) => {
+    if (!confirm("Bu bildirimi tamamen silmek istediğinize emin misiniz? (Kullanıcılardan da silinir)")) return;
+    try {
+      const res = await fetch(`/api/admin/notifications?id=${id}`, { method: "DELETE" });
+      if (res.ok) {
+        setNotifHistory(prev => prev.filter(n => n.id !== id));
+      } else {
+        alert("Silinirken hata oluştu!");
+      }
+    } catch (e) { console.error(e); }
+  };
 
   const fetchSectors = async () => {
     const res = await fetch("/api/admin/sectors");
@@ -136,6 +166,7 @@ export default function SuperAdminPage() {
       if (!res.ok) throw new Error(data.error);
       setNotifSuccess(`Bildirim başarıyla ${data.sentCount} işletmeye gönderildi!`);
       setNotifForm({ ...notifForm, title: "", message: "" });
+      fetchNotificationHistory();
     } catch (err: any) { setNotifError(err.message); } finally { setNotifLoading(false); }
   };
 
@@ -235,45 +266,95 @@ export default function SuperAdminPage() {
         )}
 
         {activeTab === "notifications" && (
-          <div className="bg-white rounded-3xl shadow-xl p-8 max-w-2xl mx-auto w-full animate-modal-in">
-            <h2 className="text-xl font-bold mb-6 flex items-center gap-2"><Send className="text-indigo-500" /> Cihaz Bildirimi Gönder (Push)</h2>
-            {notifError && <div className="mb-4 p-4 bg-red-50 text-red-600 text-sm rounded-xl">{notifError}</div>}
-            {notifSuccess && <div className="mb-4 p-4 bg-emerald-50 text-emerald-600 text-sm rounded-xl">{notifSuccess}</div>}
-            <form onSubmit={handleSendNotification} className="space-y-5">
+          <div className="bg-white rounded-3xl shadow-xl p-8 max-w-5xl mx-auto w-full animate-modal-in">
+            <h2 className="text-xl font-bold mb-6 flex items-center gap-2"><Send className="text-indigo-500" /> Bildirim Yönetimi</h2>
+            
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+              
+              {/* Sol Taraf: Bildirim Gönder */}
               <div>
-                <label className="block text-sm font-semibold mb-1">Hedef Kitle</label>
-                <select value={notifForm.targetType} onChange={e => setNotifForm({...notifForm, targetType: e.target.value})} className="w-full px-4 py-2.5 rounded-xl border outline-none bg-white">
-                  <option value="all">Sistemdeki Tüm İşletmelere (Herkes)</option>
-                  <option value="sector">Sadece Belirli Bir Sektöre</option>
-                  <option value="single">Sadece Tek Bir İşletmeye</option>
-                </select>
+                <h3 className="text-lg font-bold text-slate-800 mb-4 border-b pb-2">Yeni Bildirim Gönder</h3>
+                {notifError && <div className="mb-4 p-4 bg-red-50 text-red-600 text-sm rounded-xl">{notifError}</div>}
+                {notifSuccess && <div className="mb-4 p-4 bg-emerald-50 text-emerald-600 text-sm rounded-xl">{notifSuccess}</div>}
+                
+                <form onSubmit={handleSendNotification} className="space-y-5">
+                  <div>
+                    <label className="block text-sm font-semibold mb-1">Hedef Kitle</label>
+                    <select value={notifForm.targetType} onChange={e => setNotifForm({...notifForm, targetType: e.target.value})} className="w-full px-4 py-2.5 rounded-xl border outline-none bg-white">
+                      <option value="all">Sistemdeki Tüm İşletmelere (Herkes)</option>
+                      <option value="sector">Sadece Belirli Bir Sektöre</option>
+                      <option value="single">Sadece Tek Bir İşletmeye</option>
+                    </select>
+                  </div>
+
+                  {notifForm.targetType === "sector" && (
+                    <div className="animate-in fade-in zoom-in-95">
+                      <label className="block text-sm font-semibold mb-1 text-indigo-600">Sektör Seçin</label>
+                      <select value={notifForm.targetValue} onChange={e => setNotifForm({...notifForm, targetValue: e.target.value})} className="w-full px-4 py-2.5 rounded-xl border border-indigo-200 outline-none bg-indigo-50/30">
+                        {sectors.map(s => <option key={s.id} value={s.value}>{s.name}</option>)}
+                      </select>
+                    </div>
+                  )}
+
+                  {notifForm.targetType === "single" && (
+                    <div className="animate-in fade-in zoom-in-95">
+                      <label className="block text-sm font-semibold mb-1 text-indigo-600">İşletme Seçin</label>
+                      <select value={notifForm.targetValue} onChange={e => setNotifForm({...notifForm, targetValue: e.target.value})} className="w-full px-4 py-2.5 rounded-xl border border-indigo-200 outline-none bg-indigo-50/30">
+                        {tenants.map(t => <option key={t.tenantId} value={t.tenantId}>{t.tenantName}</option>)}
+                      </select>
+                    </div>
+                  )}
+
+                  <hr className="border-gray-100" />
+
+                  <div><label className="block text-sm font-semibold mb-1">Bildirim Başlığı</label><input required type="text" value={notifForm.title} onChange={e => setNotifForm({...notifForm, title: e.target.value})} className="w-full px-4 py-2.5 rounded-xl border outline-none focus:border-indigo-500" placeholder="Örn: Önemli Sistem Bakımı" /></div>
+                  <div><label className="block text-sm font-semibold mb-1">Mesaj İçeriği</label><textarea required rows={3} value={notifForm.message} onChange={e => setNotifForm({...notifForm, message: e.target.value})} className="w-full px-4 py-2.5 rounded-xl border outline-none focus:border-indigo-500" placeholder="İşletmelerin telefonuna düşecek olan asıl mesaj metni..."></textarea></div>
+
+                  <button disabled={notifLoading} type="submit" className="w-full flex items-center justify-center gap-2 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all">{notifLoading ? <Loader2 className="animate-spin" /> : <Send size={18} />} Bildirimi Yolla (Push)</button>
+                </form>
               </div>
 
-              {notifForm.targetType === "sector" && (
-                <div className="animate-in fade-in zoom-in-95">
-                  <label className="block text-sm font-semibold mb-1 text-indigo-600">Sektör Seçin</label>
-                  <select value={notifForm.sectorValue} onChange={e => setNotifForm({...notifForm, sectorValue: e.target.value})} className="w-full px-4 py-2.5 rounded-xl border border-indigo-200 outline-none bg-indigo-50/30">
-                    {sectors.map(s => <option key={s.id} value={s.value}>{s.name}</option>)}
-                  </select>
+              {/* Sağ Taraf: Gönderilenler (Silme) */}
+              <div>
+                <h3 className="text-lg font-bold text-slate-800 mb-4 border-b pb-2 flex justify-between items-center">
+                  Gönderilenler Geçmişi
+                  <button onClick={fetchNotificationHistory} className="text-indigo-500 hover:text-indigo-700 p-1"><List size={18} /></button>
+                </h3>
+                
+                <div className="flex flex-col gap-3 max-h-[450px] overflow-y-auto custom-scrollbar pr-2">
+                  {notifHistoryLoading ? (
+                    <div className="flex justify-center py-10"><Loader2 className="animate-spin text-indigo-500" size={30} /></div>
+                  ) : notifHistory.length === 0 ? (
+                    <div className="text-center py-8 text-slate-400 text-sm">Geçmiş bildirim bulunmuyor.</div>
+                  ) : (
+                    notifHistory.map((n: any) => (
+                      <div key={n.id} className="p-3 border rounded-xl bg-slate-50 flex items-start justify-between gap-3 hover:bg-slate-100 transition-colors">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-sm text-slate-800 truncate">{n.title}</p>
+                          <p className="text-xs text-slate-500 mt-1 line-clamp-2">{n.message}</p>
+                          <div className="flex items-center gap-2 mt-2">
+                            <span className="text-[10px] font-semibold px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-md truncate max-w-[120px]">
+                              {n.tenants?.name || "Bilinmiyor"}
+                            </span>
+                            <span className="text-[10px] text-slate-400">
+                              {new Date(n.created_at).toLocaleDateString("tr-TR", { hour: "2-digit", minute: "2-digit" })}
+                            </span>
+                          </div>
+                        </div>
+                        <button 
+                          onClick={() => handleDeleteNotification(n.id)}
+                          className="p-2 text-red-400 hover:bg-red-100 hover:text-red-600 rounded-lg transition-colors shrink-0"
+                          title="Bildirimi Sil"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    ))
+                  )}
                 </div>
-              )}
-
-              {notifForm.targetType === "single" && (
-                <div className="animate-in fade-in zoom-in-95">
-                  <label className="block text-sm font-semibold mb-1 text-indigo-600">İşletme Seçin</label>
-                  <select value={notifForm.targetId} onChange={e => setNotifForm({...notifForm, targetId: e.target.value})} className="w-full px-4 py-2.5 rounded-xl border border-indigo-200 outline-none bg-indigo-50/30">
-                    {tenants.map(t => <option key={t.tenantId} value={t.tenantId}>{t.tenantName}</option>)}
-                  </select>
-                </div>
-              )}
-
-              <hr className="border-gray-100" />
-
-              <div><label className="block text-sm font-semibold mb-1">Bildirim Başlığı</label><input required type="text" value={notifForm.title} onChange={e => setNotifForm({...notifForm, title: e.target.value})} className="w-full px-4 py-2.5 rounded-xl border outline-none focus:border-indigo-500" placeholder="Örn: Önemli Sistem Bakımı" /></div>
-              <div><label className="block text-sm font-semibold mb-1">Mesaj İçeriği</label><textarea required rows={3} value={notifForm.message} onChange={e => setNotifForm({...notifForm, message: e.target.value})} className="w-full px-4 py-2.5 rounded-xl border outline-none focus:border-indigo-500" placeholder="İşletmelerin telefonuna düşecek olan asıl mesaj metni..."></textarea></div>
-
-              <button disabled={notifLoading} type="submit" className="w-full mt-2 flex items-center justify-center gap-2 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all">{notifLoading ? <Loader2 className="animate-spin" /> : <Send size={18} />} Bildirimi Yolla (Push)</button>
-            </form>
+              </div>
+              
+            </div>
           </div>
         )}
 

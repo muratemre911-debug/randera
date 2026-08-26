@@ -13,6 +13,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
+import { useLanguage } from "@/context/LanguageContext";
 
 
 const HOURS = Array.from({ length: 10 }, (_, i) => i + 9);
@@ -84,8 +85,18 @@ const TR_MONTHS = [
   "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık",
 ];
 
+const EN_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const EN_MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
 export default function TakvimPage() {
   const supabase = createClient();
+  const { t, lang } = useLanguage();
+  const LABELS = lang === "tr" ? TR_LABELS : EN_LABELS;
+  const MONTHS = lang === "tr" ? TR_MONTHS : EN_MONTHS;
+  
   const [viewMode, setViewMode] = useState<ViewMode>("weekly");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -300,21 +311,21 @@ export default function TakvimPage() {
   const headerLabel = useMemo(() => {
     switch (viewMode) {
       case "today":
-        return `${days[0]?.getDate()} ${TR_MONTHS[days[0]?.getMonth()]} ${days[0]?.getFullYear()}`;
+        return `${days[0]?.getDate()} ${MONTHS[days[0]?.getMonth()]} ${days[0]?.getFullYear()}`;
       case "weekly": {
         const first = days[0];
         const last = days[days.length - 1];
-        return `${first?.getDate()} ${TR_MONTHS[first?.getMonth()]} - ${last?.getDate()} ${TR_MONTHS[last?.getMonth()]} ${last?.getFullYear()}`;
+        return `${first?.getDate()} ${MONTHS[first?.getMonth()]} - ${last?.getDate()} ${MONTHS[last?.getMonth()]} ${last?.getFullYear()}`;
       }
       case "monthly":
-        return `${TR_MONTHS[currentDate.getMonth()]} ${currentDate.getFullYear()}`;
+        return `${MONTHS[currentDate.getMonth()]} ${currentDate.getFullYear()}`;
     }
-  }, [viewMode, days, currentDate]);
+  }, [viewMode, days, currentDate, MONTHS]);
 
   const renderMonthGrid = () => (
     <div className="overflow-hidden rounded-[32px] border border-white/50 bg-white/70 backdrop-blur-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:border-slate-700/50 dark:bg-slate-900/60 dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)]">
       <div className="grid grid-cols-7 border-b border-gray-200/50 dark:border-slate-700/50">
-        {TR_LABELS.map((l) => (
+        {LABELS.map((l) => (
           <div
             key={l}
             className="border-r border-gray-200/50 px-2 py-4 text-center text-xs font-bold uppercase tracking-wider text-gray-400 last:border-r-0 dark:border-slate-700/50"
@@ -373,7 +384,7 @@ export default function TakvimPage() {
               <CalendarDays size={24} className="text-indigo-600 dark:text-indigo-400" />
             </div>
             <div>
-              <p className="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-slate-400">Bugün Randevu</p>
+              <p className="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-slate-400">{t("dashboard.today_appointments")}</p>
               <p className="text-3xl font-extrabold text-gray-900 dark:text-white">{todayApptsCount}</p>
             </div>
           </div>
@@ -385,7 +396,7 @@ export default function TakvimPage() {
               <Clock size={24} className="text-amber-600 dark:text-amber-400" />
             </div>
             <div>
-              <p className="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-slate-400">Bekleyen</p>
+              <p className="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-slate-400">{t("dashboard.pending")}</p>
               <div className="flex items-baseline gap-2">
                 <p className="text-3xl font-extrabold text-gray-900 dark:text-white">{pendingCount}</p>
               </div>
@@ -399,7 +410,7 @@ export default function TakvimPage() {
               <TrendingUp size={24} className="text-emerald-600 dark:text-emerald-400" />
             </div>
             <div>
-              <p className="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-slate-400">Doluluk</p>
+              <p className="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-slate-400">{t("dashboard.occupancy")}</p>
               <p className="text-3xl font-extrabold text-gray-900 dark:text-white">%{occupancyPercent}</p>
             </div>
           </div>
@@ -417,49 +428,43 @@ export default function TakvimPage() {
         </div>
 
         {/* Orta Kısım: Yön Okları (Sabit Konum) */}
-        <div className="lg:w-1/3 flex justify-start lg:justify-center">
-          <div className="flex items-center gap-1 rounded-full border border-gray-200/50 bg-white/50 p-1 backdrop-blur-xl dark:border-slate-700/50 dark:bg-slate-800/50 shadow-sm">
+        <div className="lg:w-1/3 flex justify-center">
+          <div className="flex items-center gap-2 rounded-2xl bg-white/50 p-1 backdrop-blur-xl shadow-sm dark:bg-slate-800/50">
             <button
               onClick={() => navigate(-1)}
-              className="rounded-full p-2 text-gray-600 transition-colors hover:bg-white/80 active:scale-90 dark:text-slate-300 dark:hover:bg-slate-700"
+              className="rounded-xl p-2.5 text-gray-600 hover:bg-white hover:shadow-sm dark:text-slate-300 dark:hover:bg-slate-700 transition-all active:scale-95"
             >
-              <ChevronLeft size={20} strokeWidth={2.5} />
+              <ChevronLeft size={22} />
             </button>
-            <div className="w-px h-4 bg-gray-300 dark:bg-slate-600 mx-1"></div>
             <button
               onClick={goToday}
-              className="rounded-full px-4 py-1.5 text-sm font-bold text-gray-700 transition-colors hover:bg-white/80 active:scale-95 dark:text-slate-200 dark:hover:bg-slate-700"
+              className="px-5 py-2.5 text-sm font-bold text-gray-700 hover:bg-white hover:shadow-sm rounded-xl dark:text-slate-200 dark:hover:bg-slate-700 transition-all active:scale-95"
             >
-              Bugüne Dön
+              {t("calendar.today")}
             </button>
-            <div className="w-px h-4 bg-gray-300 dark:bg-slate-600 mx-1"></div>
             <button
               onClick={() => navigate(1)}
-              className="rounded-full p-2 text-gray-600 transition-colors hover:bg-white/80 active:scale-90 dark:text-slate-300 dark:hover:bg-slate-700"
+              className="rounded-xl p-2.5 text-gray-600 hover:bg-white hover:shadow-sm dark:text-slate-300 dark:hover:bg-slate-700 transition-all active:scale-95"
             >
-              <ChevronRight size={20} strokeWidth={2.5} />
+              <ChevronRight size={22} />
             </button>
           </div>
         </div>
 
         {/* Sağ Taraf: Sekmeler ve Ekle Butonu */}
-        <div className="lg:w-1/3 flex items-center justify-start lg:justify-end gap-3">
-          <div className="flex rounded-full border border-gray-200/50 bg-white/50 p-1 backdrop-blur-xl dark:border-slate-700/50 dark:bg-slate-800/50 shadow-sm">
+        <div className="lg:w-1/3 flex items-center justify-end gap-3">
+          <div className="flex rounded-2xl bg-gray-200/50 p-1 dark:bg-slate-800/50">
             {(["today", "weekly", "monthly"] as const).map((mode) => (
               <button
                 key={mode}
                 onClick={() => setViewMode(mode)}
-                className={`rounded-full px-5 py-2 text-sm font-bold transition-all ${
+                className={`rounded-xl px-4 py-2 text-sm font-bold transition-all ${
                   viewMode === mode
                     ? "bg-white text-indigo-600 shadow-sm dark:bg-slate-700 dark:text-indigo-400"
-                    : "text-gray-500 hover:text-gray-900 dark:text-slate-400 dark:hover:text-white"
+                    : "text-gray-500 hover:text-gray-900 dark:text-slate-400 dark:hover:text-slate-200"
                 }`}
               >
-                {mode === "today"
-                  ? "Gün"
-                  : mode === "weekly"
-                    ? "Hafta"
-                    : "Ay"}
+                {mode === "today" ? t("calendar.day") : mode === "weekly" ? t("calendar.week") : t("calendar.month")}
               </button>
             ))}
           </div>

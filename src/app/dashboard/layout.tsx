@@ -20,12 +20,14 @@ import {
 import { createClient } from "@/utils/supabase/client";
 import NotificationBell from "@/components/NotificationBell";
 
+import { useLanguage } from "@/context/LanguageContext";
+
 const navItems = [
-  { label: "Genel Bakış", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Takvim", href: "/dashboard/takvim", icon: Calendar },
-  { label: "Hizmetler", href: "/dashboard/hizmetler", icon: Wrench },
-  { label: "Müşteriler", href: "/dashboard/musteriler", icon: Users },
-  { label: "Ayarlar", href: "/dashboard/ayarlar", icon: Settings },
+  { i18nKey: "nav.overview", href: "/dashboard", icon: LayoutDashboard },
+  { i18nKey: "nav.calendar", href: "/dashboard/takvim", icon: Calendar },
+  { i18nKey: "nav.services", href: "/dashboard/hizmetler", icon: Wrench },
+  { i18nKey: "nav.customers", href: "/dashboard/musteriler", icon: Users },
+  { i18nKey: "nav.settings", href: "/dashboard/ayarlar", icon: Settings },
 ];
 
 export default function DashboardLayout({
@@ -36,6 +38,7 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
+  const { t, lang, toggleLanguage } = useLanguage();
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark">("light");
@@ -134,7 +137,7 @@ export default function DashboardLayout({
                 }`}
               >
                 <item.icon size={22} strokeWidth={isActive ? 2.5 : 2} />
-                {item.label}
+                {t(item.i18nKey)}
               </Link>
             );
           })}
@@ -149,9 +152,9 @@ export default function DashboardLayout({
               </div>
               <div className="flex-1 truncate">
                 <p className="font-semibold tracking-tight text-gray-800 dark:text-slate-200 truncate">
-                  {userEmail || "Yükleniyor..."}
+                  {userEmail || t("header.loading")}
                 </p>
-                <p className="text-[11px] font-medium text-indigo-500 dark:text-indigo-400">İşletme Hesabı</p>
+                <p className="text-[11px] font-medium text-indigo-500 dark:text-indigo-400">{t("nav.business_account")}</p>
               </div>
             </div>
             <button
@@ -159,7 +162,7 @@ export default function DashboardLayout({
               className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-red-50 px-4 py-2 text-[13px] font-bold text-red-600 transition-colors hover:bg-red-100 dark:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20"
             >
               <LogOut size={16} />
-              Çıkış Yap
+              {t("nav.logout")}
             </button>
           </div>
         </div>
@@ -179,6 +182,14 @@ export default function DashboardLayout({
           <div className="hidden lg:block" />
 
           <div className="flex items-center gap-2 sm:gap-4">
+            {/* Language toggle */}
+            <button
+              onClick={toggleLanguage}
+              className="rounded-full px-3 py-1 text-sm font-bold text-gray-500 transition-all hover:bg-black/5 active:scale-90 dark:text-slate-400 dark:hover:bg-white/10"
+            >
+              {lang === "tr" ? "TR" : "EN"}
+            </button>
+
             {/* Theme toggle */}
             <button
               onClick={toggleTheme}

@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { Plus, X, Clock, Banknote, Scissors, Trash2, Edit2 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 
+import { useLanguage } from "@/context/LanguageContext";
+
 interface Service {
   id: string;
   name: string;
@@ -13,10 +15,9 @@ interface Service {
   is_active: boolean;
 }
 
-
-
 export default function HizmetlerPage() {
   const supabase = createClient();
+  const { t, lang } = useLanguage();
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -111,7 +112,7 @@ export default function HizmetlerPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-4xl font-extrabold tracking-tight text-gray-900 dark:text-white">Hizmetler</h1>
+          <h1 className="text-4xl font-extrabold tracking-tight text-gray-900 dark:text-white">{t("services.title")}</h1>
         </div>
         <button
           onClick={() => {
@@ -122,7 +123,7 @@ export default function HizmetlerPage() {
           className="flex items-center gap-2 rounded-full bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-indigo-500/30 transition-all hover:bg-indigo-500 active:scale-95"
         >
           <Plus size={20} strokeWidth={2.5} />
-          Yeni Hizmet
+          {t("btn.add")}
         </button>
       </div>
 
@@ -131,15 +132,14 @@ export default function HizmetlerPage() {
         <div className="divide-y divide-gray-200/50 dark:divide-slate-700/50">
           {loading ? (
             <div className="p-8 text-center text-sm font-medium text-gray-500 dark:text-slate-400">
-              Yükleniyor...
+              {t("header.loading")}
             </div>
           ) : services.length === 0 ? (
             <div className="p-12 text-center">
               <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 dark:bg-slate-800 mb-4">
                 <Scissors className="h-8 w-8 text-gray-400" />
               </div>
-              <p className="text-lg font-medium text-gray-900 dark:text-white">Henüz hizmet eklenmemiş</p>
-              <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">Müşterilerinize sunacağınız ilk hizmeti ekleyin.</p>
+              <p className="text-lg font-medium text-gray-900 dark:text-white">{t("services.empty")}</p>
             </div>
           ) : (
             services.map((service) => (
@@ -163,7 +163,7 @@ export default function HizmetlerPage() {
                   <div className="hidden sm:flex items-center gap-6 text-sm font-medium text-gray-600 dark:text-slate-300">
                     <div className="flex items-center gap-1.5">
                       <Clock size={16} className="text-gray-400" />
-                      {service.duration} dk
+                      {service.duration} {lang === "tr" ? "dk" : "min"}
                     </div>
                     <div className="flex items-center gap-1.5">
                       <Banknote size={16} className="text-gray-400" />
@@ -215,7 +215,7 @@ export default function HizmetlerPage() {
           <div className="relative w-full max-w-md rounded-[32px] border border-white/40 bg-white/80 p-8 shadow-2xl backdrop-blur-3xl dark:border-slate-700/50 dark:bg-slate-900/80 animate-modal-in">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                {editingService ? "Hizmet Düzenle" : "Yeni Hizmet"}
+                {editingService ? t("services.edit") : t("services.add_new")}
               </h2>
               <button
                 onClick={() => setModalOpen(false)}
@@ -228,7 +228,7 @@ export default function HizmetlerPage() {
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-1.5">
-                  Hizmet Adı
+                  {t("services.name")}
                 </label>
                 <input
                   type="text"
@@ -236,13 +236,13 @@ export default function HizmetlerPage() {
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
                   className="block w-full rounded-2xl border-0 bg-white/50 px-4 py-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300/50 backdrop-blur-xl focus:ring-2 focus:ring-inset focus:ring-indigo-600 dark:bg-slate-800/50 dark:text-white dark:ring-slate-700/50 dark:focus:ring-indigo-500 transition-all"
-                  placeholder="Örn: Saç Kesimi"
+                  placeholder=""
                 />
               </div>
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-1.5">
-                  Açıklama
+                  Açıklama / Description
                 </label>
                 <textarea
                   value={form.description}
@@ -292,13 +292,20 @@ export default function HizmetlerPage() {
                 </div>
               </div>
 
-              <div className="mt-8 pt-4">
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setModalOpen(false)}
+                  className="flex-1 rounded-2xl bg-white px-4 py-3 text-sm font-bold text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300/50 hover:bg-gray-50 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700/50 dark:hover:bg-slate-700 transition-colors"
+                >
+                  {t("btn.cancel")}
+                </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="w-full rounded-full bg-indigo-600 px-4 py-3.5 text-base font-bold text-white shadow-lg shadow-indigo-500/30 transition-all hover:bg-indigo-500 active:scale-95 disabled:opacity-50"
+                  className="flex-1 rounded-2xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-indigo-500/30 hover:bg-indigo-500 disabled:opacity-50 transition-all active:scale-95"
                 >
-                  {saving ? "Kaydediliyor..." : "Kaydet"}
+                  {saving ? t("header.loading") : t("btn.save")}
                 </button>
               </div>
             </form>

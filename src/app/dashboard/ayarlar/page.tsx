@@ -17,6 +17,8 @@ import {
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 
+import { useLanguage } from "@/context/LanguageContext";
+
 interface WorkingDay {
   isOpen: boolean;
   openTime: string;
@@ -53,7 +55,7 @@ const defaultBookingRules: BookingRules = {
   notifyWhatsapp: false,
 };
 
-const daysTranslation: { [key: string]: string } = {
+const daysTranslationTR: { [key: string]: string } = {
   pazartesi: "Pazartesi",
   sali: "Salı",
   carsamba: "Çarşamba",
@@ -63,8 +65,20 @@ const daysTranslation: { [key: string]: string } = {
   pazar: "Pazar",
 };
 
+const daysTranslationEN: { [key: string]: string } = {
+  pazartesi: "Monday",
+  sali: "Tuesday",
+  carsamba: "Wednesday",
+  persembe: "Thursday",
+  cuma: "Friday",
+  cumartesi: "Saturday",
+  pazar: "Sunday",
+};
+
 export default function AyarlarPage() {
   const supabase = createClient();
+  const { t, lang } = useLanguage();
+  const daysTranslation = lang === "tr" ? daysTranslationTR : daysTranslationEN;
   const [activeTab, setActiveTab] = useState<"profile" | "hours" | "booking">("profile");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -222,7 +236,7 @@ export default function AyarlarPage() {
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 max-w-5xl mx-auto pb-12">
       {/* Page Header */}
       <div className="mb-8 pl-2">
-        <h1 className="text-[34px] font-extrabold tracking-tight text-gray-900 dark:text-white">Ayarlar</h1>
+        <h1 className="text-[34px] font-extrabold tracking-tight text-gray-900 dark:text-white">{t("settings.title")}</h1>
       </div>
 
       {/* Toast Notification */}
