@@ -11,12 +11,13 @@ import {
   CalendarDays,
   Clock,
   TrendingUp,
+  Phone,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useLanguage } from "@/context/LanguageContext";
 
 
-const HOURS = Array.from({ length: 10 }, (_, i) => i + 9);
+const HOURS = Array.from({ length: 12 }, (_, i) => i + 9);
 
 interface Profile {
   id: string;
@@ -41,6 +42,11 @@ interface Appointment {
   status: string;
   custom_fields: Record<string, string>;
   services?: Service;
+  profiles?: {
+    full_name: string;
+    phone: string | null;
+    avatar_url: string | null;
+  };
 }
 
 
@@ -119,7 +125,7 @@ export default function TakvimPage() {
 
   const getCustomerName = (app: Appointment) => {
     const cust = customers.find(c => c.id === app.customer_id);
-    return cust ? cust.full_name : (app.custom_fields?.customer_name || "Müşteri");
+    return cust ? cust.full_name : (app.profiles?.full_name || app.custom_fields?.customer_name || "Bilinmeyen Müşteri");
   };
 
   const [highlightedCell, setHighlightedCell] = useState<string | null>(null);
@@ -172,7 +178,7 @@ export default function TakvimPage() {
     const [apptRes, svcRes, custRes] = await Promise.all([
       supabase
         .from("appointments")
-        .select("*, services(name, duration, price)")
+        .select("*, services(name, duration, price), profiles!appointments_customer_id_fkey(full_name, phone, avatar_url)")
         .eq("tenant_id", profile.tenant_id)
         .neq("status", "cancelled")
         .gte("start_time", dateRange.start)
@@ -247,7 +253,8 @@ export default function TakvimPage() {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedSlot || !formService || !formCustomer) return;
+    if (!selectedSlot || !formService) return;
+    if (!editingApptId && !formCustomer) return;
     setSaving(true);
 
     const service = services.find((s) => s.id === formService);
@@ -260,7 +267,6 @@ export default function TakvimPage() {
 
     if (editingApptId) {
       const { error } = await supabase.from("appointments").update({
-        customer_id: formCustomer,
         service_id: formService,
         start_time: start.toISOString(),
         end_time: end.toISOString(),
@@ -274,6 +280,8 @@ export default function TakvimPage() {
         fetchData();
       }
     } else {
+      const customerName = customers.find((c) => c.id === formCustomer)?.full_name || "";
+
       const { error } = await supabase.from("appointments").insert({
         tenant_id: tenantId,
         customer_id: formCustomer,
@@ -281,7 +289,7 @@ export default function TakvimPage() {
         start_time: start.toISOString(),
         end_time: end.toISOString(),
         status: "confirmed",
-        custom_fields: {},
+        custom_fields: { customer_name: customerName },
       });
 
       if (!error) {
@@ -617,24 +625,26 @@ export default function TakvimPage() {
             </div>
 
             <form onSubmit={handleCreate} className="space-y-5">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-1.5">
-                  Müşteri Seçimi
-                </label>
-                <select
-                  required
-                  value={formCustomer}
-                  onChange={(e) => setFormCustomer(e.target.value)}
-                  className="block w-full rounded-2xl border-0 bg-white/50 px-4 py-3.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300/50 backdrop-blur-xl focus:ring-2 focus:ring-inset focus:ring-indigo-600 dark:bg-slate-800/50 dark:text-white dark:ring-slate-700/50 dark:focus:ring-indigo-500 transition-all"
-                >
-                  <option value="">Müşteri seçin...</option>
-                  {customers.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.full_name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {!editingApptId && (
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-1.5">
+                    Müşteri Seçimi
+                  </label>
+                  <select
+                    required
+                    value={formCustomer}
+                    onChange={(e) => setFormCustomer(e.target.value)}
+                    className="block w-full rounded-2xl border-0 bg-white/50 px-4 py-3.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300/50 backdrop-blur-xl focus:ring-2 focus:ring-inset focus:ring-indigo-600 dark:bg-slate-800/50 dark:text-white dark:ring-slate-700/50 dark:focus:ring-indigo-500 transition-all"
+                  >
+                    <option value="">Müşteri seçin...</option>
+                    {customers.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.full_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-1.5">
                   Hizmet Seçimi
@@ -689,12 +699,21 @@ export default function TakvimPage() {
             
             <div className="space-y-6">
               <div className="flex items-center gap-4 rounded-3xl bg-indigo-50 p-4 dark:bg-indigo-500/10">
-                <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-2xl bg-indigo-600 text-xl font-bold text-white shadow-md shadow-indigo-500/30">
-                  {getCustomerName(selectedAppointment)
-                    .split(" ")
-                    .map((n) => n[0])
-                    .slice(0, 2)
-                    .join("")}
+                <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-indigo-600 text-xl font-bold text-white shadow-md shadow-indigo-500/30">
+                  {selectedAppointment.profiles?.avatar_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={selectedAppointment.profiles.avatar_url}
+                      alt={getCustomerName(selectedAppointment)}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    getCustomerName(selectedAppointment)
+                      .split(" ")
+                      .map((n) => n[0])
+                      .slice(0, 2)
+                      .join("")
+                  )}
                 </div>
                 <div>
                   <p className="text-lg font-bold text-gray-900 dark:text-slate-100">
@@ -703,6 +722,12 @@ export default function TakvimPage() {
                   <p className="text-sm font-medium text-indigo-600 dark:text-indigo-400">
                     {selectedAppointment.services?.name || "Hizmet"}
                   </p>
+                  {(selectedAppointment.profiles?.phone || selectedAppointment.custom_fields?.phone) && (
+                    <p className="flex items-center gap-1.5 text-sm font-medium text-gray-500 dark:text-gray-400 mt-1">
+                      <Phone size={13} className="shrink-0 text-indigo-500" />
+                      {selectedAppointment.profiles?.phone || selectedAppointment.custom_fields?.phone}
+                    </p>
+                  )}
                 </div>
               </div>
               
@@ -727,6 +752,15 @@ export default function TakvimPage() {
                   </p>
                 </div>
               </div>
+
+              {selectedAppointment.custom_fields?.note && (
+                <div className="rounded-3xl bg-white/50 p-4 shadow-inner border border-white/40 dark:bg-slate-800/50 dark:border-slate-700/50">
+                  <p className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-500 mb-1">Açıklama</p>
+                  <p className="text-[15px] font-medium text-gray-900 dark:text-slate-100 whitespace-pre-wrap">
+                    {selectedAppointment.custom_fields.note}
+                  </p>
+                </div>
+              )}
 
               <div className="mt-8 flex gap-3">
                 <button

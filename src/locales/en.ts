@@ -2,7 +2,9 @@ export const en = {
   // Sidebar & Navigation
   "nav.overview": "Overview",
   "nav.calendar": "Calendar",
+  "nav.past_appointments": "Past Appointments",
   "nav.services": "Services",
+  "nav.posts": "Posts",
   "nav.customers": "Customers",
   "nav.settings": "Settings",
   "nav.business_account": "Business Account",
@@ -17,7 +19,7 @@ export const en = {
   // Dashboard Overview
   "dashboard.today_appointments": "Today's Appts",
   "dashboard.pending": "Pending",
-  "dashboard.occupancy": "Occupancy",
+  "dashboard.occupancy": "Revenue",
   "dashboard.quick_actions": "Quick Actions",
   "dashboard.new_appointment": "New Appt",
   "dashboard.new_customer": "New Customer",

@@ -12,12 +12,14 @@ const SUPER_ADMIN_EMAILS = ["muratemre911@gmail.com", "muratemre912@gmail.com"];
 
 export default function SuperAdminPage() {
   const [authorized, setAuthorized] = useState<boolean | null>(null);
-  const [activeTab, setActiveTab] = useState<"create" | "manage" | "sectors" | "notifications">("create");
+  const [activeTab, setActiveTab] = useState<"create" | "manage" | "customers" | "sectors" | "notifications">("create");
   const supabase = createClient();
 
   // Veriler
   const [sectors, setSectors] = useState<any[]>([]);
   const [tenants, setTenants] = useState<any[]>([]);
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [customersLoading, setCustomersLoading] = useState(false);
 
   // Sektör Yönetimi
   const [newSector, setNewSector] = useState("");
@@ -62,6 +64,9 @@ export default function SuperAdminPage() {
     if ((activeTab === "manage" || activeTab === "notifications") && tenants.length === 0) {
       fetchTenants();
     }
+    if (activeTab === "customers" && customers.length === 0) {
+      fetchCustomers();
+    }
     if (activeTab === "notifications") {
       fetchNotificationHistory();
     }
@@ -73,7 +78,7 @@ export default function SuperAdminPage() {
       const res = await fetch("/api/admin/notifications");
       const data = await res.json();
       if (Array.isArray(data)) setNotifHistory(data);
-    } finally {
+    } catch(err) { console.error("fetchNotificationHistory error:", err); } finally {
       setNotifHistoryLoading(false);
     }
   };
@@ -91,24 +96,40 @@ export default function SuperAdminPage() {
   };
 
   const fetchSectors = async () => {
-    const res = await fetch("/api/admin/sectors");
-    const data = await res.json();
-    if (Array.isArray(data)) {
-      setSectors(data);
-      if (data.length > 0 && !form.sector) setForm(prev => ({ ...prev, sector: data[0].value }));
-      if (data.length > 0 && !notifForm.sectorValue) setNotifForm(prev => ({ ...prev, sectorValue: data[0].value }));
+    try {
+      const res = await fetch("/api/admin/sectors");
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setSectors(data);
+        if (data.length > 0 && !form.sector) setForm(prev => ({ ...prev, sector: data[0].value }));
+        if (data.length > 0 && !notifForm.sectorValue) setNotifForm(prev => ({ ...prev, sectorValue: data[0].value }));
+      }
+    } catch(err) { console.error("fetchSectors error:", err); }
+  };
+
+  const fetchCustomers = async () => {
+    setCustomersLoading(true);
+    try {
+      const res = await fetch("/api/admin/customers");
+      const data = await res.json();
+      if (Array.isArray(data)) setCustomers(data);
+    } catch(err) { console.error("fetchCustomers error:", err); } finally {
+      setCustomersLoading(false);
     }
   };
 
   const fetchTenants = async () => {
     setTenantsLoading(true);
-    const res = await fetch("/api/admin/tenants");
-    const data = await res.json();
-    if (Array.isArray(data)) {
-      setTenants(data);
-      if (data.length > 0 && !notifForm.targetId) setNotifForm(prev => ({ ...prev, targetId: data[0].tenantId }));
+    try {
+      const res = await fetch("/api/admin/tenants");
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setTenants(data);
+        if (data.length > 0 && !notifForm.targetId) setNotifForm(prev => ({ ...prev, targetId: data[0].tenantId }));
+      }
+    } catch(err) { console.error("fetchTenants error:", err); } finally {
+      setTenantsLoading(false);
     }
-    setTenantsLoading(false);
   };
 
   const handleAddSector = async (e: React.FormEvent) => {
@@ -196,6 +217,7 @@ export default function SuperAdminPage() {
           <div className="flex flex-wrap justify-center bg-slate-100 p-1 rounded-2xl gap-1">
             <button onClick={() => setActiveTab("create")} className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all flex items-center gap-2 ${activeTab === "create" ? "bg-white text-indigo-700 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}><Plus size={16} /> Hesap Aç</button>
             <button onClick={() => setActiveTab("manage")} className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all flex items-center gap-2 ${activeTab === "manage" ? "bg-white text-indigo-700 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}><List size={16} /> İşletmeler</button>
+            <button onClick={() => setActiveTab("customers")} className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all flex items-center gap-2 ${activeTab === "customers" ? "bg-white text-indigo-700 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}><User size={16} /> Müşteriler</button>
             <button onClick={() => setActiveTab("sectors")} className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all flex items-center gap-2 ${activeTab === "sectors" ? "bg-white text-indigo-700 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}><Tags size={16} /> Sektörler</button>
             <button onClick={() => setActiveTab("notifications")} className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all flex items-center gap-2 ${activeTab === "notifications" ? "bg-white text-indigo-700 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}><Bell size={16} /> Bildirimler</button>
           </div>
@@ -231,11 +253,12 @@ export default function SuperAdminPage() {
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm whitespace-nowrap">
                   <thead className="bg-slate-50 text-slate-500 uppercase font-semibold">
-                    <tr><th className="px-4 py-3">İşletme Adı</th><th className="px-4 py-3">Sektör</th><th className="px-4 py-3">E-Posta</th><th className="px-4 py-3 text-right">İşlem</th></tr>
+                    <tr><th className="px-4 py-3">ID</th><th className="px-4 py-3">İşletme Adı</th><th className="px-4 py-3">Sektör</th><th className="px-4 py-3">E-Posta</th><th className="px-4 py-3 text-right">İşlem</th></tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {tenants.map(t => (
                       <tr key={t.tenantId}>
+                        <td className="px-4 py-4 text-xs font-mono text-gray-500">{t.tenantId?.substring(0,8)}</td>
                         <td className="px-4 py-4 font-medium">{editingTenant === t.tenantId ? <input type="text" value={editForm.tenantName} onChange={e => setEditForm({...editForm, tenantName: e.target.value})} className="px-2 py-1 border rounded w-full outline-none focus:border-indigo-500" /> : t.tenantName}</td>
                         <td className="px-4 py-4">{sectors.find(s=>s.value === t.sector)?.name || t.sector}</td>
                         <td className="px-4 py-4">{editingTenant === t.tenantId ? <div className="flex flex-col gap-1"><input type="email" value={editForm.email} onChange={e => setEditForm({...editForm, email: e.target.value})} className="px-2 py-1 border rounded outline-none" /><input type="password" value={editForm.password} onChange={e => setEditForm({...editForm, password: e.target.value})} placeholder="Yeni Şifre" className="px-2 py-1 border rounded outline-none" /></div> : t.email}</td>
@@ -245,6 +268,34 @@ export default function SuperAdminPage() {
                           ) : (
                             <div className="flex justify-end gap-2"><button onClick={() => handleStartEdit(t)} className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg"><Edit3 size={16} /></button><button onClick={() => handleDeleteTenant(t.tenantId, t.userId, t.tenantName)} className="p-1.5 bg-red-50 text-red-600 rounded-lg"><Trash2 size={16} /></button></div>
                           )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        
+        {activeTab === "customers" && (
+          <div className="bg-white rounded-3xl shadow-xl p-6 animate-modal-in">
+            <h2 className="text-xl font-bold mb-6 flex items-center gap-2"><User className="text-indigo-500" /> Son Kullanıcılar (Müşteriler)</h2>
+            {customersLoading ? <div className="flex justify-center py-10"><Loader2 className="animate-spin text-indigo-500" size={30} /></div> : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm whitespace-nowrap">
+                  <thead className="bg-slate-50 text-slate-500 uppercase font-semibold">
+                    <tr><th className="px-4 py-3">Ad Soyad</th><th className="px-4 py-3">E-Posta</th><th className="px-4 py-3">Kayıt Tarihi</th><th className="px-4 py-3 text-right">Randevu Sayısı</th></tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {customers.map((c: any) => (
+                      <tr key={c.id}>
+                        <td className="px-4 py-4 font-medium">{c.fullName}</td>
+                        <td className="px-4 py-4">{c.email}</td>
+                        <td className="px-4 py-4">{new Date(c.createdAt).toLocaleDateString('tr-TR')}</td>
+                        <td className="px-4 py-4 text-right">
+                          <span className="px-2 py-1 bg-indigo-50 text-indigo-700 rounded-md font-semibold">{c.appointmentCount}</span>
                         </td>
                       </tr>
                     ))}

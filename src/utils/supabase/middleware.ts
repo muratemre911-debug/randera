@@ -31,28 +31,45 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  const isAuthPage = request.nextUrl.pathname.startsWith('/login')
-  const isDashboardPage = request.nextUrl.pathname.startsWith('/dashboard')
-
-  // If user is not logged in and tries to access dashboard, redirect to login
-  if (!user && isDashboardPage) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/login'
-    return NextResponse.redirect(url)
+  let userRole = null;
+  if (user) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+    userRole = profile?.role;
   }
 
-  // If user is logged in and tries to access login, redirect to dashboard
-  if (user && isAuthPage) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/dashboard'
-    return NextResponse.redirect(url)
+  const pathname = request.nextUrl.pathname;
+  const isAuthPage = pathname.startsWith('/login');
+  const isDashboardPage = pathname.startsWith('/dashboard');
+  const isMyAppointmentsPage = pathname.startsWith('/my-appointments');
+
+  // If user is NOT logged in
+  if (!user) {
+    if (isDashboardPage || isMyAppointmentsPage) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/login';
+      return NextResponse.redirect(url);
+    }
   }
 
-  // Redirect from root to dashboard
-  if (request.nextUrl.pathname === '/') {
-    const url = request.nextUrl.clone()
-    url.pathname = user ? '/dashboard' : '/login'
-    return NextResponse.redirect(url)
+  // If user IS logged in
+  if (user) {
+    // Redirect from login or root page to their respective panels
+    if (isAuthPage || pathname === '/') {
+      const url = request.nextUrl.clone();
+      url.pathname = userRole === 'customer' ? '/my-appointments' : '/dashboard';
+      return NextResponse.redirect(url);
+    }
+
+    // Prevent customers from accessing the business dashboard
+    if (userRole === 'customer' && isDashboardPage) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/my-appointments';
+      return NextResponse.redirect(url);
+    }
   }
 
   return supabaseResponse

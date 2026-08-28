@@ -24,6 +24,7 @@ export async function GET() {
         id, name, sector, created_at,
         profiles (id, full_name, role)
       `)
+      .eq("is_active", true)
       .order("created_at", { ascending: false });
 
     if (tenantsError) throw tenantsError;
@@ -36,16 +37,16 @@ export async function GET() {
     authUsers.users.forEach(u => userMap.set(u.id, u.email));
 
     const result = tenants.map((t: any) => {
-      const ownerProfile = t.profiles.find((p: any) => p.role === "owner") || t.profiles[0];
+      const ownerProfile = t.profiles?.find((p: any) => p.role === "owner") || (t.profiles && t.profiles[0]);
       const userId = ownerProfile?.id;
       return {
         tenantId: t.id,
         tenantName: t.name,
         sector: t.sector,
         createdAt: t.created_at,
-        userId: userId,
-        fullName: ownerProfile?.full_name || "Bilinmiyor",
-        email: userId ? userMap.get(userId) : "Bulunamadı"
+        userId: userId || null,
+        fullName: ownerProfile?.full_name || "Sahipsiz İşletme",
+        email: userId ? (userMap.get(userId) || "Bulunamadı") : "Sahipsiz İşletme"
       };
     });
 
@@ -92,16 +93,37 @@ export async function DELETE(req: Request) {
 
     const supabaseAdmin = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 
-    // Kullanıcıyı tamamen sil (Profil tablosundaki cascade ayarı varsa oradan da uçar)
-    if (userId) {
+    if (tenantId) {
+      // 1. appointments sil
+      const { error: appErr } = await supabaseAdmin.from("appointments").delete().eq("tenant_id", tenantId);
+      if (appErr) throw new Error(`Randevular silinirken hata: ${appErr.message}`);
+
+      // 2. services sil
+      const { error: srvErr } = await supabaseAdmin.from("services").delete().eq("tenant_id", tenantId);
+      if (srvErr) throw new Error(`Hizmetler silinirken hata: ${srvErr.message}`);
+
+      // 3. notifications ve push_subscriptions sil
+      const { error: notifErr } = await supabaseAdmin.from("notifications").delete().eq("tenant_id", tenantId);
+      if (notifErr) throw new Error(`Bildirimler silinirken hata: ${notifErr.message}`);
+
+      const { error: pushErr } = await supabaseAdmin.from("push_subscriptions").delete().eq("tenant_id", tenantId);
+      if (pushErr) throw new Error(`Push abonelikleri silinirken hata: ${pushErr.message}`);
+
+      // 4. profiles tablosunda tenant_id'si bu olanların tenant_id değerini null yap
+      const { error: profErr } = await supabaseAdmin.from("profiles").update({ tenant_id: null }).eq("tenant_id", tenantId);
+      if (profErr) throw new Error(`Profiller güncellenirken hata: ${profErr.message}`);
+    }
+
+    // Kullanıcıyı auth'dan tamamen sil
+    if (userId && userId !== "null") {
       const { error: authErr } = await supabaseAdmin.auth.admin.deleteUser(userId);
-      if (authErr) console.warn("Kullanıcı silinemedi:", authErr);
+      if (authErr) throw new Error(`Kullanıcı silinemedi: ${authErr.message}`);
     }
     
-    // Kiracıyı (Tenants) tamamen sil
+    // 5. Kiracıyı (Tenants) en son sil
     if (tenantId) {
       const { error: tErr } = await supabaseAdmin.from("tenants").delete().eq("id", tenantId);
-      if (tErr) console.warn("İşletme silinemedi:", tErr);
+      if (tErr) throw new Error(`İşletme silinirken hata: ${tErr.message}`);
     }
 
     return NextResponse.json({ success: true });

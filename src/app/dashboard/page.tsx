@@ -64,7 +64,7 @@ export default function DashboardPage() {
       // 4. Next Appointment
       const { data: nextApptList } = await supabase
         .from("appointments")
-        .select("*, services(name)")
+        .select("*, services(name), profiles!appointments_customer_id_fkey(full_name)")
         .eq("tenant_id", tId)
         .eq("status", "confirmed")
         .gte("start_time", now.toISOString())
@@ -72,13 +72,8 @@ export default function DashboardPage() {
         .limit(1);
 
       let nextAppt = nextApptList?.[0] || null;
-      if (nextAppt && nextAppt.customer_id) {
-        const { data: custData } = await supabase
-          .from("profiles")
-          .select("full_name")
-          .eq("id", nextAppt.customer_id)
-          .single();
-        nextAppt.customer_name = custData?.full_name || nextAppt.custom_fields?.customer_name || t("dashboard.customer");
+      if (nextAppt) {
+        nextAppt.customer_name = nextAppt.profiles?.full_name || nextAppt.custom_fields?.customer_name || "Bilinmeyen Müşteri";
       }
 
       setStats({

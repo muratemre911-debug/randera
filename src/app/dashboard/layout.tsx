@@ -6,6 +6,7 @@ import { useState, useEffect, useRef } from "react";
 import {
   LayoutDashboard,
   Calendar,
+  History,
   Wrench,
   Users,
   Settings,
@@ -16,16 +17,20 @@ import {
   Sun,
   Moon,
   LogOut,
+  Image as ImageIcon,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import NotificationBell from "@/components/NotificationBell";
 
 import { useLanguage } from "@/context/LanguageContext";
+import DynamicLogoLink from "@/components/DynamicLogoLink";
 
 const navItems = [
   { i18nKey: "nav.overview", href: "/dashboard", icon: LayoutDashboard },
   { i18nKey: "nav.calendar", href: "/dashboard/takvim", icon: Calendar },
+  { i18nKey: "nav.past_appointments", href: "/dashboard/gecmis-randevular", icon: History },
   { i18nKey: "nav.services", href: "/dashboard/hizmetler", icon: Wrench },
+  { i18nKey: "nav.posts", href: "/dashboard/icerikler", icon: ImageIcon },
   { i18nKey: "nav.customers", href: "/dashboard/musteriler", icon: Users },
   { i18nKey: "nav.settings", href: "/dashboard/ayarlar", icon: Settings },
 ];
@@ -79,7 +84,7 @@ export default function DashboardLayout({
   };
 
   return (
-    <div className="flex h-screen relative overflow-hidden bg-gray-50/50 dark:bg-slate-950">
+    <div className="flex h-screen relative overflow-hidden bg-slate-50 dark:bg-[#0B0D14]">
       {/* Animated Mesh Gradient Backgrounds */}
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-purple-400/20 mix-blend-multiply filter blur-3xl opacity-70 animate-blob dark:bg-purple-900/20 dark:mix-blend-screen" />
       <div className="absolute top-[20%] right-[-10%] w-[40%] h-[40%] rounded-full bg-indigo-400/20 mix-blend-multiply filter blur-3xl opacity-70 animate-blob dark:bg-indigo-900/20 dark:mix-blend-screen" style={{ animationDelay: '2s' }} />
@@ -101,7 +106,7 @@ export default function DashboardLayout({
       >
         {/* Logo */}
         <div className="flex h-20 items-center justify-between px-6 pt-2">
-          <Link href="/dashboard" className="flex items-center gap-3 group">
+          <DynamicLogoLink className="flex items-center gap-3 group">
             <div className="relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl shadow-md transition-transform duration-300 group-hover:scale-105 border border-gray-200/50 dark:border-slate-700/50">
               <img src="/logo-light.png" alt="Randera Logo" className="h-full w-full object-cover dark:hidden" />
               <img src="/logo-dark.png" alt="Randera Logo" className="hidden h-full w-full object-cover dark:block" />
@@ -109,7 +114,7 @@ export default function DashboardLayout({
             <span className="text-xl font-bold tracking-tight text-gray-800 dark:text-slate-100">
               Randera
             </span>
-          </Link>
+          </DynamicLogoLink>
           <button
             onClick={() => setSidebarOpen(false)}
             className="rounded-full p-2 text-gray-400 hover:bg-black/5 hover:text-gray-600 dark:text-slate-500 dark:hover:bg-white/10 dark:hover:text-slate-300 lg:hidden transition-colors"

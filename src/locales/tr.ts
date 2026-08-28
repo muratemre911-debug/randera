@@ -2,7 +2,9 @@ export const tr = {
   // Sidebar & Navigation
   "nav.overview": "Genel Bakış",
   "nav.calendar": "Takvim",
+  "nav.past_appointments": "Geçmiş Randevular",
   "nav.services": "Hizmetler",
+  "nav.posts": "İçerikler",
   "nav.customers": "Müşteriler",
   "nav.settings": "Ayarlar",
   "nav.business_account": "İşletme Hesabı",
@@ -17,7 +19,7 @@ export const tr = {
   // Dashboard Overview
   "dashboard.today_appointments": "Bugün Randevu",
   "dashboard.pending": "Bekleyen",
-  "dashboard.occupancy": "Doluluk",
+  "dashboard.occupancy": "Ciro",
   "dashboard.quick_actions": "Hızlı İşlemler",
   "dashboard.new_appointment": "Yeni Randevu",
   "dashboard.new_customer": "Yeni Müşteri",

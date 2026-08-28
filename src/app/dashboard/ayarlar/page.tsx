@@ -13,7 +13,8 @@ import {
   AlertCircle,
   Loader2,
   ChevronRight,
-  Info
+  Info,
+  Image
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 
@@ -75,11 +76,13 @@ const daysTranslationEN: { [key: string]: string } = {
   pazar: "Sunday",
 };
 
+import citiesData from "@/lib/cities.json";
+
 export default function AyarlarPage() {
   const supabase = createClient();
   const { t, lang } = useLanguage();
   const daysTranslation = lang === "tr" ? daysTranslationTR : daysTranslationEN;
-  const [activeTab, setActiveTab] = useState<"profile" | "hours" | "booking">("profile");
+  const [activeTab, setActiveTab] = useState<"profile" | "hours" | "booking" | "vitrin">("profile");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
@@ -96,13 +99,30 @@ export default function AyarlarPage() {
   const [bookingRules, setBookingRules] = useState<BookingRules>(defaultBookingRules);
   const [tenantId, setTenantId] = useState<string | null>(null);
 
+  // Vitrin / Konum states
+  const [province, setProvince] = useState("");
+  const [district, setDistrict] = useState("");
+  const [profileImageUrl, setProfileImageUrl] = useState("");
+  const [coverImageUrl, setCoverImageUrl] = useState("");
+  const [sector, setSector] = useState("");
+  const [sectorsList, setSectorsList] = useState<{name:string, value:string}[]>([]);
+
   // Load settings
   useEffect(() => {
     const fetchSettings = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
-        const currentTenantId = user.id;
+        const { data: profileData } = await supabase
+          .from("profiles")
+          .select("tenant_id")
+          .eq("id", user.id)
+          .single();
+        const currentTenantId = profileData?.tenant_id;
+        if (!currentTenantId) {
+          setLoading(false);
+          return;
+        }
         setTenantId(currentTenantId);
 
         const localProfile = localStorage.getItem(`tenant_profile_${currentTenantId}`);
@@ -115,9 +135,16 @@ export default function AyarlarPage() {
 
         const { data, error } = await supabase
           .from("tenants")
-          .select("name, phone, email, address")
+          .select("name, phone, email, address, province, district, profile_image_url, cover_image_url, sector")
           .eq("id", currentTenantId)
           .single();
+
+        const sectorRes = await fetch('/api/admin/sectors');
+        const sectorData = await sectorRes.json();
+        
+        if (Array.isArray(sectorData)) {
+          setSectorsList(sectorData);
+        }
 
         if (data && !error) {
           setProfile((prev) => ({
@@ -127,6 +154,11 @@ export default function AyarlarPage() {
             email: data.email || "",
             address: data.address || "",
           }));
+          setProvince(data.province || "");
+          setDistrict(data.district || "");
+          setProfileImageUrl(data.profile_image_url || "");
+          setCoverImageUrl(data.cover_image_url || "");
+          setSector(data.sector || "");
           
           localStorage.setItem(
             `tenant_profile_${currentTenantId}`,
@@ -164,18 +196,27 @@ export default function AyarlarPage() {
       localStorage.setItem(`tenant_hours_${tenantId}`, JSON.stringify(workingHours));
       localStorage.setItem(`tenant_rules_${tenantId}`, JSON.stringify(bookingRules));
 
-      const { error } = await supabase.from("tenants").upsert({
-        id: tenantId,
-        name: profile.name,
-        slug: profile.name.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
-        phone: profile.phone,
-        email: profile.email,
-        address: profile.address,
+      const res = await fetch('/api/tenant/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tenantId,
+          name: profile.name,
+          phone: profile.phone,
+          email: profile.email,
+          address: profile.address,
+          province,
+          district,
+          profile_image_url: profileImageUrl,
+          cover_image_url: coverImageUrl,
+          sector,
+        })
       });
+      const data = await res.json();
 
-      if (error) {
-        console.warn("Supabase upsert failed, using localStorage fallback:", error);
-        showToast("success", "Ayarlar kaydedildi (Yerel veri güncellendi).");
+      if (!res.ok || data.error) {
+        console.error("API update failed:", data.error);
+        showToast("error", data.error || "Sunucu hatası, ayarlar kaydedilemedi!");
       } else {
         showToast("success", "Ayarlar başarıyla güncellendi.");
       }
@@ -311,6 +352,25 @@ export default function AyarlarPage() {
                 <div className="flex-1 text-left">
                   <span className={`text-[17px] font-medium ${activeTab === "booking" ? "text-[#007AFF] dark:text-[#0A84FF]" : "text-gray-900 dark:text-white"}`}>
                     Randevu Kuralları
+                  </span>
+                </div>
+                <ChevronRight size={20} className="text-gray-400 dark:text-slate-500" />
+              </button>
+
+              <button
+                onClick={() => setActiveTab("vitrin")}
+                className={`flex w-full items-center gap-4 px-4 py-3.5 transition-colors ${
+                  activeTab === "vitrin" 
+                    ? "bg-indigo-50/50 dark:bg-indigo-500/10" 
+                    : "hover:bg-white/40 dark:hover:bg-slate-800/40"
+                }`}
+              >
+                <div className="flex h-[30px] w-[30px] items-center justify-center rounded-lg bg-[#AF52DE] text-white">
+                  <Image size={18} strokeWidth={2.5} />
+                </div>
+                <div className="flex-1 text-left">
+                  <span className={`text-[17px] font-medium ${activeTab === "vitrin" ? "text-[#007AFF] dark:text-[#0A84FF]" : "text-gray-900 dark:text-white"}`}>
+                    Konum & Vitrin
                   </span>
                 </div>
                 <ChevronRight size={20} className="text-gray-400 dark:text-slate-500" />
@@ -563,7 +623,147 @@ export default function AyarlarPage() {
                         onChange={() => setBookingRules({ ...bookingRules, notifyWhatsapp: !bookingRules.notifyWhatsapp })} 
                       />
                     </div>
+                 </div>
+               </div>
+             </div>
+           )}
 
+            {/* 4. KONUM & VİTRİN TAB */}
+            {activeTab === "vitrin" && (
+              <div className="animate-in fade-in duration-300">
+                {/* Konum */}
+                <div className="mb-2 pl-4">
+                  <h2 className="text-[13px] font-semibold uppercase tracking-widest text-gray-500 dark:text-slate-400">
+                    Konum
+                  </h2>
+                </div>
+                <div className="overflow-hidden rounded-[20px] bg-white/70 backdrop-blur-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:bg-slate-900/60 dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)]">
+                  <div className="divide-y divide-gray-200/50 dark:divide-slate-700/50">
+                    <div className="flex items-center px-4 py-3 min-h-[44px] relative">
+                      <label className="w-[120px] shrink-0 text-[17px] text-gray-900 dark:text-white">İl</label>
+                      <select
+                        value={province}
+                        onChange={(e) => {
+                          const newProv = e.target.value;
+                          setProvince(newProv);
+                          const districts = (citiesData as Record<string, string[]>)[newProv] || [];
+                          setDistrict(districts.length > 0 ? districts[0] : "");
+                        }}
+                        className="flex-1 appearance-none bg-transparent text-[17px] text-gray-900 focus:outline-none cursor-pointer dark:text-white pr-8"
+                      >
+                        <option value="" disabled>İl Seçin</option>
+                        {Object.keys(citiesData).map((city) => (
+                          <option key={city} value={city}>{city}</option>
+                        ))}
+                      </select>
+                      <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center">
+                        <ChevronRight size={18} className="text-gray-400" />
+                      </div>
+                    </div>
+                    <div className="flex items-center px-4 py-3 min-h-[44px] relative">
+                      <label className="w-[120px] shrink-0 text-[17px] text-gray-900 dark:text-white">İlçe</label>
+                      <select
+                        value={district}
+                        onChange={(e) => setDistrict(e.target.value)}
+                        className="flex-1 appearance-none bg-transparent text-[17px] text-gray-900 focus:outline-none cursor-pointer dark:text-white pr-8"
+                        disabled={!province}
+                      >
+                        <option value="" disabled>İlçe Seçin</option>
+                        {((citiesData as Record<string, string[]>)[province] || []).map((dist) => (
+                          <option key={dist} value={dist}>{dist}</option>
+                        ))}
+                      </select>
+                      <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center">
+                        <ChevronRight size={18} className="text-gray-400" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Sektör */}
+                <div className="mt-8 mb-2 pl-4">
+                  <h2 className="text-[13px] font-semibold uppercase tracking-widest text-gray-500 dark:text-slate-400">
+                    Sektör
+                  </h2>
+                </div>
+                <div className="overflow-hidden rounded-[20px] bg-white/70 backdrop-blur-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:bg-slate-900/60 dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)]">
+                  <div className="flex items-center px-4 py-3 min-h-[44px] relative">
+                    <label className="w-[120px] shrink-0 text-[17px] text-gray-900 dark:text-white">Sektör</label>
+                    <select
+                      value={sector}
+                      onChange={(e) => setSector(e.target.value)}
+                      className="flex-1 appearance-none bg-transparent text-[17px] text-gray-900 focus:outline-none cursor-pointer dark:text-white pr-8"
+                    >
+                      <option value="" disabled>Sektör Seçin</option>
+                      {sectorsList.length > 0 ? (
+                        sectorsList.map((s) => (
+                          <option key={s.value} value={s.value}>{s.name}</option>
+                        ))
+                      ) : (
+                        <option value="Diğer">Diğer</option>
+                      )}
+                    </select>
+                    <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center">
+                      <ChevronRight size={18} className="text-gray-400" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Vitrin Görselleri */}
+                <div className="mt-8 mb-2 pl-4">
+                  <h2 className="text-[13px] font-semibold uppercase tracking-widest text-gray-500 dark:text-slate-400">
+                    Vitrin Görselleri
+                  </h2>
+                </div>
+                <div className="overflow-hidden rounded-[20px] bg-white/70 backdrop-blur-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:bg-slate-900/60 dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)]">
+                  <div className="divide-y divide-gray-200/50 dark:divide-slate-700/50">
+                    {/* Profile Image URL */}
+                    <div className="px-4 py-3">
+                      <div className="flex items-center min-h-[44px]">
+                        <label className="w-[120px] shrink-0 text-[17px] text-gray-900 dark:text-white">Profil Fotoğrafı</label>
+                        <input
+                          type="text"
+                          value={profileImageUrl}
+                          onChange={(e) => setProfileImageUrl(e.target.value)}
+                          placeholder="https://..."
+                          className="flex-1 bg-transparent text-[17px] text-gray-900 placeholder-gray-400 focus:outline-none dark:text-white dark:placeholder-slate-500"
+                        />
+                      </div>
+                      {profileImageUrl && (
+                        <div className="mt-3 flex justify-center">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={profileImageUrl}
+                            alt="Profil önizleme"
+                            className="h-20 w-20 rounded-full object-cover border-2 border-gray-200 dark:border-slate-700 shadow-sm"
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Cover Image URL */}
+                    <div className="px-4 py-3">
+                      <div className="flex items-center min-h-[44px]">
+                        <label className="w-[120px] shrink-0 text-[17px] text-gray-900 dark:text-white">Kapak Fotoğrafı</label>
+                        <input
+                          type="text"
+                          value={coverImageUrl}
+                          onChange={(e) => setCoverImageUrl(e.target.value)}
+                          placeholder="https://..."
+                          className="flex-1 bg-transparent text-[17px] text-gray-900 placeholder-gray-400 focus:outline-none dark:text-white dark:placeholder-slate-500"
+                        />
+                      </div>
+                      {coverImageUrl && (
+                        <div className="mt-3">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={coverImageUrl}
+                            alt="Kapak önizleme"
+                            className="w-full h-32 rounded-xl object-cover border border-gray-200 dark:border-slate-700 shadow-sm"
+                          />
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
