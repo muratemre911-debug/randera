@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
-import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { createClient as createServerClient } from "@/utils/supabase/server";
-
-const SUPER_ADMIN_EMAILS = ["muratemre911@gmail.com", "muratemre912@gmail.com"];
+import { createAdminClient } from "@/utils/supabase/server";
+import { updateTenantSchema, validateRequest } from "@/lib/validations";
+import { isSuperAdmin } from "@/lib/admin";
 
 async function checkAuth() {
   const supabaseUser = await createServerClient();
   const { data: { user } } = await supabaseUser.auth.getUser();
-  if (!user || !SUPER_ADMIN_EMAILS.includes(user.email!)) {
+  if (!user || !isSuperAdmin(user.email)) {
     throw new Error("Yetkisiz işlem. Süper Admin değilsiniz.");
   }
 }
@@ -15,7 +15,7 @@ async function checkAuth() {
 export async function GET() {
   try {
     await checkAuth();
-    const supabaseAdmin = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+    const supabaseAdmin = createAdminClient();
     
     // İşletmeleri ve onlara bağlı profilleri çek
     const { data: tenants, error: tenantsError } = await supabaseAdmin
@@ -59,8 +59,14 @@ export async function GET() {
 export async function PATCH(req: Request) {
   try {
     await checkAuth();
-    const { userId, tenantId, email, password, tenantName } = await req.json();
-    const supabaseAdmin = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+    const body = await req.json();
+    const validation = validateRequest(updateTenantSchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
+    }
+
+    const { userId, tenantId, email, password, tenantName } = validation.data;
+    const supabaseAdmin = createAdminClient();
 
     // E-posta veya şifre güncelleniyorsa Auth modülüne istek at
     const updates: any = {};
@@ -91,7 +97,7 @@ export async function DELETE(req: Request) {
     const userId = searchParams.get("userId");
     const tenantId = searchParams.get("tenantId");
 
-    const supabaseAdmin = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+    const supabaseAdmin = createAdminClient();
 
     if (tenantId) {
       // 1. appointments sil

@@ -135,7 +135,7 @@ export default function AyarlarPage() {
 
         const { data, error } = await supabase
           .from("tenants")
-          .select("name, phone, email, address, province, district, profile_image_url, cover_image_url, sector")
+          .select("name, phone, email, address, description, province, district, profile_image_url, cover_image_url, sector, working_hours")
           .eq("id", currentTenantId)
           .single();
 
@@ -153,12 +153,17 @@ export default function AyarlarPage() {
             phone: data.phone || "",
             email: data.email || "",
             address: data.address || "",
+            description: data.description || "",
           }));
           setProvince(data.province || "");
           setDistrict(data.district || "");
           setProfileImageUrl(data.profile_image_url || "");
           setCoverImageUrl(data.cover_image_url || "");
           setSector(data.sector || "");
+
+          if (data.working_hours) {
+            setWorkingHours(data.working_hours);
+          }
           
           localStorage.setItem(
             `tenant_profile_${currentTenantId}`,
@@ -168,6 +173,7 @@ export default function AyarlarPage() {
               phone: data.phone || "",
               email: data.email || "",
               address: data.address || "",
+              description: data.description || "",
             })
           );
         }
@@ -205,11 +211,13 @@ export default function AyarlarPage() {
           phone: profile.phone,
           email: profile.email,
           address: profile.address,
+          description: profile.description,
           province,
           district,
           profile_image_url: profileImageUrl,
           cover_image_url: coverImageUrl,
           sector,
+          working_hours: workingHours,
         })
       });
       const data = await res.json();

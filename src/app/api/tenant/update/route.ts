@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { createClient as createServerClient } from "@/utils/supabase/server";
-import { createClient as createAdminClient } from "@supabase/supabase-js";
+import { createAdminClient } from "@/utils/supabase/server";
 import { revalidatePath } from "next/cache";
+import { isSuperAdmin } from "@/lib/admin";
+import { updateTenantProfileSchema, validateRequest } from "@/lib/validations";
 
 export async function POST(req: Request) {
   try {
@@ -13,13 +15,14 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { tenantId, name, phone, email, address, province, district, profile_image_url, cover_image_url, sector } = body;
-
-    if (!tenantId) {
-      return NextResponse.json({ error: "Tenant ID eksik." }, { status: 400 });
+    const validation = validateRequest(updateTenantProfileSchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
 
-    const supabaseAdmin = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+    const { tenantId, name, phone, email, address, description, province, district, profile_image_url, cover_image_url, sector, working_hours } = validation.data;
+
+    const supabaseAdmin = createAdminClient();
     const { data: profile, error: profileError } = await supabaseAdmin.from("profiles").select("tenant_id, role").eq("id", user.id).single();
     
     if (profileError) {
@@ -27,12 +30,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Profil doğrulanamadı." }, { status: 500 });
     }
     
-    const SUPER_ADMIN_EMAILS = ["muratemre911@gmail.com", "muratemre912@gmail.com"];
-    const isSuperAdmin = SUPER_ADMIN_EMAILS.includes(user.email || "");
+    const isSuperAdminUser = isSuperAdmin(user.email);
     const isOwner = profile?.role === "owner" && profile?.tenant_id === tenantId;
 
-    if (!isSuperAdmin && !isOwner) {
-      console.error("API Auth Error:", { userEmail: user.email, profile, tenantId, isSuperAdmin, isOwner });
+    if (!isSuperAdminUser && !isOwner) {
+      console.error("API Auth Error:", { userEmail: user.email, profile, tenantId, isSuperAdmin: isSuperAdminUser, isOwner });
       return NextResponse.json({ error: `Yetkisiz işlem. (Rol: ${profile?.role}, Kayıtlı Tenant: ${profile?.tenant_id}, İstek: ${tenantId})` }, { status: 403 });
     }
 
@@ -41,11 +43,13 @@ export async function POST(req: Request) {
       phone,
       email,
       address,
+      description,
       province,
       district,
       profile_image_url,
       cover_image_url,
-      sector
+      sector,
+      working_hours
     }).eq("id", tenantId);
 
     if (error) {

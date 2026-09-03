@@ -1,12 +1,9 @@
 import { NextResponse } from "next/server";
 import { createClient as createServerClient } from "@/utils/supabase/server";
-import { createClient as createAdminClient } from "@supabase/supabase-js";
+import { createAdminClient } from "@/utils/supabase/server";
 
 async function getTenantId(userId: string) {
-  const supabaseAdmin = createAdminClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  const supabaseAdmin = createAdminClient();
   const { data: profile } = await supabaseAdmin
     .from("profiles")
     .select("tenant_id, role")
@@ -24,10 +21,10 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "tenant_id gerekli." }, { status: 400 });
     }
 
-    const supabaseAdmin = createAdminClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    const supabaseUser = await createServerClient();
+    const { data: { user } } = await supabaseUser.auth.getUser();
+
+    const supabaseAdmin = createAdminClient();
 
     const { data: posts, error } = await supabaseAdmin
       .from("posts")
@@ -36,6 +33,25 @@ export async function GET(req: Request) {
       .order("created_at", { ascending: false });
 
     if (error) throw error;
+
+    // If user is authenticated, check which posts they've liked
+    if (user && posts && posts.length > 0) {
+      const postIds = posts.map(p => p.id);
+      const { data: userLikes } = await supabaseAdmin
+        .from("post_likes")
+        .select("post_id")
+        .eq("user_id", user.id)
+        .in("post_id", postIds);
+
+      const likedPostIds = new Set(userLikes?.map(l => l.post_id) || []);
+      
+      const postsWithLikeStatus = posts.map(post => ({
+        ...post,
+        user_has_liked: likedPostIds.has(post.id),
+      }));
+
+      return NextResponse.json(postsWithLikeStatus);
+    }
 
     return NextResponse.json(posts);
   } catch (err: any) {
@@ -62,10 +78,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Fotoğraf gerekli." }, { status: 400 });
     }
 
-    const supabaseAdmin = createAdminClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    const supabaseAdmin = createAdminClient();
 
     const { data: post, error } = await supabaseAdmin
       .from("posts")
@@ -101,10 +114,7 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: "Gönderi ID gerekli." }, { status: 400 });
     }
 
-    const supabaseAdmin = createAdminClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    const supabaseAdmin = createAdminClient();
 
     const { error } = await supabaseAdmin
       .from("posts")

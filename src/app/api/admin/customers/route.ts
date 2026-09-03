@@ -1,13 +1,12 @@
 import { NextResponse } from "next/server";
-import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { createClient as createServerClient } from "@/utils/supabase/server";
-
-const SUPER_ADMIN_EMAILS = ["muratemre911@gmail.com", "muratemre912@gmail.com"];
+import { createAdminClient } from "@/utils/supabase/server";
+import { isSuperAdmin } from "@/lib/admin";
 
 async function checkAuth() {
   const supabaseUser = await createServerClient();
   const { data: { user } } = await supabaseUser.auth.getUser();
-  if (!user || !SUPER_ADMIN_EMAILS.includes(user.email!)) {
+  if (!user || !isSuperAdmin(user.email)) {
     throw new Error("Yetkisiz işlem. Süper Admin değilsiniz.");
   }
 }
@@ -15,7 +14,7 @@ async function checkAuth() {
 export async function GET() {
   try {
     await checkAuth();
-    const supabaseAdmin = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+    const supabaseAdmin = createAdminClient();
     
     const { data: customers, error: profileError } = await supabaseAdmin
       .from("profiles")

@@ -1,16 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Users, CalendarDays, TrendingUp, DollarSign, Clock, CheckCircle2 } from "lucide-react";
+import { Users, CalendarDays, DollarSign, Clock, CheckCircle2 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useLanguage } from "@/context/LanguageContext";
+import type { DashboardStats } from "@/types";
+import { PageSkeleton } from "@/components/Skeleton";
 
 export default function DashboardPage() {
-  const [stats, setStats] = useState({
+  const [stats, setStats] = useState<DashboardStats>({
     dailyRevenue: 0,
     pendingAppointments: 0,
     newCustomers: 0,
-    nextAppointment: null as any,
+    nextAppointment: null,
   });
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
@@ -71,7 +73,7 @@ export default function DashboardPage() {
         .order("start_time", { ascending: true })
         .limit(1);
 
-      let nextAppt = nextApptList?.[0] || null;
+      const nextAppt = nextApptList?.[0] || null;
       if (nextAppt) {
         nextAppt.customer_name = nextAppt.profiles?.full_name || nextAppt.custom_fields?.customer_name || "Bilinmeyen Müşteri";
       }
@@ -97,8 +99,12 @@ export default function DashboardPage() {
     return Math.max(0, Math.floor(diff / 60000));
   };
 
+  if (loading) {
+    return <PageSkeleton />;
+  }
+
   return (
-    <div className={`space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 ${loading ? "opacity-50" : ""}`}>
+    <>
       <div>
         <h1 className="text-4xl font-extrabold tracking-tight text-gray-900 dark:text-white">{t("nav.overview")}</h1>
         <p className="mt-2 text-lg text-gray-500 dark:text-slate-400">{t("dashboard.today_appointments")}</p>
@@ -167,6 +173,6 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient as createAdminClient } from "@supabase/supabase-js";
+import { createAdminClient } from "@/utils/supabase/server";
 import { createClient as createServerClient } from "@/utils/supabase/server";
 
 export async function POST(req: Request) {
@@ -21,16 +21,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Sunucu ayarları eksik." }, { status: 500 });
     }
 
-    const supabaseAdmin = createAdminClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      serviceRoleKey,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
-      }
-    );
+    const supabaseAdmin = createAdminClient();
 
     // Check current role
     const { data: profile } = await supabaseAdmin

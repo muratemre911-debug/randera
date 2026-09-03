@@ -1,26 +1,28 @@
 import { NextResponse } from "next/server";
 import { createClient as createServerClient } from "@/utils/supabase/server";
-import { createClient as createAdminClient } from "@supabase/supabase-js";
+import { createAdminClient } from "@/utils/supabase/server";
 import webpush from "web-push";
-
-const SUPER_ADMIN_EMAILS = ["muratemre911@gmail.com", "muratemre912@gmail.com"];
+import { sendNotificationSchema, validateRequest } from "@/lib/validations";
+import { isSuperAdmin } from "@/lib/admin";
 
 export async function POST(req: Request) {
   try {
     const supabaseUser = await createServerClient();
     const { data: { user } } = await supabaseUser.auth.getUser();
 
-    if (!user || !SUPER_ADMIN_EMAILS.includes(user.email!)) {
+    if (!user || !isSuperAdmin(user.email)) {
       return NextResponse.json({ error: "Yetkisiz işlem" }, { status: 403 });
     }
 
-    const { title, message, targetType, targetId, sectorValue } = await req.json();
-
-    if (!title || !message) {
-      return NextResponse.json({ error: "Başlık ve mesaj zorunludur" }, { status: 400 });
+    const body = await req.json();
+    const validation = validateRequest(sendNotificationSchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
 
-    const supabaseAdmin = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+    const { title, message, targetType, targetValue } = validation.data;
+
+    const supabaseAdmin = createAdminClient();
 
     // Hangi tenantlara gideceğini belirle
     let tenantIds: string[] = [];
@@ -29,10 +31,10 @@ export async function POST(req: Request) {
       const { data } = await supabaseAdmin.from("tenants").select("id");
       tenantIds = data?.map(t => t.id) || [];
     } else if (targetType === "sector") {
-      const { data } = await supabaseAdmin.from("tenants").select("id").eq("sector", sectorValue);
+      const { data } = await supabaseAdmin.from("tenants").select("id").eq("sector", targetValue);
       tenantIds = data?.map(t => t.id) || [];
     } else if (targetType === "single") {
-      tenantIds = [targetId];
+      tenantIds = [targetValue!];
     }
 
     if (tenantIds.length === 0) {

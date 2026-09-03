@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { createClient as createServerClient } from "@/utils/supabase/server";
-
-const SUPER_ADMIN_EMAILS = ["muratemre911@gmail.com", "muratemre912@gmail.com"];
+import { createTenantSchema, validateRequest } from "@/lib/validations";
+import { generateBaseSlug, generateUniqueSlug } from "@/lib/slug";
+import { isSuperAdmin } from "@/lib/admin";
 
 export async function POST(req: Request) {
   try {
@@ -10,11 +11,17 @@ export async function POST(req: Request) {
     const supabaseUser = await createServerClient();
     const { data: { user } } = await supabaseUser.auth.getUser();
     
-    if (!user || !SUPER_ADMIN_EMAILS.includes(user.email!)) {
+    if (!user || !isSuperAdmin(user.email)) {
       return NextResponse.json({ error: "Yetkisiz işlem. Süper Admin girişi yapılmadı." }, { status: 403 });
     }
 
-    const { email, password, tenantName, sector, fullName } = await req.json();
+    const body = await req.json();
+    const validation = validateRequest(createTenantSchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
+    }
+
+    const { email, password, tenantName, sector, fullName } = validation.data;
 
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (!serviceRoleKey) {
@@ -47,17 +54,18 @@ export async function POST(req: Request) {
 
     const userId = authData.user.id;
 
-    // Trigger'ın arka planda çalışmasını 1 saniye bekleyelim
+    // 2. Trigger'ın arka planda çalışmasını 1 saniye bekleyelim
     await new Promise((resolve) => setTimeout(resolve, 1000));
 
-    // 2. Trigger (eğer varsa) otomatik profil oluşturdu mu kontrol et
+    // 3. Trigger (eğer varsa) otomatik profil oluşturdu mu kontrol et
     const { data: existingProfile } = await supabaseAdmin
       .from("profiles")
       .select("tenant_id")
       .eq("id", userId)
       .single();
 
-    const slug = tenantName.toLowerCase().replace(/[^a-z0-9]+/g, "-") + "-" + Math.random().toString(36).substring(2, 6);
+    const baseSlug = generateBaseSlug(tenantName);
+    const slug = await generateUniqueSlug(supabaseAdmin, baseSlug);
 
     if (existingProfile) {
       const tenantId = existingProfile.tenant_id;

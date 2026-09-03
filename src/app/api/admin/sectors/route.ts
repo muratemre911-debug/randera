@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
-import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { createClient as createServerClient } from "@/utils/supabase/server";
-
-const SUPER_ADMIN_EMAILS = ["muratemre911@gmail.com", "muratemre912@gmail.com"];
+import { createAdminClient } from "@/utils/supabase/server";
+import { createSectorSchema, validateRequest } from "@/lib/validations";
+import { isSuperAdmin } from "@/lib/admin";
 
 export async function GET() {
   try {
-    const supabaseAdmin = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+    const supabaseAdmin = createAdminClient();
     const { data, error } = await supabaseAdmin.from("sectors").select("*").order("created_at", { ascending: true });
     if (error) throw error;
     return NextResponse.json(data);
@@ -19,12 +19,18 @@ export async function POST(req: Request) {
   try {
     const supabaseUser = await createServerClient();
     const { data: { user } } = await supabaseUser.auth.getUser();
-    if (!user || !SUPER_ADMIN_EMAILS.includes(user.email!)) {
+    if (!user || !isSuperAdmin(user.email)) {
       return NextResponse.json({ error: "Yetkisiz işlem. Yalnızca süper admin sektör ekleyebilir." }, { status: 403 });
     }
 
-    const { name, value } = await req.json();
-    const supabaseAdmin = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+    const body = await req.json();
+    const validation = validateRequest(createSectorSchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
+    }
+
+    const { name, value } = validation.data;
+    const supabaseAdmin = createAdminClient();
     const { data, error } = await supabaseAdmin.from("sectors").insert({ name, value }).select().single();
     if (error) throw error;
     
@@ -38,7 +44,7 @@ export async function DELETE(req: Request) {
   try {
     const supabaseUser = await createServerClient();
     const { data: { user } } = await supabaseUser.auth.getUser();
-    if (!user || !SUPER_ADMIN_EMAILS.includes(user.email!)) {
+    if (!user || !isSuperAdmin(user.email)) {
       return NextResponse.json({ error: "Yetkisiz işlem. Yalnızca süper admin sektör silebilir." }, { status: 403 });
     }
 
@@ -46,7 +52,7 @@ export async function DELETE(req: Request) {
     const id = searchParams.get("id");
     if (!id) return NextResponse.json({ error: "Silinecek ID gerekli" }, { status: 400 });
 
-    const supabaseAdmin = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+    const supabaseAdmin = createAdminClient();
     const { error } = await supabaseAdmin.from("sectors").delete().eq("id", id);
     if (error) throw error;
     

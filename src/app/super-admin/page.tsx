@@ -7,8 +7,36 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/utils/supabase/client";
+import type { Sector, Tenant } from "@/types";
 
-const SUPER_ADMIN_EMAILS = ["muratemre911@gmail.com", "muratemre912@gmail.com"];
+const SUPER_ADMIN_EMAILS = (process.env.NEXT_PUBLIC_SUPER_ADMIN_EMAILS || "")
+  .split(",")
+  .map((s) => s.trim().toLowerCase())
+  .filter(Boolean);
+
+interface Customer {
+  id: string;
+  fullName: string;
+  email: string;
+  createdAt: string;
+  appointmentCount: number;
+}
+
+interface NotificationHistoryItem {
+  id: string;
+  title: string;
+  message: string;
+  created_at: string;
+  tenants?: { name: string };
+}
+
+interface TenantListItem {
+  tenantId: string;
+  tenantName: string;
+  sector: string;
+  email: string;
+  userId: string;
+}
 
 export default function SuperAdminPage() {
   const [authorized, setAuthorized] = useState<boolean | null>(null);
@@ -16,9 +44,9 @@ export default function SuperAdminPage() {
   const supabase = createClient();
 
   // Veriler
-  const [sectors, setSectors] = useState<any[]>([]);
-  const [tenants, setTenants] = useState<any[]>([]);
-  const [customers, setCustomers] = useState<any[]>([]);
+  const [sectors, setSectors] = useState<Sector[]>([]);
+  const [tenants, setTenants] = useState<TenantListItem[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [customersLoading, setCustomersLoading] = useState(false);
 
   // Sektör Yönetimi
@@ -44,13 +72,13 @@ export default function SuperAdminPage() {
   const [notifError, setNotifError] = useState("");
   
   // Bildirim Geçmişi (Silme)
-  const [notifHistory, setNotifHistory] = useState<any[]>([]);
+  const [notifHistory, setNotifHistory] = useState<NotificationHistoryItem[]>([]);
   const [notifHistoryLoading, setNotifHistoryLoading] = useState(false);
 
   useEffect(() => {
     async function checkAuthAndLoadData() {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user || !SUPER_ADMIN_EMAILS.includes(user.email!)) {
+      if (!user || !SUPER_ADMIN_EMAILS.includes(user.email!.toLowerCase())) {
         setAuthorized(false);
         return;
       }
@@ -256,7 +284,7 @@ export default function SuperAdminPage() {
                     <tr><th className="px-4 py-3">ID</th><th className="px-4 py-3">İşletme Adı</th><th className="px-4 py-3">Sektör</th><th className="px-4 py-3">E-Posta</th><th className="px-4 py-3 text-right">İşlem</th></tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {tenants.map(t => (
+                    {tenants.map((t: TenantListItem) => (
                       <tr key={t.tenantId}>
                         <td className="px-4 py-4 text-xs font-mono text-gray-500">{t.tenantId?.substring(0,8)}</td>
                         <td className="px-4 py-4 font-medium">{editingTenant === t.tenantId ? <input type="text" value={editForm.tenantName} onChange={e => setEditForm({...editForm, tenantName: e.target.value})} className="px-2 py-1 border rounded w-full outline-none focus:border-indigo-500" /> : t.tenantName}</td>
@@ -289,7 +317,7 @@ export default function SuperAdminPage() {
                     <tr><th className="px-4 py-3">Ad Soyad</th><th className="px-4 py-3">E-Posta</th><th className="px-4 py-3">Kayıt Tarihi</th><th className="px-4 py-3 text-right">Randevu Sayısı</th></tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {customers.map((c: any) => (
+                    {customers.map((c: Customer) => (
                       <tr key={c.id}>
                         <td className="px-4 py-4 font-medium">{c.fullName}</td>
                         <td className="px-4 py-4">{c.email}</td>
@@ -351,7 +379,7 @@ export default function SuperAdminPage() {
                     <div className="animate-in fade-in zoom-in-95">
                       <label className="block text-sm font-semibold mb-1 text-indigo-600">İşletme Seçin</label>
                       <select value={notifForm.targetValue} onChange={e => setNotifForm({...notifForm, targetValue: e.target.value})} className="w-full px-4 py-2.5 rounded-xl border border-indigo-200 outline-none bg-indigo-50/30">
-                        {tenants.map(t => <option key={t.tenantId} value={t.tenantId}>{t.tenantName}</option>)}
+                        {tenants.map((t: TenantListItem) => <option key={t.tenantId} value={t.tenantId}>{t.tenantName}</option>)}
                       </select>
                     </div>
                   )}
@@ -378,7 +406,7 @@ export default function SuperAdminPage() {
                   ) : notifHistory.length === 0 ? (
                     <div className="text-center py-8 text-slate-400 text-sm">Geçmiş bildirim bulunmuyor.</div>
                   ) : (
-                    notifHistory.map((n: any) => (
+                    notifHistory.map((n: NotificationHistoryItem) => (
                       <div key={n.id} className="p-3 border rounded-xl bg-slate-50 flex items-start justify-between gap-3 hover:bg-slate-100 transition-colors">
                         <div className="flex-1 min-w-0">
                           <p className="font-bold text-sm text-slate-800 truncate">{n.title}</p>

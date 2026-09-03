@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient as createAdminClient } from "@supabase/supabase-js";
+import { createAdminClient } from "@/utils/supabase/server";
 
 export async function POST(req: Request) {
   try {
@@ -19,16 +19,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Sunucu yapılandırması eksik (Service Role Key)." }, { status: 500 });
     }
 
-    const supabaseAdmin = createAdminClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      serviceRoleKey,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
-      }
-    );
+    const supabaseAdmin = createAdminClient();
 
     // Kullanıcı adı benzersiz olmalı
     const { data: existingNick } = await supabaseAdmin

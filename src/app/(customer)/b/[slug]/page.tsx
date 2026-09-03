@@ -4,18 +4,29 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { useParams, useRouter } from "next/navigation";
 import { useLanguage } from "@/context/LanguageContext";
-import { Calendar as CalendarIcon, MapPin, Building2, Loader2 } from "lucide-react";
+import { Calendar as CalendarIcon, MapPin, Building2 } from "lucide-react";
+import type { Tenant, Post } from "@/types";
+import { BusinessPageSkeleton, Spinner } from "@/components/Skeleton";
+import { PostGrid, PostGridSkeleton } from "@/components/PostGrid";
+import { PostModal } from "@/components/PostModal";
+
+interface PostWithTenant extends Post {
+  tenant?: Pick<Tenant, "id" | "name" | "profile_image_url">;
+}
 
 export default function BusinessPage() {
-  const { slug } = useParams();
+  const { slug } = useParams<{ slug: string }>();
   const supabase = createClient();
   const { lang } = useLanguage();
   const router = useRouter();
 
-  const [tenant, setTenant] = useState<any>(null);
-  const [posts, setPosts] = useState<any[]>([]);
+  const [tenant, setTenant] = useState<Tenant | null>(null);
+  const [posts, setPosts] = useState<PostWithTenant[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  const [selectedPost, setSelectedPost] = useState<PostWithTenant | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
 
   useEffect(() => {
     fetchTenantData();
@@ -38,17 +49,49 @@ export default function BusinessPage() {
 
     const postsRes = await fetch(`/api/posts?tenant_id=${tenantData.id}`);
     const postsData = await postsRes.json();
-    if (Array.isArray(postsData)) setPosts(postsData);
+    if (Array.isArray(postsData)) {
+      const postsWithTenant = postsData.map((post: Post) => ({
+        ...post,
+        tenant: { id: tenantData.id, name: tenantData.name, profile_image_url: tenantData.profile_image_url },
+      }));
+      setPosts(postsWithTenant);
+    }
 
     setLoading(false);
   };
 
+  const handleLikeToggle = async (postId: string) => {
+    const res = await fetch(`/api/posts/${postId}/like`, { method: "POST" });
+    if (!res.ok) throw new Error("Failed to toggle like");
+  };
+
+  const handleAddComment = async (postId: string, text: string) => {
+    const res = await fetch(`/api/posts/${postId}/comment`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    });
+    if (!res.ok) throw new Error("Failed to add comment");
+  };
+
+  const handlePostClick = (post: PostWithTenant) => {
+    setSelectedPost(post);
+    setModalOpen(true);
+  };
+
   if (loading) {
-    return <div className="w-full h-64 flex items-center justify-center"><Loader2 className="animate-spin text-indigo-600 h-8 w-8" /></div>;
+    return <BusinessPageSkeleton />;
   }
 
   if (error || !tenant) {
-    return <div className="w-full h-64 flex items-center justify-center text-red-500 dark:text-red-400 font-medium">{error}</div>;
+    return (
+      <div className="w-full max-w-4xl mx-auto h-64 flex items-center justify-center">
+        <div className="text-center">
+          <Spinner size="h-12 w-12" className="mx-auto mb-4" color="text-red-500" />
+          <p className="text-red-500 dark:text-red-400 font-medium">{error}</p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -71,7 +114,7 @@ export default function BusinessPage() {
         <div className="px-4 md:px-6 relative z-10">
           <div className="-mt-12 md:-mt-16 mb-4 ml-2 md:ml-4">
             {/* Profile Image / Avatar */}
-            <div className="h-24 w-24 md:h-28 md:w-28 shrink-0 rounded-[24px] md:rounded-[28px] border-[5px] border-white dark:border-slate-900 shadow-xl overflow-hidden bg-white dark:bg-slate-800 flex items-center justify-center">
+            <div className="h-24 w-24 md:h-28 md:w-28 shrink-0 rounded-full border-[5px] border-white dark:border-slate-900 shadow-xl overflow-hidden bg-white dark:bg-slate-800 flex items-center justify-center">
               {tenant.profile_image_url ? (
                 <img src={tenant.profile_image_url} alt={tenant.name} className="h-full w-full object-cover" />
               ) : (
@@ -104,26 +147,30 @@ export default function BusinessPage() {
       </div>
 
       {/* Posts Feed */}
-      {posts.length > 0 && (
-        <div>
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4 px-2">
-            {lang === 'tr' ? 'Gönderiler' : 'Posts'}
-          </h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            {posts.map((p) => (
-              <div key={p.id} className="relative aspect-square overflow-hidden rounded-2xl">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={p.image_url} alt={p.description || ''} className="h-full w-full object-cover" />
-                {p.description && (
-                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-3">
-                    <p className="text-xs text-white line-clamp-2">{p.description}</p>
-                  </div>
-                )}
-              </div>
-            ))}
+      <div>
+        <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4 px-2">
+          {lang === 'tr' ? 'Gönderiler' : 'Posts'}
+        </h2>
+        {posts.length === 0 ? (
+          <div className="p-12 text-center text-gray-400 dark:text-slate-500">
+            {lang === 'tr' ? 'Henüz gönderi yok.' : 'No posts yet.'}
           </div>
-        </div>
-      )}
+        ) : (
+          <PostGrid
+            posts={posts}
+            onPostClick={handlePostClick}
+            isLoading={false}
+          />
+        )}
+      </div>
+
+      <PostModal
+        post={selectedPost}
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        onLikeToggle={handleLikeToggle}
+        onAddComment={handleAddComment}
+      />
     </div>
   );
 }

@@ -1,19 +1,18 @@
 import { NextResponse } from "next/server";
 import { createClient as createServerClient } from "@/utils/supabase/server";
-import { createClient as createAdminClient } from "@supabase/supabase-js";
-
-const SUPER_ADMIN_EMAILS = ["muratemre911@gmail.com", "muratemre912@gmail.com"];
+import { createAdminClient } from "@/utils/supabase/server";
+import { isSuperAdmin } from "@/lib/admin";
 
 export async function GET(req: Request) {
   try {
     const supabaseUser = await createServerClient();
     const { data: { user } } = await supabaseUser.auth.getUser();
 
-    if (!user || !SUPER_ADMIN_EMAILS.includes(user.email!)) {
+    if (!user || !isSuperAdmin(user.email)) {
       return NextResponse.json({ error: "Yetkisiz işlem" }, { status: 403 });
     }
 
-    const supabaseAdmin = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+    const supabaseAdmin = createAdminClient();
     
     // Tüm bildirimleri getir, en yeni en üstte
     const { data, error } = await supabaseAdmin
@@ -42,7 +41,7 @@ export async function DELETE(req: Request) {
     const supabaseUser = await createServerClient();
     const { data: { user } } = await supabaseUser.auth.getUser();
 
-    if (!user || !SUPER_ADMIN_EMAILS.includes(user.email!)) {
+    if (!user || !isSuperAdmin(user.email)) {
       return NextResponse.json({ error: "Yetkisiz işlem" }, { status: 403 });
     }
 
@@ -51,7 +50,7 @@ export async function DELETE(req: Request) {
     
     if (!id) return NextResponse.json({ error: "ID gerekli" }, { status: 400 });
 
-    const supabaseAdmin = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+    const supabaseAdmin = createAdminClient();
     
     const { error } = await supabaseAdmin.from("notifications").delete().eq("id", id);
     if (error) throw error;

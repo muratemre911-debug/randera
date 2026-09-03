@@ -1,23 +1,22 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { ImagePlus, Loader2, Trash2 } from "lucide-react";
+import { ImagePlus, Loader2 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useLanguage } from "@/context/LanguageContext";
+import { PostGrid, PostGridSkeleton } from "@/components/PostGrid";
+import { PostModal } from "@/components/PostModal";
+import { Post, Tenant } from "@/types";
 
-interface Post {
-  id: string;
-  tenant_id: string;
-  image_url: string;
-  description: string | null;
-  created_at: string;
+interface PostWithTenant extends Post {
+  tenant?: Pick<Tenant, "id" | "name" | "profile_image_url">;
 }
 
 export default function IceriklerPage() {
   const supabase = createClient();
   const { lang } = useLanguage();
 
-  const [posts, setPosts] = useState<Post[]>([]);
+  const [posts, setPosts] = useState<PostWithTenant[]>([]);
   const [loading, setLoading] = useState(true);
   const [tenantId, setTenantId] = useState<string | null>(null);
 
@@ -27,6 +26,9 @@ export default function IceriklerPage() {
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState({ type: "", text: "" });
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [selectedPost, setSelectedPost] = useState<PostWithTenant | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
 
   const fetchPosts = async () => {
     setLoading(true);
@@ -48,7 +50,16 @@ export default function IceriklerPage() {
 
     const res = await fetch(`/api/posts?tenant_id=${profile.tenant_id}`);
     const data = await res.json();
-    if (Array.isArray(data)) setPosts(data);
+    if (Array.isArray(data)) {
+      const tenantRes = await fetch(`/api/tenant/${profile.tenant_id}`);
+      const tenantData = await tenantRes.json();
+      const tenant = tenantData?.tenant;
+      const postsWithTenant = data.map((post: Post) => ({
+        ...post,
+        tenant: tenant ? { id: tenant.id, name: tenant.name, profile_image_url: tenant.profile_image_url } : undefined,
+      }));
+      setPosts(postsWithTenant);
+    }
     setLoading(false);
   };
 
@@ -78,7 +89,7 @@ export default function IceriklerPage() {
         .upload(filePath, file, { upsert: false, contentType: file.type });
 
       if (uploadError) {
-        setMessage({ type: "error", text: "Fotoğraf yüklenirken hata oluştu." });
+        setMessage({ type: "error", text: lang === "tr" ? "Fotoğraf yüklenirken hata oluştu." : "Error uploading photo." });
         setUploading(false);
         return;
       }
@@ -93,13 +104,13 @@ export default function IceriklerPage() {
       });
       const resData = await res.json();
       if (!res.ok || resData.error) {
-        setMessage({ type: "error", text: resData.error || "Gönderi oluşturulurken hata." });
+        setMessage({ type: "error", text: resData.error || (lang === "tr" ? "Gönderi oluşturulurken hata." : "Error creating post.") });
       } else {
         setDescription("");
         setFile(null);
         setPreview("");
         if (fileInputRef.current) fileInputRef.current.value = "";
-        setMessage({ type: "success", text: "İçerik başarıyla eklendi." });
+        setMessage({ type: "success", text: lang === "tr" ? "İçerik başarıyla eklendi." : "Content added successfully." });
         fetchPosts();
       }
     } catch (err: any) {
@@ -113,6 +124,25 @@ export default function IceriklerPage() {
     if (!confirm(lang === "tr" ? "Bu içeriği silmek istediğinize emin misiniz?" : "Are you sure you want to delete this post?")) return;
     const res = await fetch(`/api/posts?id=${id}`, { method: "DELETE" });
     if (res.ok) fetchPosts();
+  };
+
+  const handleLikeToggle = async (postId: string) => {
+    const res = await fetch(`/api/posts/${postId}/like`, { method: "POST" });
+    if (!res.ok) throw new Error("Failed to toggle like");
+  };
+
+  const handleAddComment = async (postId: string, text: string) => {
+    const res = await fetch(`/api/posts/${postId}/comment`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    });
+    if (!res.ok) throw new Error("Failed to add comment");
+  };
+
+  const handlePostClick = (post: PostWithTenant) => {
+    setSelectedPost(post);
+    setModalOpen(true);
   };
 
   return (
@@ -143,7 +173,6 @@ export default function IceriklerPage() {
             className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-gray-300 dark:border-slate-700 p-8 hover:border-indigo-400 transition-colors"
           >
             {preview ? (
-              // eslint-disable-next-line @next/next/no-img-element
               <img src={preview} alt="Önizleme" className="max-h-56 rounded-xl object-cover" />
             ) : (
               <div className="flex flex-col items-center gap-2 text-gray-400">
@@ -183,36 +212,27 @@ export default function IceriklerPage() {
           {lang === "tr" ? "Gönderilerim" : "My Posts"}
         </h2>
         {loading ? (
-          <div className="flex justify-center py-12">
-            <Loader2 className="animate-spin text-indigo-500" />
-          </div>
+          <PostGridSkeleton />
         ) : posts.length === 0 ? (
           <div className="p-12 text-center text-gray-400 dark:text-slate-500">
             {lang === "tr" ? "Henüz içerik eklenmemiş." : "No posts yet."}
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {posts.map((p) => (
-              <div key={p.id} className="group overflow-hidden rounded-2xl border border-white/50 bg-white/70 backdrop-blur-3xl dark:border-slate-700/50 dark:bg-slate-900/60">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={p.image_url} alt={p.description || ""} className="h-48 w-full object-cover" />
-                <div className="p-4">
-                  <p className="text-sm text-gray-700 dark:text-slate-200 whitespace-pre-wrap">
-                    {p.description || (lang === "tr" ? "Açıklama yok" : "No description")}
-                  </p>
-                  <button
-                    onClick={() => handleDelete(p.id)}
-                    className="mt-3 flex items-center gap-1.5 rounded-full bg-red-50 px-3 py-1.5 text-xs font-bold text-red-600 transition-colors hover:bg-red-100 dark:bg-red-500/10 dark:text-red-400"
-                  >
-                    <Trash2 size={14} />
-                    {lang === "tr" ? "Sil" : "Delete"}
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
+          <PostGrid
+            posts={posts}
+            onPostClick={handlePostClick}
+            isLoading={false}
+          />
         )}
       </div>
+
+      <PostModal
+        post={selectedPost}
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        onLikeToggle={handleLikeToggle}
+        onAddComment={handleAddComment}
+      />
     </div>
   );
 }

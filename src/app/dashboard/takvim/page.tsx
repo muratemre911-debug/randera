@@ -16,8 +16,31 @@ import {
 import { createClient } from "@/utils/supabase/client";
 import { useLanguage } from "@/context/LanguageContext";
 
+const dayNames = ["pazar", "pazartesi", "sali", "carsamba", "persembe", "cuma", "cumartesi"];
 
-const HOURS = Array.from({ length: 12 }, (_, i) => i + 9);
+interface WorkingDay {
+  isOpen: boolean;
+  openTime: string;
+  closeTime: string;
+}
+
+interface WorkingHours {
+  [key: string]: WorkingDay;
+}
+
+function getDayHours(date: Date, workingHours: WorkingHours | null): number[] {
+  if (!workingHours) return Array.from({ length: 12 }, (_, i) => i + 9);
+  
+  const dayName = dayNames[date.getDay()];
+  const hours = workingHours[dayName];
+  
+  if (!hours || !hours.isOpen) return [];
+  
+  const openHour = parseInt(hours.openTime.split(":")[0]);
+  const closeHour = parseInt(hours.closeTime.split(":")[0]);
+  
+  return Array.from({ length: closeHour - openHour }, (_, i) => openHour + i);
+}
 
 interface Profile {
   id: string;
@@ -110,6 +133,7 @@ export default function TakvimPage() {
   const [customers, setCustomers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [tenantId, setTenantId] = useState<string | null>(null);
+  const [workingHours, setWorkingHours] = useState<WorkingHours | null>(null);
 
   const [selectedSlot, setSelectedSlot] = useState<{
     day: Date;
@@ -155,10 +179,13 @@ export default function TakvimPage() {
   
   const occupancyPercent = useMemo(() => {
     if (days.length === 0) return 0;
-    const totalSlots = days.length * HOURS.length;
+    let totalSlots = 0;
+    days.forEach(day => {
+      totalSlots += getDayHours(day, workingHours).length;
+    });
     const filledSlots = appointments.filter(a => days.some(d => isSameDay(d, new Date(a.start_time)))).length;
-    return Math.round((filledSlots / totalSlots) * 100);
-  }, [days, appointments]);
+    return totalSlots > 0 ? Math.round((filledSlots / totalSlots) * 100) : 0;
+  }, [days, appointments, workingHours]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -174,6 +201,17 @@ export default function TakvimPage() {
       return;
     }
     setTenantId(profile.tenant_id);
+
+    // Fetch tenant working hours
+    const { data: tenantData } = await supabase
+      .from("tenants")
+      .select("working_hours")
+      .eq("id", profile.tenant_id)
+      .single();
+    
+    if (tenantData?.working_hours) {
+      setWorkingHours(tenantData.working_hours as WorkingHours);
+    }
 
     const [apptRes, svcRes, custRes] = await Promise.all([
       supabase
@@ -536,38 +574,50 @@ export default function TakvimPage() {
 
               {/* Time slots */}
               <div className="divide-y divide-gray-200/50 dark:divide-slate-700/50 relative">
-                {HOURS.map((hour) => (
-                  <div key={hour} className="flex min-h-[80px]">
-                    <div className="flex w-16 shrink-0 items-start justify-center pt-3">
-                      <span className="text-[13px] font-semibold text-gray-400 dark:text-slate-500">
-                        {hour.toString().padStart(2, "0")}:00
-                      </span>
-                    </div>
-                    {days.map((day, dayIndex) => {
-                      const cellId = `${dayIndex}-${hour}`;
-                      const realApps = getApptsForSlot(day, hour);
-                      const hasContent = realApps.length > 0;
-                      const isHighlighted = highlightedCell === cellId;
+                {(() => {
+                  // Calculate hour range from working hours across all displayed days
+                  const allDayHours = days.map(day => getDayHours(day, workingHours));
+                  const minHour = allDayHours.flat().length > 0 ? Math.min(...allDayHours.flat()) : 9;
+                  const maxHour = allDayHours.flat().length > 0 ? Math.max(...allDayHours.flat()) : 21;
+                  const displayHours = Array.from({ length: maxHour - minHour + 1 }, (_, i) => minHour + i);
+                  
+                  return displayHours.map((hour) => (
+                    <div key={hour} className="flex min-h-[80px]">
+                      <div className="flex w-16 shrink-0 items-start justify-center pt-3">
+                        <span className="text-[13px] font-semibold text-gray-400 dark:text-slate-500">
+                          {hour.toString().padStart(2, "0")}:00
+                        </span>
+                      </div>
+                      {days.map((day, dayIndex) => {
+                        const dayHours = getDayHours(day, workingHours);
+                        const isWithinHours = dayHours.includes(hour);
+                        const cellId = `${dayIndex}-${hour}`;
+                        const realApps = getApptsForSlot(day, hour);
+                        const hasContent = realApps.length > 0;
+                        const isHighlighted = highlightedCell === cellId;
 
-                      return (
-                        <div
-                          key={dayIndex}
-                          data-cell={cellId}
-                          className={`flex flex-1 border-l border-gray-200/50 p-1 transition-all dark:border-slate-700/50 hover:bg-white/40 dark:hover:bg-slate-800/40 cursor-pointer ${
-                            isSameDay(day, new Date())
-                              ? "bg-indigo-50/30 dark:bg-indigo-900/5"
-                              : ""
-                          } ${isHighlighted ? "ring-2 ring-inset ring-amber-400 bg-amber-50 dark:bg-amber-900/20" : ""}`}
-                          onClick={(e) => {
-                            if (e.target === e.currentTarget) {
-                                setEditingApptId(null);
-                                setFormCustomer("");
-                                setFormService("");
-                                setSelectedSlot({ day, hour });
-                            }
-                          }}
-                        >
-                          {hasContent && (
+                        return (
+                          <div
+                            key={dayIndex}
+                            data-cell={cellId}
+                            className={`flex flex-1 border-l border-gray-200/50 p-1 transition-all dark:border-slate-700/50 ${
+                              isWithinHours 
+                                ? "hover:bg-white/40 dark:hover:bg-slate-800/40 cursor-pointer" 
+                                : "bg-gray-50/50 dark:bg-slate-800/50 cursor-not-allowed"
+                            } ${isSameDay(day, new Date())
+                                ? "bg-indigo-50/30 dark:bg-indigo-900/5"
+                                : ""
+                            } ${isHighlighted ? "ring-2 ring-inset ring-amber-400 bg-amber-50 dark:bg-amber-900/20" : ""}`}
+                            onClick={(e) => {
+                              if (e.target === e.currentTarget && isWithinHours) {
+                                  setEditingApptId(null);
+                                  setFormCustomer("");
+                                  setFormService("");
+                                  setSelectedSlot({ day, hour });
+                              }
+                            }}
+                          >
+                            {hasContent && (
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -582,12 +632,13 @@ export default function TakvimPage() {
                                 {getCustomerName(realApps[0])}
                               </p>
                             </button>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ))}
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ));
+                })()}
               </div>
             </div>
           </div>
@@ -700,10 +751,10 @@ export default function TakvimPage() {
             <div className="space-y-6">
               <div className="flex items-center gap-4 rounded-3xl bg-indigo-50 p-4 dark:bg-indigo-500/10">
                 <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-indigo-600 text-xl font-bold text-white shadow-md shadow-indigo-500/30">
-                  {selectedAppointment.profiles?.avatar_url ? (
+                  {selectedAppointment.custom_fields?.avatar_url || selectedAppointment.profiles?.avatar_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
-                      src={selectedAppointment.profiles.avatar_url}
+                      src={selectedAppointment.custom_fields?.avatar_url || selectedAppointment.profiles?.avatar_url || undefined}
                       alt={getCustomerName(selectedAppointment)}
                       className="h-full w-full object-cover"
                     />

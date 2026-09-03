@@ -8,14 +8,24 @@ import { Calendar as CalendarIcon, Clock, Loader2, CheckCircle2, ChevronRight } 
 import { format, addDays, isSameDay } from "date-fns";
 import { tr, enUS } from "date-fns/locale";
 
-const defaultWorkingHours = {
-  1: { isOpen: true, open: "09:00", close: "21:00" }, // Mon
-  2: { isOpen: true, open: "09:00", close: "21:00" }, // Tue
-  3: { isOpen: true, open: "09:00", close: "21:00" }, // Wed
-  4: { isOpen: true, open: "09:00", close: "21:00" }, // Thu
-  5: { isOpen: true, open: "09:00", close: "21:00" }, // Fri
-  6: { isOpen: true, open: "09:00", close: "21:00" }, // Sat
-  0: { isOpen: true, open: "09:00", close: "21:00" }, // Sun
+const dayMap: Record<string, number> = {
+  pazartesi: 1,
+  sali: 2,
+  carsamba: 3,
+  persembe: 4,
+  cuma: 5,
+  cumartesi: 6,
+  pazar: 0,
+};
+
+const defaultWorkingHours: Record<string, { isOpen: boolean; openTime: string; closeTime: string }> = {
+  pazartesi: { isOpen: true, openTime: "09:00", closeTime: "21:00" },
+  sali: { isOpen: true, openTime: "09:00", closeTime: "21:00" },
+  carsamba: { isOpen: true, openTime: "09:00", closeTime: "21:00" },
+  persembe: { isOpen: true, openTime: "09:00", closeTime: "21:00" },
+  cuma: { isOpen: true, openTime: "09:00", closeTime: "21:00" },
+  cumartesi: { isOpen: true, openTime: "09:00", closeTime: "21:00" },
+  pazar: { isOpen: true, openTime: "09:00", closeTime: "21:00" },
 };
 
 export default function BookPage() {
@@ -72,14 +82,19 @@ export default function BookPage() {
   };
 
   const getAvailableTimeSlots = (date: Date) => {
-    const dayOfWeek = date.getDay();
-    const hours = defaultWorkingHours[dayOfWeek as keyof typeof defaultWorkingHours];
+    const workingHours = tenant?.working_hours as Record<string, { isOpen: boolean; openTime: string; closeTime: string }> | undefined;
+    const hoursSource = workingHours || defaultWorkingHours;
 
-    if (!hours.isOpen) return [];
+    const dayOfWeek = date.getDay();
+    const dayName = Object.keys(dayMap).find(key => dayMap[key] === dayOfWeek);
+    if (!dayName) return [];
+
+    const hours = hoursSource[dayName];
+    if (!hours || !hours.isOpen) return [];
 
     const slots = [];
-    let currentHour = parseInt(hours.open.split(":")[0]);
-    const closeHour = parseInt(hours.close.split(":")[0]);
+    let currentHour = parseInt(hours.openTime.split(":")[0]);
+    const closeHour = parseInt(hours.closeTime.split(":")[0]);
 
     while (currentHour < closeHour) {
       slots.push(`${currentHour.toString().padStart(2, '0')}:00`);
@@ -163,7 +178,7 @@ export default function BookPage() {
     <div className="w-full max-w-4xl mx-auto space-y-8 pb-12 font-sans">
       {/* Business mini header */}
       <div className="flex items-center gap-4 px-2">
-        <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-white dark:bg-slate-800 shadow-md">
+        <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white dark:bg-slate-800 shadow-md">
           {tenant.profile_image_url ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={tenant.profile_image_url} alt={tenant.name} className="h-full w-full object-cover" />
