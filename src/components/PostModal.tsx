@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import { X, Heart, MessageCircle, Send, Loader2, MoreVertical, User, AtSign } from "lucide-react";
 import { Post, PostComment } from "@/types";
 import { createClient } from "@/utils/supabase/client";
@@ -179,7 +180,7 @@ export function PostModal({
 
   if (!isOpen || !post) return null;
 
-  return (
+  return createPortal(
     <div
       ref={modalRef}
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -332,7 +333,8 @@ export function PostModal({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
