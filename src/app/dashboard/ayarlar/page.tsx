@@ -197,9 +197,18 @@ export default function AyarlarPage() {
     if (!tenantId) return;
     setSaving(true);
 
+    const normalizedHours = Object.fromEntries(
+      Object.entries(workingHours).map(([day, h]) => [
+        day,
+        h.isOpen && h.openTime === "00:00" && h.closeTime === "00:00"
+          ? { isOpen: true, openTime: "09:00", closeTime: "18:00" }
+          : h,
+      ])
+    );
+
     try {
       localStorage.setItem(`tenant_profile_${tenantId}`, JSON.stringify(profile));
-      localStorage.setItem(`tenant_hours_${tenantId}`, JSON.stringify(workingHours));
+      localStorage.setItem(`tenant_hours_${tenantId}`, JSON.stringify(normalizedHours));
       localStorage.setItem(`tenant_rules_${tenantId}`, JSON.stringify(bookingRules));
 
       const res = await fetch('/api/tenant/update', {
@@ -217,7 +226,7 @@ export default function AyarlarPage() {
           profile_image_url: profileImageUrl,
           cover_image_url: coverImageUrl,
           sector,
-          working_hours: workingHours,
+          working_hours: normalizedHours,
         })
       });
       const data = await res.json();
@@ -237,13 +246,22 @@ export default function AyarlarPage() {
   };
 
   const handleDayToggle = (day: string) => {
-    setWorkingHours((prev) => ({
-      ...prev,
-      [day]: {
-        ...prev[day],
-        isOpen: !prev[day].isOpen,
-      },
-    }));
+    setWorkingHours((prev) => {
+      const current = prev[day];
+      if (!current.isOpen && current.openTime === "00:00" && current.closeTime === "00:00") {
+        return {
+          ...prev,
+          [day]: { isOpen: true, openTime: "09:00", closeTime: "18:00" },
+        };
+      }
+      return {
+        ...prev,
+        [day]: {
+          ...current,
+          isOpen: !current.isOpen,
+        },
+      };
+    });
   };
 
   const handleTimeChange = (day: string, type: "openTime" | "closeTime", value: string) => {
