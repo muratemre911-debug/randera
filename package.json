@@ -21,6 +21,7 @@
     "web-push": "^3.6.7",
     "zod": "^4.5.4"
   },
+  "allowScripts": ["sharp", "unrs-resolver"],
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^7.0.1",
