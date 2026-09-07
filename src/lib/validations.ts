@@ -43,7 +43,7 @@ export const updateTenantProfileSchema = z.object({
   profile_image_url: z.string().url().optional().or(z.literal("")),
   cover_image_url: z.string().url().optional().or(z.literal("")),
   sector: z.string().max(50).optional(),
-  working_hours: z.record(z.object({
+  working_hours: z.record(z.string(), z.object({
     isOpen: z.boolean(),
     openTime: z.string(),
     closeTime: z.string(),
