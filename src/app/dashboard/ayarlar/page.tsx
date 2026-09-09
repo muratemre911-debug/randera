@@ -19,6 +19,7 @@ import {
 import { createClient } from "@/utils/supabase/client";
 
 import { useLanguage } from "@/context/LanguageContext";
+import CustomSelect from "@/components/CustomSelect";
 
 interface WorkingDay {
   isOpen: boolean;
@@ -302,8 +303,36 @@ export default function AyarlarPage() {
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 max-w-5xl mx-auto pb-12">
       {/* Page Header */}
-      <div className="mb-8 pl-2">
-        <h1 className="text-[34px] font-extrabold tracking-tight text-gray-900 dark:text-white">{t("settings.title")}</h1>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+        <div>
+          <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-gray-900 dark:text-white">
+            {t("settings.title")}
+          </h1>
+          <p className="mt-1 text-sm font-medium text-slate-500 dark:text-slate-400">
+            {lang === "tr" ? "İşletme profili, çalışma saatleri ve randevu kurallarınızı yönetin." : "Manage business profile, hours, and booking rules."}
+          </p>
+        </div>
+
+        {/* Header Save Button */}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-indigo-500/30 hover:bg-indigo-500 active:scale-95 disabled:opacity-50 transition-all"
+          >
+            {saving ? (
+              <>
+                <Loader2 size={18} className="animate-spin" />
+                <span>Kaydediliyor...</span>
+              </>
+            ) : (
+              <>
+                <Save size={18} />
+                <span>Ayarları Kaydet</span>
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Toast Notification */}
@@ -320,107 +349,89 @@ export default function AyarlarPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         
-        {/* Left Sidebar Menu (iPad Settings Style) */}
-        <div className="lg:col-span-4 space-y-4">
-          <div className="overflow-hidden rounded-[20px] bg-white/70 backdrop-blur-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:bg-slate-900/60 dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)]">
-            <div className="divide-y divide-gray-200/50 dark:divide-slate-700/50">
+        {/* Left Sidebar Menu */}
+        <div className="lg:col-span-4 space-y-4 lg:sticky lg:top-6 select-none">
+          <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white/80 backdrop-blur-2xl shadow-sm dark:border-slate-700 dark:bg-slate-900/70">
+            <div className="divide-y divide-slate-100 dark:divide-slate-800/80">
               <button
                 onClick={() => setActiveTab("profile")}
                 className={`flex w-full items-center gap-4 px-4 py-3.5 transition-colors ${
                   activeTab === "profile" 
-                    ? "bg-indigo-50/50 dark:bg-indigo-500/10" 
-                    : "hover:bg-white/40 dark:hover:bg-slate-800/40"
+                    ? "bg-indigo-50/70 dark:bg-indigo-500/10" 
+                    : "hover:bg-slate-50/80 dark:hover:bg-slate-800/40"
                 }`}
               >
-                <div className="flex h-[30px] w-[30px] items-center justify-center rounded-lg bg-[#007AFF] text-white">
+                <div className="flex h-[32px] w-[32px] items-center justify-center rounded-xl bg-indigo-600 text-white shadow-xs">
                   <Building2 size={18} strokeWidth={2.5} />
                 </div>
                 <div className="flex-1 text-left">
-                  <span className={`text-[17px] font-medium ${activeTab === "profile" ? "text-[#007AFF] dark:text-[#0A84FF]" : "text-gray-900 dark:text-white"}`}>
+                  <span className={`text-[15px] font-bold ${activeTab === "profile" ? "text-indigo-600 dark:text-indigo-400" : "text-slate-800 dark:text-white"}`}>
                     İşletme Profili
                   </span>
                 </div>
-                <ChevronRight size={20} className="text-gray-400 dark:text-slate-500" />
+                <ChevronRight size={18} className="text-slate-400 dark:text-slate-500" />
               </button>
 
               <button
                 onClick={() => setActiveTab("hours")}
                 className={`flex w-full items-center gap-4 px-4 py-3.5 transition-colors ${
                   activeTab === "hours" 
-                    ? "bg-indigo-50/50 dark:bg-indigo-500/10" 
-                    : "hover:bg-white/40 dark:hover:bg-slate-800/40"
+                    ? "bg-indigo-50/70 dark:bg-indigo-500/10" 
+                    : "hover:bg-slate-50/80 dark:hover:bg-slate-800/40"
                 }`}
               >
-                <div className="flex h-[30px] w-[30px] items-center justify-center rounded-lg bg-[#FF9500] text-white">
+                <div className="flex h-[32px] w-[32px] items-center justify-center rounded-xl bg-amber-500 text-white shadow-xs">
                   <Clock size={18} strokeWidth={2.5} />
                 </div>
                 <div className="flex-1 text-left">
-                  <span className={`text-[17px] font-medium ${activeTab === "hours" ? "text-[#007AFF] dark:text-[#0A84FF]" : "text-gray-900 dark:text-white"}`}>
+                  <span className={`text-[15px] font-bold ${activeTab === "hours" ? "text-indigo-600 dark:text-indigo-400" : "text-slate-800 dark:text-white"}`}>
                     Çalışma Saatleri
                   </span>
                 </div>
-                <ChevronRight size={20} className="text-gray-400 dark:text-slate-500" />
+                <ChevronRight size={18} className="text-slate-400 dark:text-slate-500" />
               </button>
 
               <button
                 onClick={() => setActiveTab("booking")}
                 className={`flex w-full items-center gap-4 px-4 py-3.5 transition-colors ${
                   activeTab === "booking" 
-                    ? "bg-indigo-50/50 dark:bg-indigo-500/10" 
-                    : "hover:bg-white/40 dark:hover:bg-slate-800/40"
+                    ? "bg-indigo-50/70 dark:bg-indigo-500/10" 
+                    : "hover:bg-slate-50/80 dark:hover:bg-slate-800/40"
                 }`}
               >
-                <div className="flex h-[30px] w-[30px] items-center justify-center rounded-lg bg-[#5856D6] text-white">
+                <div className="flex h-[32px] w-[32px] items-center justify-center rounded-xl bg-violet-600 text-white shadow-xs">
                   <Sliders size={18} strokeWidth={2.5} />
                 </div>
                 <div className="flex-1 text-left">
-                  <span className={`text-[17px] font-medium ${activeTab === "booking" ? "text-[#007AFF] dark:text-[#0A84FF]" : "text-gray-900 dark:text-white"}`}>
+                  <span className={`text-[15px] font-bold ${activeTab === "booking" ? "text-indigo-600 dark:text-indigo-400" : "text-slate-800 dark:text-white"}`}>
                     Randevu Kuralları
                   </span>
                 </div>
-                <ChevronRight size={20} className="text-gray-400 dark:text-slate-500" />
+                <ChevronRight size={18} className="text-slate-400 dark:text-slate-500" />
               </button>
 
               <button
                 onClick={() => setActiveTab("vitrin")}
                 className={`flex w-full items-center gap-4 px-4 py-3.5 transition-colors ${
                   activeTab === "vitrin" 
-                    ? "bg-indigo-50/50 dark:bg-indigo-500/10" 
-                    : "hover:bg-white/40 dark:hover:bg-slate-800/40"
+                    ? "bg-indigo-50/70 dark:bg-indigo-500/10" 
+                    : "hover:bg-slate-50/80 dark:hover:bg-slate-800/40"
                 }`}
               >
-                <div className="flex h-[30px] w-[30px] items-center justify-center rounded-lg bg-[#AF52DE] text-white">
+                <div className="flex h-[32px] w-[32px] items-center justify-center rounded-xl bg-purple-600 text-white shadow-xs">
                   <Image size={18} strokeWidth={2.5} />
                 </div>
                 <div className="flex-1 text-left">
-                  <span className={`text-[17px] font-medium ${activeTab === "vitrin" ? "text-[#007AFF] dark:text-[#0A84FF]" : "text-gray-900 dark:text-white"}`}>
+                  <span className={`text-[15px] font-bold ${activeTab === "vitrin" ? "text-indigo-600 dark:text-indigo-400" : "text-slate-800 dark:text-white"}`}>
                     Konum & Vitrin
                   </span>
                 </div>
-                <ChevronRight size={20} className="text-gray-400 dark:text-slate-500" />
+                <ChevronRight size={18} className="text-slate-400 dark:text-slate-500" />
               </button>
             </div>
           </div>
-          
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#007AFF] px-6 py-4 text-[17px] font-bold text-white shadow-lg shadow-blue-500/30 transition-all hover:bg-blue-600 active:scale-[0.98] disabled:opacity-50 dark:bg-[#0A84FF] dark:hover:bg-blue-500"
-          >
-            {saving ? (
-              <>
-                <Loader2 size={20} className="animate-spin" />
-                Kaydediliyor...
-              </>
-            ) : (
-              <>
-                <Save size={20} />
-                Ayarları Kaydet
-              </>
-            )}
-          </button>
         </div>
 
         {/* Right Content Area (iOS Inset Grouped List Style) */}
@@ -429,76 +440,96 @@ export default function AyarlarPage() {
             
             {/* 1. BUSINESS PROFILE TAB */}
             {activeTab === "profile" && (
-              <div className="animate-in fade-in duration-300">
-                <div className="mb-2 pl-4">
-                  <h2 className="text-[13px] font-semibold uppercase tracking-widest text-gray-500 dark:text-slate-400">
-                    Genel Bilgiler
-                  </h2>
-                </div>
-                <div className="overflow-hidden rounded-[20px] bg-white/70 backdrop-blur-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:bg-slate-900/60 dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)]">
-                  <div className="divide-y divide-gray-200/50 dark:divide-slate-700/50">
-                    {/* Input Group */}
-                    <div className="flex items-center px-4 py-3 min-h-[44px]">
-                      <label className="w-[120px] shrink-0 text-[17px] text-gray-900 dark:text-white">İsim</label>
+              <div className="animate-in fade-in duration-300 space-y-6">
+                {/* Genel Bilgiler Card */}
+                <div className="rounded-3xl border border-slate-200 bg-white/80 p-6 backdrop-blur-2xl shadow-sm dark:border-slate-700 dark:bg-slate-900/70 space-y-5">
+                  <div className="border-b border-slate-100 dark:border-slate-800/80 pb-3">
+                    <h2 className="text-base font-bold text-slate-900 dark:text-white">
+                      Genel Bilgiler
+                    </h2>
+                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mt-0.5">
+                      Müşterilerinizin göreceği temel işletme iletişim bilgileri
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
+                        İşletme Adı
+                      </label>
                       <input
                         type="text"
                         required
                         value={profile.name}
                         onChange={(e) => setProfile({ ...profile, name: e.target.value })}
-                        placeholder="İşletme Adı"
-                        className="flex-1 bg-transparent text-[17px] text-gray-900 placeholder-gray-400 focus:outline-none dark:text-white dark:placeholder-slate-500"
+                        placeholder="Örn: Kuaför Ahmet"
+                        className="w-full rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-[15px] font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-white transition-all"
                       />
                     </div>
-                    
-                    <div className="flex items-center px-4 py-3 min-h-[44px]">
-                      <label className="w-[120px] shrink-0 text-[17px] text-gray-900 dark:text-white">Telefon</label>
+
+                    <div>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
+                        Telefon Numarası
+                      </label>
                       <input
                         type="tel"
                         value={profile.phone}
                         onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
                         placeholder="05XX XXX XX XX"
-                        className="flex-1 bg-transparent text-[17px] text-gray-900 placeholder-gray-400 focus:outline-none dark:text-white dark:placeholder-slate-500"
+                        className="w-full rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-[15px] font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-white transition-all"
                       />
                     </div>
 
-                    <div className="flex items-center px-4 py-3 min-h-[44px]">
-                      <label className="w-[120px] shrink-0 text-[17px] text-gray-900 dark:text-white">E-posta</label>
+                    <div>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
+                        E-posta Adresi
+                      </label>
                       <input
                         type="email"
                         value={profile.email}
                         onChange={(e) => setProfile({ ...profile, email: e.target.value })}
-                        placeholder="info@ornek.com"
-                        className="flex-1 bg-transparent text-[17px] text-gray-900 placeholder-gray-400 focus:outline-none dark:text-white dark:placeholder-slate-500"
+                        placeholder="info@isletme.com"
+                        className="w-full rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-[15px] font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-white transition-all"
                       />
                     </div>
                   </div>
                 </div>
-                
-                <div className="mt-8 mb-2 pl-4">
-                  <h2 className="text-[13px] font-semibold uppercase tracking-widest text-gray-500 dark:text-slate-400">
-                    Adres & Detaylar
-                  </h2>
-                </div>
-                <div className="overflow-hidden rounded-[20px] bg-white/70 backdrop-blur-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:bg-slate-900/60 dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)]">
-                  <div className="divide-y divide-gray-200/50 dark:divide-slate-700/50">
-                    <div className="px-4 py-3 min-h-[88px]">
-                      <label className="block text-[17px] text-gray-900 dark:text-white mb-1">Açık Adres</label>
-                      <textarea
-                        rows={2}
-                        value={profile.address}
-                        onChange={(e) => setProfile({ ...profile, address: e.target.value })}
-                        placeholder="Müşterilerin sizi bulabileceği tam adres..."
-                        className="w-full bg-transparent text-[17px] text-gray-500 placeholder-gray-400 focus:outline-none resize-none dark:text-slate-400 dark:placeholder-slate-600"
-                      />
-                    </div>
-                    <div className="px-4 py-3 min-h-[110px]">
-                      <label className="block text-[17px] text-gray-900 dark:text-white mb-1">Hakkımızda</label>
+
+                {/* Adres & Detaylar Card */}
+                <div className="rounded-3xl border border-slate-200 bg-white/80 p-6 backdrop-blur-2xl shadow-sm dark:border-slate-700 dark:bg-slate-900/70 space-y-5">
+                  <div className="border-b border-slate-100 dark:border-slate-800/80 pb-3">
+                    <h2 className="text-base font-bold text-slate-900 dark:text-white">
+                      Adres & Detaylar
+                    </h2>
+                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mt-0.5">
+                      Fiziksel konum ve işletmeniz hakkında tanıtıcı açıklama
+                    </p>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
+                        Açık Adres
+                      </label>
                       <textarea
                         rows={3}
+                        value={profile.address}
+                        onChange={(e) => setProfile({ ...profile, address: e.target.value })}
+                        placeholder="Müşterilerin sizi kolayca bulabileceği cadde, sokak ve açık adres..."
+                        className="w-full rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-[15px] font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-white transition-all resize-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
+                        Hakkımızda / İşletme Açıklaması
+                      </label>
+                      <textarea
+                        rows={4}
                         value={profile.description}
                         onChange={(e) => setProfile({ ...profile, description: e.target.value })}
-                        placeholder="İşletmeniz ve hizmetleriniz hakkında açıklama..."
-                        className="w-full bg-transparent text-[17px] text-gray-500 placeholder-gray-400 focus:outline-none resize-none dark:text-slate-400 dark:placeholder-slate-600"
+                        placeholder="İşletmeniz, ekibiniz ve sunduğunuz deneyim hakkında müşterileri bilgilendirin..."
+                        className="w-full rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-[15px] font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-white transition-all resize-none"
                       />
                     </div>
                   </div>
@@ -520,7 +551,7 @@ export default function AyarlarPage() {
                       const info = workingHours[day];
                       return (
                         <div key={day} className="flex flex-col py-3 px-4 min-h-[60px] sm:flex-row sm:items-center justify-between gap-3">
-                          <div className="flex items-center justify-between sm:w-44 shrink-0">
+                          <div className="flex items-center justify-between sm:w-44 shrink-0 select-none">
                             <span className="text-[17px] font-medium text-gray-900 dark:text-white">
                               {daysTranslation[day]}
                             </span>
@@ -575,23 +606,21 @@ export default function AyarlarPage() {
                     
                     <div className="flex items-center justify-between px-4 py-3 min-h-[44px]">
                       <span className="text-[17px] text-gray-900 dark:text-white">Randevu Aralığı</span>
-                      <div className="relative">
-                        <select
+                      <div className="w-40">
+                        <CustomSelect
                           value={bookingRules.slotDuration}
-                          onChange={(e) =>
-                            setBookingRules({ ...bookingRules, slotDuration: parseInt(e.target.value) })
+                          onChange={(val) =>
+                            setBookingRules({ ...bookingRules, slotDuration: parseInt(val) })
                           }
-                          className="appearance-none bg-transparent text-[17px] text-gray-500 pr-4 text-right focus:outline-none cursor-pointer dark:text-slate-400"
-                        >
-                          <option value={15}>15 Dakika</option>
-                          <option value={30}>30 Dakika</option>
-                          <option value={45}>45 Dakika</option>
-                          <option value={60}>60 Dakika</option>
-                          <option value={90}>90 Dakika</option>
-                        </select>
-                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center">
-                          <ChevronRight size={18} className="text-gray-400" />
-                        </div>
+                          options={[
+                            { value: 15, label: "15 Dakika" },
+                            { value: 30, label: "30 Dakika" },
+                            { value: 45, label: "45 Dakika" },
+                            { value: 60, label: "60 Dakika" },
+                            { value: 90, label: "90 Dakika" },
+                          ]}
+                          buttonClassName="w-full flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2 text-sm font-medium text-slate-900 transition-all hover:border-slate-300 focus:outline-none dark:border-slate-700 dark:bg-slate-800/60 dark:text-white cursor-pointer"
+                        />
                       </div>
                     </div>
 
@@ -656,136 +685,137 @@ export default function AyarlarPage() {
 
             {/* 4. KONUM & VİTRİN TAB */}
             {activeTab === "vitrin" && (
-              <div className="animate-in fade-in duration-300">
-                {/* Konum */}
-                <div className="mb-2 pl-4">
-                  <h2 className="text-[13px] font-semibold uppercase tracking-widest text-gray-500 dark:text-slate-400">
-                    Konum
-                  </h2>
-                </div>
-                <div className="overflow-hidden rounded-[20px] bg-white/70 backdrop-blur-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:bg-slate-900/60 dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)]">
-                  <div className="divide-y divide-gray-200/50 dark:divide-slate-700/50">
-                    <div className="flex items-center px-4 py-3 min-h-[44px] relative">
-                      <label className="w-[120px] shrink-0 text-[17px] text-gray-900 dark:text-white">İl</label>
-                      <select
+              <div className="animate-in fade-in duration-300 space-y-6">
+                {/* Konum Card */}
+                <div className="rounded-3xl border border-slate-200 bg-white/80 p-6 backdrop-blur-2xl shadow-sm dark:border-slate-700 dark:bg-slate-900/70 space-y-4">
+                  <div className="border-b border-slate-100 dark:border-slate-800/80 pb-3">
+                    <h2 className="text-base font-bold text-slate-900 dark:text-white">
+                      Konum Bilgileri
+                    </h2>
+                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mt-0.5">
+                      İşletmenizin Keşfet sayfasında bulunacağı şehir ve ilçe
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
+                        İl
+                      </label>
+                      <CustomSelect
                         value={province}
-                        onChange={(e) => {
-                          const newProv = e.target.value;
-                          setProvince(newProv);
-                          const districts = (citiesData as Record<string, string[]>)[newProv] || [];
+                        onChange={(val) => {
+                          setProvince(val);
+                          const districts = (citiesData as Record<string, string[]>)[val] || [];
                           setDistrict(districts.length > 0 ? districts[0] : "");
                         }}
-                        className="flex-1 appearance-none bg-transparent text-[17px] text-gray-900 focus:outline-none cursor-pointer dark:text-white pr-8"
-                      >
-                        <option value="" disabled>İl Seçin</option>
-                        {Object.keys(citiesData).map((city) => (
-                          <option key={city} value={city}>{city}</option>
-                        ))}
-                      </select>
-                      <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center">
-                        <ChevronRight size={18} className="text-gray-400" />
-                      </div>
+                        options={Object.keys(citiesData)}
+                        placeholder="İl Seçin"
+                        searchable={true}
+                        searchPlaceholder="İl ara (örn: İstanbul, İzmir)..."
+                      />
                     </div>
-                    <div className="flex items-center px-4 py-3 min-h-[44px] relative">
-                      <label className="w-[120px] shrink-0 text-[17px] text-gray-900 dark:text-white">İlçe</label>
-                      <select
+
+                    <div>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
+                        İlçe
+                      </label>
+                      <CustomSelect
                         value={district}
-                        onChange={(e) => setDistrict(e.target.value)}
-                        className="flex-1 appearance-none bg-transparent text-[17px] text-gray-900 focus:outline-none cursor-pointer dark:text-white pr-8"
+                        onChange={(val) => setDistrict(val)}
+                        options={(citiesData as Record<string, string[]>)[province] || []}
+                        placeholder={province ? "İlçe Seçin" : "Önce il seçin"}
                         disabled={!province}
-                      >
-                        <option value="" disabled>İlçe Seçin</option>
-                        {((citiesData as Record<string, string[]>)[province] || []).map((dist) => (
-                          <option key={dist} value={dist}>{dist}</option>
-                        ))}
-                      </select>
-                      <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center">
-                        <ChevronRight size={18} className="text-gray-400" />
-                      </div>
+                        searchable={true}
+                        searchPlaceholder="İlçe ara (örn: Kadıköy, Çankaya)..."
+                      />
                     </div>
                   </div>
                 </div>
 
-                {/* Sektör */}
-                <div className="mt-8 mb-2 pl-4">
-                  <h2 className="text-[13px] font-semibold uppercase tracking-widest text-gray-500 dark:text-slate-400">
-                    Sektör
-                  </h2>
-                </div>
-                <div className="overflow-hidden rounded-[20px] bg-white/70 backdrop-blur-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:bg-slate-900/60 dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)]">
-                  <div className="flex items-center px-4 py-3 min-h-[44px] relative">
-                    <label className="w-[120px] shrink-0 text-[17px] text-gray-900 dark:text-white">Sektör</label>
-                    <select
+                {/* Sektör Card */}
+                <div className="rounded-3xl border border-slate-200 bg-white/80 p-6 backdrop-blur-2xl shadow-sm dark:border-slate-700 dark:bg-slate-900/70 space-y-4">
+                  <div className="border-b border-slate-100 dark:border-slate-800/80 pb-3">
+                    <h2 className="text-base font-bold text-slate-900 dark:text-white">
+                      Faaliyet Sektörü
+                    </h2>
+                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mt-0.5">
+                      İşletmenizin kategorize edileceği ana sektör
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
+                      Sektör
+                    </label>
+                    <CustomSelect
                       value={sector}
-                      onChange={(e) => setSector(e.target.value)}
-                      className="flex-1 appearance-none bg-transparent text-[17px] text-gray-900 focus:outline-none cursor-pointer dark:text-white pr-8"
-                    >
-                      <option value="" disabled>Sektör Seçin</option>
-                      {sectorsList.length > 0 ? (
-                        sectorsList.map((s) => (
-                          <option key={s.value} value={s.value}>{s.name}</option>
-                        ))
-                      ) : (
-                        <option value="Diğer">Diğer</option>
-                      )}
-                    </select>
-                    <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center">
-                      <ChevronRight size={18} className="text-gray-400" />
-                    </div>
+                      onChange={(val) => setSector(val)}
+                      options={
+                        sectorsList.length > 0
+                          ? sectorsList.map((s) => ({ value: s.value, label: s.name }))
+                          : [{ value: "Diğer", label: "Diğer" }]
+                      }
+                      placeholder="Sektör Seçin"
+                      searchPlaceholder="Sektör ara..."
+                    />
                   </div>
                 </div>
 
-                {/* Vitrin Görselleri */}
-                <div className="mt-8 mb-2 pl-4">
-                  <h2 className="text-[13px] font-semibold uppercase tracking-widest text-gray-500 dark:text-slate-400">
-                    Vitrin Görselleri
-                  </h2>
-                </div>
-                <div className="overflow-hidden rounded-[20px] bg-white/70 backdrop-blur-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:bg-slate-900/60 dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)]">
-                  <div className="divide-y divide-gray-200/50 dark:divide-slate-700/50">
-                    {/* Profile Image URL */}
-                    <div className="px-4 py-3">
-                      <div className="flex items-center min-h-[44px]">
-                        <label className="w-[120px] shrink-0 text-[17px] text-gray-900 dark:text-white">Profil Fotoğrafı</label>
-                        <input
-                          type="text"
-                          value={profileImageUrl}
-                          onChange={(e) => setProfileImageUrl(e.target.value)}
-                          placeholder="https://..."
-                          className="flex-1 bg-transparent text-[17px] text-gray-900 placeholder-gray-400 focus:outline-none dark:text-white dark:placeholder-slate-500"
-                        />
-                      </div>
+                {/* Vitrin Görselleri Card */}
+                <div className="rounded-3xl border border-slate-200 bg-white/80 p-6 backdrop-blur-2xl shadow-sm dark:border-slate-700 dark:bg-slate-900/70 space-y-5">
+                  <div className="border-b border-slate-100 dark:border-slate-800/80 pb-3">
+                    <h2 className="text-base font-bold text-slate-900 dark:text-white">
+                      Vitrin Görselleri
+                    </h2>
+                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mt-0.5">
+                      Müşterilerinizi karşılayan kapak ve profil görselleri
+                    </p>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
+                        Profil Fotoğrafı URL
+                      </label>
+                      <input
+                        type="text"
+                        value={profileImageUrl}
+                        onChange={(e) => setProfileImageUrl(e.target.value)}
+                        placeholder="https://images.unsplash.com/..."
+                        className="w-full rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-[15px] font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-white transition-all"
+                      />
                       {profileImageUrl && (
-                        <div className="mt-3 flex justify-center">
+                        <div className="mt-3 flex items-center gap-3 p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700/80">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={profileImageUrl}
                             alt="Profil önizleme"
-                            className="h-20 w-20 rounded-full object-cover border-2 border-gray-200 dark:border-slate-700 shadow-sm"
+                            className="h-16 w-16 rounded-full object-cover border-2 border-indigo-500 shadow-sm"
                           />
+                          <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Profil fotoğrafı önizleme</span>
                         </div>
                       )}
                     </div>
 
-                    {/* Cover Image URL */}
-                    <div className="px-4 py-3">
-                      <div className="flex items-center min-h-[44px]">
-                        <label className="w-[120px] shrink-0 text-[17px] text-gray-900 dark:text-white">Kapak Fotoğrafı</label>
-                        <input
-                          type="text"
-                          value={coverImageUrl}
-                          onChange={(e) => setCoverImageUrl(e.target.value)}
-                          placeholder="https://..."
-                          className="flex-1 bg-transparent text-[17px] text-gray-900 placeholder-gray-400 focus:outline-none dark:text-white dark:placeholder-slate-500"
-                        />
-                      </div>
+                    <div>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
+                        Kapak Fotoğrafı URL
+                      </label>
+                      <input
+                        type="text"
+                        value={coverImageUrl}
+                        onChange={(e) => setCoverImageUrl(e.target.value)}
+                        placeholder="https://images.unsplash.com/..."
+                        className="w-full rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-[15px] font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-white transition-all"
+                      />
                       {coverImageUrl && (
                         <div className="mt-3">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={coverImageUrl}
                             alt="Kapak önizleme"
-                            className="w-full h-32 rounded-xl object-cover border border-gray-200 dark:border-slate-700 shadow-sm"
+                            className="w-full h-36 rounded-2xl object-cover border border-slate-200 dark:border-slate-700 shadow-sm"
                           />
                         </div>
                       )}
@@ -794,6 +824,27 @@ export default function AyarlarPage() {
                 </div>
               </div>
             )}
+
+            {/* Form Bottom Save Action */}
+            <div className="flex items-center justify-end pt-4">
+              <button
+                type="submit"
+                disabled={saving}
+                className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-indigo-500/30 hover:bg-indigo-500 active:scale-95 disabled:opacity-50 transition-all"
+              >
+                {saving ? (
+                  <>
+                    <Loader2 size={18} className="animate-spin" />
+                    <span>Kaydediliyor...</span>
+                  </>
+                ) : (
+                  <>
+                    <Save size={18} />
+                    <span>Ayarları Kaydet</span>
+                  </>
+                )}
+              </button>
+            </div>
           </form>
         </div>
       </div>

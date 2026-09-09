@@ -8,13 +8,11 @@ import {
   ChevronRight,
   Trash2,
   Edit2,
-  CalendarDays,
-  Clock,
-  TrendingUp,
   Phone,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useLanguage } from "@/context/LanguageContext";
+import CustomSelect from "@/components/CustomSelect";
 
 const dayNames = ["pazar", "pazartesi", "sali", "carsamba", "persembe", "cuma", "cumartesi"];
 
@@ -173,19 +171,6 @@ export default function TakvimPage() {
     end.setHours(23, 59, 59, 999);
     return { start: start.toISOString(), end: end.toISOString() };
   }, [days]);
-
-  const todayApptsCount = appointments.filter(a => isSameDay(new Date(a.start_time), new Date())).length;
-  const pendingCount = appointments.filter(a => a.status === "confirmed" && new Date(a.start_time) > new Date()).length;
-  
-  const occupancyPercent = useMemo(() => {
-    if (days.length === 0) return 0;
-    let totalSlots = 0;
-    days.forEach(day => {
-      totalSlots += getDayHours(day, workingHours).length;
-    });
-    const filledSlots = appointments.filter(a => days.some(d => isSameDay(d, new Date(a.start_time)))).length;
-    return totalSlots > 0 ? Math.round((filledSlots / totalSlots) * 100) : 0;
-  }, [days, appointments, workingHours]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -369,12 +354,12 @@ export default function TakvimPage() {
   }, [viewMode, days, currentDate, MONTHS]);
 
   const renderMonthGrid = () => (
-    <div className="overflow-hidden rounded-[32px] border border-white/50 bg-white/70 backdrop-blur-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:border-slate-700/50 dark:bg-slate-900/60 dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)]">
-      <div className="grid grid-cols-7 border-b border-gray-200/50 dark:border-slate-700/50">
+    <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white/80 backdrop-blur-3xl shadow-sm dark:border-slate-700 dark:bg-slate-900/70">
+      <div className="grid grid-cols-7 border-b border-slate-200 dark:border-slate-700 select-none">
         {LABELS.map((l) => (
           <div
             key={l}
-            className="border-r border-gray-200/50 px-2 py-4 text-center text-xs font-bold uppercase tracking-wider text-gray-400 last:border-r-0 dark:border-slate-700/50"
+            className="border-r border-slate-200 px-2 py-3.5 text-center text-xs font-bold uppercase tracking-wider text-slate-500 last:border-r-0 dark:border-slate-700 dark:text-slate-400"
           >
             {l}
           </div>
@@ -387,27 +372,27 @@ export default function TakvimPage() {
           return (
             <div
               key={day.toISOString()}
-              className={`min-h-[100px] border-b border-r border-gray-200/50 p-2 transition-colors hover:bg-white/40 dark:border-slate-700/50 dark:hover:bg-slate-800/40 ${
-                isToday ? "bg-indigo-50/50 dark:bg-indigo-900/10" : ""
+              className={`min-h-[110px] border-b border-r border-slate-200 p-2 transition-colors hover:bg-slate-50/50 dark:border-slate-700 dark:hover:bg-slate-800/40 ${
+                isToday ? "bg-indigo-50/40 dark:bg-indigo-900/10" : ""
               }`}
             >
               <div className="flex justify-center mb-1">
                 <span
-                  className={`inline-flex h-8 w-8 items-center justify-center rounded-full text-[15px] font-bold ${
+                  className={`inline-flex h-8 w-8 items-center justify-center rounded-full text-[14px] font-bold ${
                     isToday
                       ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/30"
-                      : "text-gray-900 dark:text-slate-200"
+                      : "text-slate-900 dark:text-slate-200"
                   }`}
                 >
                   {day.getDate()}
                 </span>
               </div>
-              <div className="mt-2 space-y-1">
+              <div className="mt-1.5 space-y-1">
                 {dayAppts.slice(0, 3).map((a) => (
                   <button
                     key={a.id}
                     onClick={() => setSelectedAppointment(a)}
-                    className="w-full truncate rounded-lg bg-indigo-100/80 px-2 py-1 text-[11px] font-semibold text-indigo-800 backdrop-blur-md hover:bg-indigo-200 dark:bg-indigo-500/20 dark:text-indigo-200 dark:hover:bg-indigo-500/30 transition-colors"
+                    className="w-full truncate rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 border-l-[3px] border-l-indigo-600 px-2 py-1 text-[11px] font-bold text-slate-800 dark:text-slate-200 hover:bg-indigo-50/50 dark:hover:bg-slate-700/60 shadow-xs transition-colors text-left"
                   >
                     {formatTime(a.start_time)} {getCustomerName(a)}
                   </button>
@@ -421,50 +406,9 @@ export default function TakvimPage() {
   );
 
   return (
-    <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 space-y-6">
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 mb-8">
-        <div className="rounded-[28px] border border-white/40 bg-white/60 p-5 backdrop-blur-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:border-slate-700/50 dark:bg-slate-800/60 transition-transform hover:scale-[1.02] duration-300">
-          <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-500/10 dark:bg-indigo-500/20">
-              <CalendarDays size={24} className="text-indigo-600 dark:text-indigo-400" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-slate-400">{t("dashboard.today_appointments")}</p>
-              <p className="text-3xl font-extrabold text-gray-900 dark:text-white">{todayApptsCount}</p>
-            </div>
-          </div>
-        </div>
-        
-        <div className="rounded-[28px] border border-white/40 bg-white/60 p-5 backdrop-blur-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:border-slate-700/50 dark:bg-slate-800/60 transition-transform hover:scale-[1.02] duration-300">
-          <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/10 dark:bg-amber-500/20">
-              <Clock size={24} className="text-amber-600 dark:text-amber-400" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-slate-400">{t("dashboard.pending")}</p>
-              <div className="flex items-baseline gap-2">
-                <p className="text-3xl font-extrabold text-gray-900 dark:text-white">{pendingCount}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-[28px] border border-white/40 bg-white/60 p-5 backdrop-blur-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:border-slate-700/50 dark:bg-slate-800/60 transition-transform hover:scale-[1.02] duration-300">
-          <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/10 dark:bg-emerald-500/20">
-              <TrendingUp size={24} className="text-emerald-600 dark:text-emerald-400" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-slate-400">{t("dashboard.occupancy")}</p>
-              <p className="text-3xl font-extrabold text-gray-900 dark:text-white">%{occupancyPercent}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
+    <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 space-y-5">
       {/* Navigation Header */}
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between mb-6">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between mb-4 select-none">
         
         {/* Sol Taraf: Başlık */}
         <div className="lg:w-1/3 flex justify-start">
@@ -475,22 +419,22 @@ export default function TakvimPage() {
 
         {/* Orta Kısım: Yön Okları (Sabit Konum) */}
         <div className="lg:w-1/3 flex justify-center">
-          <div className="flex items-center gap-2 rounded-2xl bg-white/50 p-1 backdrop-blur-xl shadow-sm dark:bg-slate-800/50">
+          <div className="flex items-center gap-2 rounded-2xl bg-white/70 p-1 backdrop-blur-xl border border-slate-200/80 shadow-xs dark:bg-slate-800/60 dark:border-slate-700/80">
             <button
               onClick={() => navigate(-1)}
-              className="rounded-xl p-2.5 text-gray-600 hover:bg-white hover:shadow-sm dark:text-slate-300 dark:hover:bg-slate-700 transition-all active:scale-95"
+              className="rounded-xl p-2.5 text-gray-600 hover:bg-white hover:shadow-xs dark:text-slate-300 dark:hover:bg-slate-700 transition-all active:scale-95"
             >
               <ChevronLeft size={22} />
             </button>
             <button
               onClick={goToday}
-              className="px-5 py-2.5 text-sm font-bold text-gray-700 hover:bg-white hover:shadow-sm rounded-xl dark:text-slate-200 dark:hover:bg-slate-700 transition-all active:scale-95"
+              className="px-5 py-2.5 text-sm font-bold text-gray-700 hover:bg-white hover:shadow-xs rounded-xl dark:text-slate-200 dark:hover:bg-slate-700 transition-all active:scale-95"
             >
               {t("calendar.today")}
             </button>
             <button
               onClick={() => navigate(1)}
-              className="rounded-xl p-2.5 text-gray-600 hover:bg-white hover:shadow-sm dark:text-slate-300 dark:hover:bg-slate-700 transition-all active:scale-95"
+              className="rounded-xl p-2.5 text-gray-600 hover:bg-white hover:shadow-xs dark:text-slate-300 dark:hover:bg-slate-700 transition-all active:scale-95"
             >
               <ChevronRight size={22} />
             </button>
@@ -499,15 +443,15 @@ export default function TakvimPage() {
 
         {/* Sağ Taraf: Sekmeler ve Ekle Butonu */}
         <div className="lg:w-1/3 flex items-center justify-end gap-3">
-          <div className="flex rounded-2xl bg-gray-200/50 p-1 dark:bg-slate-800/50">
+          <div className="flex rounded-2xl bg-slate-200/60 p-1 dark:bg-slate-800/60 border border-slate-200/50 dark:border-slate-700/50">
             {(["today", "weekly", "monthly"] as const).map((mode) => (
               <button
                 key={mode}
                 onClick={() => setViewMode(mode)}
                 className={`rounded-xl px-4 py-2 text-sm font-bold transition-all ${
                   viewMode === mode
-                    ? "bg-white text-indigo-600 shadow-sm dark:bg-slate-700 dark:text-indigo-400"
-                    : "text-gray-500 hover:text-gray-900 dark:text-slate-400 dark:hover:text-slate-200"
+                    ? "bg-white text-indigo-600 shadow-xs dark:bg-slate-700 dark:text-indigo-400"
+                    : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
                 }`}
               >
                 {mode === "today" ? t("calendar.day") : mode === "weekly" ? t("calendar.week") : t("calendar.month")}
@@ -540,29 +484,34 @@ export default function TakvimPage() {
         {viewMode === "monthly" && renderMonthGrid()}
 
         {viewMode !== "monthly" && (
-        <div className="overflow-hidden rounded-[32px] border border-white/50 bg-white/70 backdrop-blur-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:border-slate-700/50 dark:bg-slate-900/60 dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)]">
+        <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white/80 backdrop-blur-3xl shadow-sm dark:border-slate-700 dark:bg-slate-900/70">
           <div className="overflow-x-auto custom-scrollbar">
-            <div className="min-w-[700px] md:min-w-full">
+            <div className="min-w-[800px] lg:min-w-full">
               {/* Day headers */}
-              <div className="flex border-b border-gray-200/50 dark:border-slate-700/50">
+              <div
+                className="grid border-b border-slate-200 dark:border-slate-700 select-none"
+                style={{
+                  gridTemplateColumns: `4rem repeat(${days.length}, minmax(0, 1fr))`,
+                }}
+              >
                 <div className="w-16 shrink-0" />
                 {days.map((day, i) => {
                   const isToday = isSameDay(day, new Date());
                   return (
                     <div
                       key={i}
-                      className={`flex flex-1 flex-col items-center border-l border-gray-200/50 py-4 dark:border-slate-700/50 ${
+                      className={`flex flex-col items-center border-l border-slate-200 py-3.5 dark:border-slate-700 min-w-0 ${
                         isToday ? "bg-indigo-50/50 dark:bg-indigo-900/10" : ""
                       }`}
                     >
-                      <span className={`text-[11px] font-bold uppercase tracking-widest ${isToday ? "text-indigo-600 dark:text-indigo-400" : "text-gray-400 dark:text-slate-500"}`}>
+                      <span className={`text-[11px] font-bold uppercase tracking-widest truncate ${isToday ? "text-indigo-600 dark:text-indigo-400" : "text-slate-500 dark:text-slate-400"}`}>
                         {TR_LABELS[day.getDay()]}
                       </span>
                       <span
-                        className={`mt-1.5 flex h-10 w-10 items-center justify-center rounded-full text-xl font-bold transition-all ${
+                        className={`mt-1 flex h-9 w-9 items-center justify-center rounded-full text-lg font-bold transition-all shrink-0 ${
                           isToday
                             ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/30"
-                            : "text-gray-900 dark:text-white"
+                            : "text-slate-900 dark:text-white"
                         }`}
                       >
                         {day.getDate()}
@@ -573,7 +522,7 @@ export default function TakvimPage() {
               </div>
 
               {/* Time slots */}
-              <div className="divide-y divide-gray-200/50 dark:divide-slate-700/50 relative">
+              <div className="divide-y divide-slate-200 dark:divide-slate-700 relative">
                 {(() => {
                   // Calculate hour range from working hours across all displayed days
                   const allDayHours = days.map(day => getDayHours(day, workingHours));
@@ -582,9 +531,15 @@ export default function TakvimPage() {
                   const displayHours = Array.from({ length: maxHour - minHour + 1 }, (_, i) => minHour + i);
                   
                   return displayHours.map((hour) => (
-                    <div key={hour} className="flex min-h-[80px]">
-                      <div className="flex w-16 shrink-0 items-start justify-center pt-3">
-                        <span className="text-[13px] font-semibold text-gray-400 dark:text-slate-500">
+                    <div
+                      key={hour}
+                      className="grid min-h-[92px]"
+                      style={{
+                        gridTemplateColumns: `4rem repeat(${days.length}, minmax(0, 1fr))`,
+                      }}
+                    >
+                      <div className="flex w-16 shrink-0 items-start justify-center pt-3 select-none">
+                        <span className="text-[13px] font-semibold text-slate-500 dark:text-slate-400">
                           {hour.toString().padStart(2, "0")}:00
                         </span>
                       </div>
@@ -600,12 +555,12 @@ export default function TakvimPage() {
                           <div
                             key={dayIndex}
                             data-cell={cellId}
-                            className={`flex flex-1 border-l border-gray-200/50 p-1 transition-all dark:border-slate-700/50 ${
+                            className={`min-w-0 border-l border-slate-200 p-1.5 transition-all dark:border-slate-700 flex flex-col ${
                               isWithinHours 
-                                ? "hover:bg-white/40 dark:hover:bg-slate-800/40 cursor-pointer" 
-                                : "bg-gray-50/50 dark:bg-slate-800/50 cursor-not-allowed"
+                                ? "hover:bg-slate-50/80 dark:hover:bg-slate-800/40 cursor-pointer" 
+                                : "bg-slate-100/40 dark:bg-slate-800/40 cursor-not-allowed"
                             } ${isSameDay(day, new Date())
-                                ? "bg-indigo-50/30 dark:bg-indigo-900/5"
+                                ? "bg-indigo-50/20 dark:bg-indigo-900/5"
                                 : ""
                             } ${isHighlighted ? "ring-2 ring-inset ring-amber-400 bg-amber-50 dark:bg-amber-900/20" : ""}`}
                             onClick={(e) => {
@@ -623,14 +578,26 @@ export default function TakvimPage() {
                                 e.stopPropagation();
                                 setSelectedAppointment(realApps[0]);
                               }}
-                              className="w-full h-full rounded-xl p-2 text-left transition-all hover:scale-[0.98] bg-indigo-100/90 text-indigo-900 border border-indigo-200 shadow-sm backdrop-blur-md dark:bg-indigo-500/20 dark:text-indigo-200 dark:border-indigo-500/30 overflow-hidden"
+                              className="w-full h-full min-w-0 rounded-xl p-2.5 text-left transition-all hover:shadow-md hover:scale-[0.99] bg-white dark:bg-slate-800 border border-slate-200/90 dark:border-slate-700/80 border-l-[5px] border-l-indigo-600 dark:border-l-indigo-500 shadow-xs overflow-hidden flex flex-col justify-between group"
                             >
-                              <p className="text-[12px] font-bold mb-0.5 leading-tight truncate">
-                                {realApps[0]?.services?.name || "Randevu"}
-                              </p>
-                              <p className="text-[11px] font-medium opacity-80 leading-tight truncate">
-                                {getCustomerName(realApps[0])}
-                              </p>
+                              <div className="min-w-0 w-full">
+                                <div className="flex items-center justify-between gap-1 mb-1 min-w-0">
+                                  <p className="text-[13px] font-bold text-slate-900 dark:text-white leading-tight truncate min-w-0">
+                                    {realApps[0]?.services?.name || "Randevu"}
+                                  </p>
+                                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 shrink-0 select-none">
+                                    {formatTime(realApps[0].start_time)}
+                                  </span>
+                                </div>
+                                <p className="text-[12px] font-semibold text-slate-600 dark:text-slate-300 leading-tight truncate">
+                                  {getCustomerName(realApps[0])}
+                                </p>
+                              </div>
+                              {realApps.length > 1 && (
+                                <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 mt-1">
+                                  +{realApps.length - 1} randevu daha
+                                </span>
+                              )}
                             </button>
                             )}
                           </div>
@@ -681,38 +648,36 @@ export default function TakvimPage() {
                   <label className="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-1.5">
                     Müşteri Seçimi
                   </label>
-                  <select
-                    required
+                  <CustomSelect
                     value={formCustomer}
-                    onChange={(e) => setFormCustomer(e.target.value)}
-                    className="block w-full rounded-2xl border-0 bg-white/50 px-4 py-3.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300/50 backdrop-blur-xl focus:ring-2 focus:ring-inset focus:ring-indigo-600 dark:bg-slate-800/50 dark:text-white dark:ring-slate-700/50 dark:focus:ring-indigo-500 transition-all"
-                  >
-                    <option value="">Müşteri seçin...</option>
-                    {customers.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.full_name}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setFormCustomer(val)}
+                    options={customers.map((c) => ({
+                      value: c.id,
+                      label: c.full_name,
+                    }))}
+                    placeholder="Müşteri seçin..."
+                    searchPlaceholder="Müşteri ara..."
+                    buttonClassName="w-full flex items-center justify-between rounded-2xl border-0 bg-white/60 px-4 py-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300/50 backdrop-blur-xl focus:ring-2 focus:ring-inset focus:ring-indigo-600 dark:bg-slate-800/60 dark:text-white dark:ring-slate-700/50 dark:focus:ring-indigo-500 transition-all cursor-pointer"
+                  />
                 </div>
               )}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-1.5">
                   Hizmet Seçimi
                 </label>
-                <select
-                  required
+                <CustomSelect
                   value={formService}
-                  onChange={(e) => setFormService(e.target.value)}
-                  className="block w-full rounded-2xl border-0 bg-white/50 px-4 py-3.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300/50 backdrop-blur-xl focus:ring-2 focus:ring-inset focus:ring-indigo-600 dark:bg-slate-800/50 dark:text-white dark:ring-slate-700/50 dark:focus:ring-indigo-500 transition-all"
-                >
-                  <option value="">Hizmet seçin...</option>
-                  {services.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name} (₺{s.price})
-                    </option>
-                  ))}
-                </select>
+                  onChange={(val) => setFormService(val)}
+                  options={services.map((s) => ({
+                    value: s.id,
+                    label: s.name,
+                    badge: `₺${s.price}`,
+                    sublabel: `${s.duration} dk`,
+                  }))}
+                  placeholder="Hizmet seçin..."
+                  searchPlaceholder="Hizmet ara..."
+                  buttonClassName="w-full flex items-center justify-between rounded-2xl border-0 bg-white/60 px-4 py-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300/50 backdrop-blur-xl focus:ring-2 focus:ring-inset focus:ring-indigo-600 dark:bg-slate-800/60 dark:text-white dark:ring-slate-700/50 dark:focus:ring-indigo-500 transition-all cursor-pointer"
+                />
               </div>
               <div className="mt-8 pt-4">
                 <button
@@ -767,15 +732,15 @@ export default function TakvimPage() {
                   )}
                 </div>
                 <div>
-                  <p className="text-lg font-bold text-gray-900 dark:text-slate-100">
+                  <p className="text-lg font-bold text-gray-900 dark:text-slate-100 select-text">
                     {getCustomerName(selectedAppointment)}
                   </p>
-                  <p className="text-sm font-medium text-indigo-600 dark:text-indigo-400">
+                  <p className="text-sm font-medium text-indigo-600 dark:text-indigo-400 select-text">
                     {selectedAppointment.services?.name || "Hizmet"}
                   </p>
                   {(selectedAppointment.profiles?.phone || selectedAppointment.custom_fields?.phone) && (
-                    <p className="flex items-center gap-1.5 text-sm font-medium text-gray-500 dark:text-gray-400 mt-1">
-                      <Phone size={13} className="shrink-0 text-indigo-500" />
+                    <p className="flex items-center gap-1.5 text-sm font-medium text-gray-500 dark:text-gray-400 mt-1 select-text">
+                      <Phone size={13} className="shrink-0 text-indigo-500 select-none" />
                       {selectedAppointment.profiles?.phone || selectedAppointment.custom_fields?.phone}
                     </p>
                   )}
@@ -784,8 +749,8 @@ export default function TakvimPage() {
               
               <div className="grid grid-cols-2 gap-4 rounded-3xl bg-white/50 p-4 shadow-inner border border-white/40 dark:bg-slate-800/50 dark:border-slate-700/50">
                 <div>
-                  <p className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-500 mb-1">Tarih</p>
-                  <p className="text-[15px] font-bold text-gray-900 dark:text-slate-100">
+                  <p className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-500 mb-1 select-none">Tarih</p>
+                  <p className="text-[15px] font-bold text-gray-900 dark:text-slate-100 select-text">
                     {new Date(
                       selectedAppointment.start_time,
                     ).toLocaleDateString("tr-TR", {
@@ -796,8 +761,8 @@ export default function TakvimPage() {
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-500 mb-1">Saat</p>
-                  <p className="text-[15px] font-bold text-gray-900 dark:text-slate-100">
+                  <p className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-500 mb-1 select-none">Saat</p>
+                  <p className="text-[15px] font-bold text-gray-900 dark:text-slate-100 select-text">
                     {formatTime(selectedAppointment.start_time)} -{" "}
                     {formatTime(selectedAppointment.end_time)}
                   </p>
@@ -806,8 +771,8 @@ export default function TakvimPage() {
 
               {selectedAppointment.custom_fields?.note && (
                 <div className="rounded-3xl bg-white/50 p-4 shadow-inner border border-white/40 dark:bg-slate-800/50 dark:border-slate-700/50">
-                  <p className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-500 mb-1">Açıklama</p>
-                  <p className="text-[15px] font-medium text-gray-900 dark:text-slate-100 whitespace-pre-wrap">
+                  <p className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-500 mb-1 select-none">Açıklama</p>
+                  <p className="text-[15px] font-medium text-gray-900 dark:text-slate-100 whitespace-pre-wrap select-text">
                     {selectedAppointment.custom_fields.note}
                   </p>
                 </div>

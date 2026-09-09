@@ -115,7 +115,7 @@ export default function NotificationBell() {
           <div className="absolute right-0 top-14 z-50 w-80 rounded-3xl border border-gray-100 bg-white/90 p-4 shadow-2xl backdrop-blur-xl dark:border-slate-700/50 dark:bg-slate-900/90 animate-modal-in">
             <h3 className="mb-4 text-lg font-bold text-gray-900 dark:text-white flex items-center justify-between">
               {t("notifications.title")}
-              {unreadCount > 0 && <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded-lg">{unreadCount} {t("notifications.new")}</span>}
+              {unreadCount > 0 && <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded-lg dark:bg-indigo-500/20 dark:text-indigo-300">{unreadCount} {t("notifications.new")}</span>}
             </h3>
             
             <div className="flex max-h-96 flex-col gap-2 overflow-y-auto custom-scrollbar">
@@ -126,13 +126,13 @@ export default function NotificationBell() {
                   <div 
                     key={n.id} 
                     onClick={() => !n.is_read && markAsRead(n.id)}
-                    className={`rounded-2xl p-3 transition-colors cursor-pointer ${n.is_read ? "opacity-70 bg-gray-50/50 hover:bg-gray-100" : "bg-indigo-50 hover:bg-indigo-100/80"}`}
+                    className={`rounded-2xl p-3 transition-colors cursor-pointer ${n.is_read ? "opacity-70 bg-gray-50/50 hover:bg-gray-100 dark:bg-slate-800/40 dark:hover:bg-slate-800/70" : "bg-indigo-50 hover:bg-indigo-100/80 dark:bg-indigo-500/10 dark:hover:bg-indigo-500/20"}`}
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <p className={`text-sm font-semibold ${n.is_read ? "text-gray-700" : "text-indigo-900"}`}>{n.title}</p>
+                      <p className={`text-sm font-semibold ${n.is_read ? "text-gray-700 dark:text-slate-300" : "text-indigo-900 dark:text-indigo-300"}`}>{n.title}</p>
                       {!n.is_read && <div className="mt-1 h-2 w-2 rounded-full bg-indigo-500 shrink-0" />}
                     </div>
-                    <p className={`mt-1 text-xs ${n.is_read ? "text-gray-500" : "text-indigo-700/80"} leading-relaxed`}>{n.message}</p>
+                    <p className={`mt-1 text-xs ${n.is_read ? "text-gray-500 dark:text-slate-400" : "text-indigo-700/80 dark:text-indigo-300/80"} leading-relaxed`}>{n.message}</p>
                   </div>
                 ))
               )}

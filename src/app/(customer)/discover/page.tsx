@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/context/LanguageContext';
 import { Building2, MapPin, Search, Loader2, ChevronRight, X, ChevronDown } from 'lucide-react';
 import citiesData from "@/lib/cities.json";
+import CustomSelect from "@/components/CustomSelect";
 
 export const dynamic = 'force-dynamic';
 
@@ -37,9 +38,6 @@ export default function DiscoverPage() {
   const [filterProvince, setFilterProvince] = useState('');
   const [filterDistrict, setFilterDistrict] = useState('');
   const [search, setSearch] = useState('');
-
-  const [isProvinceOpen, setIsProvinceOpen] = useState(false);
-  const [isDistrictOpen, setIsDistrictOpen] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
@@ -210,113 +208,38 @@ export default function DiscoverPage() {
           {/* Konum Filtreleri */}
           <div className="flex items-center gap-3 shrink-0">
             {/* İl Filtresi Custom Dropdown */}
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setIsProvinceOpen(!isProvinceOpen)}
-                className="flex items-center justify-between w-44 pl-4 pr-3 py-2.5 rounded-2xl border border-slate-200/50 dark:border-slate-700/50 bg-white/70 dark:bg-slate-800/60 backdrop-blur-3xl text-sm font-medium text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-white shadow-sm transition-colors"
-              >
-                <span className="truncate mr-2">
-                  {filterProvince || (lang === 'tr' ? 'Tüm İller' : 'All Provinces')}
-                </span>
-                <ChevronDown
-                  size={16}
-                  className={`text-slate-400 shrink-0 transition-transform duration-300 ${isProvinceOpen ? 'rotate-180' : ''}`}
-                />
-              </button>
-
-              {isProvinceOpen && (
-                <>
-                  <div
-                    className="fixed inset-0 z-40"
-                    onClick={() => setIsProvinceOpen(false)}
-                  ></div>
-                  <ul className="absolute z-50 mt-2 w-full max-h-60 overflow-y-auto overflow-x-hidden bg-white/90 dark:bg-slate-900/90 backdrop-blur-3xl shadow-2xl rounded-2xl border border-white/40 dark:border-slate-700/50 p-1.5 custom-scrollbar">
-                    <li
-                      className="px-3 py-2 text-sm rounded-xl text-slate-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-slate-800 cursor-pointer transition-colors"
-                      onClick={() => {
-                        setFilterProvince('');
-                        setFilterDistrict('');
-                        setIsProvinceOpen(false);
-                      }}
-                    >
-                      {lang === 'tr' ? 'Tüm İller' : 'All Provinces'}
-                    </li>
-                    {uniqueProvinces.map((p) => (
-                      <li
-                        key={p}
-                        className={`px-3 py-2 text-sm rounded-xl cursor-pointer transition-colors ${
-                          filterProvince === p
-                            ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 font-medium'
-                            : 'text-slate-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-slate-800'
-                        }`}
-                        onClick={() => {
-                          setFilterProvince(p);
-                          setFilterDistrict('');
-                          setIsProvinceOpen(false);
-                        }}
-                      >
-                        {p}
-                      </li>
-                    ))}
-                  </ul>
-                </>
-              )}
-            </div>
+            <CustomSelect
+              value={filterProvince}
+              onChange={(val) => {
+                setFilterProvince(val);
+                setFilterDistrict('');
+              }}
+              options={[
+                { value: '', label: lang === 'tr' ? 'Tüm İller' : 'All Provinces' },
+                ...uniqueProvinces,
+              ]}
+              placeholder={lang === 'tr' ? 'Tüm İller' : 'All Provinces'}
+              searchable={true}
+              searchPlaceholder={lang === 'tr' ? 'İl ara...' : 'Search province...'}
+              className="w-44"
+              buttonClassName="flex items-center justify-between w-44 pl-4 pr-3 py-2.5 rounded-2xl border border-slate-200/50 dark:border-slate-700/50 bg-white/70 dark:bg-slate-800/60 backdrop-blur-3xl text-sm font-medium text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-white shadow-sm transition-colors cursor-pointer"
+            />
 
             {/* İlçe Filtresi Custom Dropdown */}
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setIsDistrictOpen(!isDistrictOpen)}
-                disabled={!filterProvince && uniqueDistricts.length === 0}
-                className="flex items-center justify-between w-44 pl-4 pr-3 py-2.5 rounded-2xl border border-slate-200/50 dark:border-slate-700/50 bg-white/70 dark:bg-slate-800/60 backdrop-blur-3xl text-sm font-medium text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-white shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none"
-              >
-                <span className="truncate mr-2">
-                  {filterDistrict || (lang === 'tr' ? 'Tüm İlçeler' : 'All Districts')}
-                </span>
-                <ChevronDown
-                  size={16}
-                  className={`text-slate-400 shrink-0 transition-transform duration-300 ${isDistrictOpen ? 'rotate-180' : ''}`}
-                />
-              </button>
-
-              {isDistrictOpen && (
-                <>
-                  <div
-                    className="fixed inset-0 z-40"
-                    onClick={() => setIsDistrictOpen(false)}
-                  ></div>
-                  <ul className="absolute z-50 mt-2 w-full max-h-60 overflow-y-auto overflow-x-hidden bg-white/90 dark:bg-slate-900/90 backdrop-blur-3xl shadow-2xl rounded-2xl border border-white/40 dark:border-slate-700/50 p-1.5 custom-scrollbar">
-                    <li
-                      className="px-3 py-2 text-sm rounded-xl text-slate-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-slate-800 cursor-pointer transition-colors"
-                      onClick={() => {
-                        setFilterDistrict('');
-                        setIsDistrictOpen(false);
-                      }}
-                    >
-                      {lang === 'tr' ? 'Tüm İlçeler' : 'All Districts'}
-                    </li>
-                    {uniqueDistricts.map((d) => (
-                      <li
-                        key={d}
-                        className={`px-3 py-2 text-sm rounded-xl cursor-pointer transition-colors ${
-                          filterDistrict === d
-                            ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 font-medium'
-                            : 'text-slate-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-slate-800'
-                        }`}
-                        onClick={() => {
-                          setFilterDistrict(d);
-                          setIsDistrictOpen(false);
-                        }}
-                      >
-                        {d}
-                      </li>
-                    ))}
-                  </ul>
-                </>
-              )}
-            </div>
+            <CustomSelect
+              value={filterDistrict}
+              onChange={(val) => setFilterDistrict(val)}
+              options={[
+                { value: '', label: lang === 'tr' ? 'Tüm İlçeler' : 'All Districts' },
+                ...uniqueDistricts,
+              ]}
+              disabled={!filterProvince && uniqueDistricts.length === 0}
+              placeholder={lang === 'tr' ? 'Tüm İlçeler' : 'All Districts'}
+              searchable={true}
+              searchPlaceholder={lang === 'tr' ? 'İlçe ara...' : 'Search district...'}
+              className="w-44"
+              buttonClassName="flex items-center justify-between w-44 pl-4 pr-3 py-2.5 rounded-2xl border border-slate-200/50 dark:border-slate-700/50 bg-white/70 dark:bg-slate-800/60 backdrop-blur-3xl text-sm font-medium text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-white shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none cursor-pointer"
+            />
 
             {/* Filtreleri Temizle */}
             {(filterSector || filterProvince || filterDistrict || search) && (

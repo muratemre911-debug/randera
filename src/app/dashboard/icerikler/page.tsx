@@ -120,6 +120,33 @@ export default function IceriklerPage() {
     }
   };
 
+  const [featuredPostIds, setFeaturedPostIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (tenantId) {
+      const saved = localStorage.getItem(`tenant_featured_posts_${tenantId}`);
+      if (saved) {
+        try {
+          setFeaturedPostIds(JSON.parse(saved));
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    }
+  }, [tenantId]);
+
+  const handleToggleFeature = (postId: string) => {
+    setFeaturedPostIds((prev) => {
+      const next = prev.includes(postId)
+        ? prev.filter((id) => id !== postId)
+        : [...prev, postId];
+      if (tenantId) {
+        localStorage.setItem(`tenant_featured_posts_${tenantId}`, JSON.stringify(next));
+      }
+      return next;
+    });
+  };
+
   const handleDelete = async (id: string) => {
     if (!confirm(lang === "tr" ? "Bu içeriği silmek istediğinize emin misiniz?" : "Are you sure you want to delete this post?")) return;
     const res = await fetch(`/api/posts?id=${id}`, { method: "DELETE" });
@@ -146,84 +173,104 @@ export default function IceriklerPage() {
   };
 
   return (
-    <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 max-w-4xl mx-auto space-y-6">
+    <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 max-w-6xl mx-auto space-y-6">
       <div>
         <h1 className="text-4xl font-extrabold tracking-tight text-gray-900 dark:text-white">
-          {lang === "tr" ? "İçerikler" : "Posts"}
+          {lang === "tr" ? "İçerikler & Galeri" : "Posts & Gallery"}
         </h1>
         <p className="mt-1 text-sm font-medium text-gray-500 dark:text-slate-400">
-          {lang === "tr" ? "İşletme sayfanızda görünecek fotoğraf ve açıklamalar ekleyin." : "Add photos and descriptions to your business page."}
+          {lang === "tr" ? "İşletme profilinizde ve vitrininizde görünecek fotoğraf ve açıklamaları yönetin." : "Manage photos and descriptions for your business showcase."}
         </p>
       </div>
 
-      {/* Upload form */}
-      <form onSubmit={handleSubmit} className="rounded-[28px] border border-white/40 bg-white/60 p-6 backdrop-blur-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:border-slate-700/50 dark:bg-slate-900/60 space-y-4">
-        {message.text && (
-          <div className={`p-4 rounded-xl ${message.type === "success" ? "bg-green-50 text-green-700 border border-green-200 dark:bg-green-900/30 dark:text-green-400" : "bg-red-50 text-red-700 border border-red-200 dark:bg-red-900/30 dark:text-red-400"}`}>
-            {message.text}
-          </div>
-        )}
+      {/* İki Sütunlu Yerleşim */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {/* Sol Sütun: Yeni fotoğraf yükleme alanı ve açıklama formu */}
+        <div className="lg:col-span-5 lg:sticky lg:top-6">
+          <div className="rounded-3xl border border-slate-200 bg-white/80 p-6 backdrop-blur-2xl shadow-sm dark:border-slate-700 dark:bg-slate-900/70">
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
+              {lang === "tr" ? "Yeni Fotoğraf Yükle" : "Upload New Photo"}
+            </h2>
 
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-2">
-            {lang === "tr" ? "Fotoğraf" : "Photo"}
-          </label>
-          <div
-            onClick={() => fileInputRef.current?.click()}
-            className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-gray-300 dark:border-slate-700 p-8 hover:border-indigo-400 transition-colors"
-          >
-            {preview ? (
-              <img src={preview} alt="Önizleme" className="max-h-56 rounded-xl object-cover" />
-            ) : (
-              <div className="flex flex-col items-center gap-2 text-gray-400">
-                <ImagePlus size={32} />
-                <span className="text-sm font-medium">{lang === "tr" ? "Fotoğraf seç" : "Choose a photo"}</span>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {message.text && (
+                <div className={`p-3.5 rounded-2xl text-sm font-medium ${message.type === "success" ? "bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800/50" : "bg-red-50 text-red-700 border border-red-200 dark:bg-red-950/40 dark:text-red-400 dark:border-red-800/50"}`}>
+                  {message.text}
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
+                  {lang === "tr" ? "Fotoğraf Seçimi" : "Select Photo"}
+                </label>
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-700 p-6 hover:border-indigo-500 hover:bg-indigo-50/20 dark:hover:bg-slate-800/50 transition-all group"
+                >
+                  {preview ? (
+                    <img src={preview} alt="Önizleme" className="max-h-52 w-full rounded-xl object-cover" />
+                  ) : (
+                    <div className="flex flex-col items-center gap-2 text-slate-400 group-hover:text-indigo-600 transition-colors py-4">
+                      <div className="h-12 w-12 rounded-full bg-indigo-50 dark:bg-indigo-950/50 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+                        <ImagePlus size={24} />
+                      </div>
+                      <span className="text-sm font-bold">{lang === "tr" ? "Görsel seçmek için tıklayın" : "Click to choose photo"}</span>
+                      <span className="text-xs text-slate-400">JPG, PNG, WEBP</span>
+                    </div>
+                  )}
+                </div>
+                <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
               </div>
-            )}
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
+                  {lang === "tr" ? "Açıklama" : "Description"}
+                </label>
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={3}
+                  placeholder={lang === "tr" ? "Bu çalışma veya model hakkında açıklama ekleyin..." : "Write a description..."}
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-white resize-none"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={uploading || !file}
+                className="w-full rounded-2xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-indigo-500/30 transition-all hover:bg-indigo-500 active:scale-95 disabled:opacity-50"
+              >
+                {uploading ? (lang === "tr" ? "Yükleniyor..." : "Uploading...") : (lang === "tr" ? "Fotoğrafı Yayınla" : "Publish Photo")}
+              </button>
+            </form>
           </div>
-          <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
         </div>
 
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-2">
-            {lang === "tr" ? "Açıklama" : "Description"}
-          </label>
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            rows={3}
-            placeholder={lang === "tr" ? "Bu gönderi hakkında bir açıklama yazın..." : "Write a description..."}
-            className="w-full rounded-2xl border-0 bg-white/50 px-4 py-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300/50 backdrop-blur-xl focus:ring-2 focus:ring-indigo-500 dark:bg-slate-800/50 dark:text-white dark:ring-slate-700/50 resize-none"
-          />
-        </div>
-
-        <button
-          type="submit"
-          disabled={uploading || !file}
-          className="w-full rounded-full bg-indigo-600 px-4 py-3 text-base font-bold text-white shadow-lg shadow-indigo-500/30 transition-all hover:bg-indigo-500 active:scale-95 disabled:opacity-50"
-        >
-          {uploading ? (lang === "tr" ? "Yükleniyor..." : "Uploading...") : (lang === "tr" ? "Yayınla" : "Publish")}
-        </button>
-      </form>
-
-      {/* Posts grid */}
-      <div>
-        <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
-          {lang === "tr" ? "Gönderilerim" : "My Posts"}
-        </h2>
-        {loading ? (
-          <PostGridSkeleton />
-        ) : posts.length === 0 ? (
-          <div className="p-12 text-center text-gray-400 dark:text-slate-500">
-            {lang === "tr" ? "Henüz içerik eklenmemiş." : "No posts yet."}
+        {/* Sağ Sütun: Yüklenen fotoğrafların yer aldığı 3'lü/4'lü Instagram tarzı grid galeri */}
+        <div className="lg:col-span-7 space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white">
+              {lang === "tr" ? "Vitrin / Galeri Fotoğrafları" : "Showcase Photos"}
+            </h2>
+            <span className="text-xs font-bold px-3 py-1 rounded-full bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+              {posts.length} {lang === "tr" ? "Fotoğraf" : "Photos"}
+            </span>
           </div>
-        ) : (
-          <PostGrid
-            posts={posts}
-            onPostClick={handlePostClick}
-            isLoading={false}
-          />
-        )}
+
+          {loading ? (
+            <PostGridSkeleton />
+          ) : (
+            <PostGrid
+              posts={posts}
+              onPostClick={handlePostClick}
+              onDelete={handleDelete}
+              onToggleFeature={handleToggleFeature}
+              featuredPostIds={featuredPostIds}
+              columns={3}
+              isLoading={false}
+            />
+          )}
+        </div>
       </div>
 
       <PostModal

@@ -94,9 +94,21 @@ export default function DashboardPage() {
     return new Date(isoString).toLocaleTimeString(lang === "tr" ? "tr-TR" : "en-US", { hour: "2-digit", minute: "2-digit" });
   };
 
-  const getMinutesLeft = (isoString: string) => {
-    const diff = new Date(isoString).getTime() - new Date().getTime();
-    return Math.max(0, Math.floor(diff / 60000));
+  const getTimeLeft = (isoString: string) => {
+    const diff = Math.max(0, new Date(isoString).getTime() - new Date().getTime());
+    const days = Math.floor(diff / 86400000);
+    const hours = Math.floor((diff % 86400000) / 3600000);
+    const minutes = Math.floor(((diff % 86400000) % 3600000) / 60000);
+
+    if (days > 0) {
+      return lang === "tr"
+        ? `${days} gün ${hours} saat ${minutes} dk`
+        : `${days}d ${hours}h ${minutes}m`;
+    }
+    if (hours > 0) {
+      return lang === "tr" ? `${hours} saat ${minutes} dk` : `${hours}h ${minutes}m`;
+    }
+    return lang === "tr" ? `${minutes} dk` : `${minutes}m`;
   };
 
   if (loading) {
@@ -165,7 +177,7 @@ export default function DashboardPage() {
             {stats.nextAppointment ? (
               <>
                 <p className="text-xl font-extrabold text-amber-500">{formatTime(stats.nextAppointment.start_time)}</p>
-                <p className="text-sm font-medium text-gray-400">{getMinutesLeft(stats.nextAppointment.start_time)} {lang === "tr" ? "dk kaldı" : "mins left"}</p>
+                <p className="text-sm font-medium text-gray-400">{getTimeLeft(stats.nextAppointment.start_time)}</p>
               </>
             ) : (
               <p className="text-xl font-extrabold text-gray-300 dark:text-slate-600">--:--</p>

@@ -8,6 +8,7 @@ import {
 import Link from "next/link";
 import { createClient } from "@/utils/supabase/client";
 import type { Sector, Tenant } from "@/types";
+import CustomSelect from "@/components/CustomSelect";
 
 const SUPER_ADMIN_EMAILS = (process.env.NEXT_PUBLIC_SUPER_ADMIN_EMAILS || "")
   .split(",")
@@ -261,9 +262,14 @@ export default function SuperAdminPage() {
               <div><label className="block text-sm font-semibold mb-1">Yetkili Adı</label><input required type="text" value={form.fullName} onChange={e => setForm({...form, fullName: e.target.value})} className="w-full px-4 py-2.5 rounded-xl border outline-none focus:border-indigo-500 focus:ring-2" /></div>
               <div>
                 <label className="block text-sm font-semibold mb-1">Sektör</label>
-                <select required value={form.sector} onChange={e => setForm({...form, sector: e.target.value})} className="w-full px-4 py-2.5 rounded-xl border outline-none focus:border-indigo-500 focus:ring-2 bg-white">
-                  {sectors.map(s => <option key={s.id} value={s.value}>{s.name}</option>)}
-                </select>
+                <CustomSelect
+                  value={form.sector}
+                  onChange={(val) => setForm({ ...form, sector: val })}
+                  options={sectors.map((s) => ({ value: s.value, label: s.name }))}
+                  placeholder="Sektör Seçin"
+                  searchPlaceholder="Sektör ara..."
+                  buttonClassName="w-full flex items-center justify-between px-4 py-2.5 rounded-xl border outline-none focus:border-indigo-500 focus:ring-2 bg-white cursor-pointer"
+                />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div><label className="block text-sm font-semibold mb-1">E-Posta</label><input required type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} className="w-full px-4 py-2.5 rounded-xl border outline-none focus:border-indigo-500" /></div>
@@ -359,28 +365,46 @@ export default function SuperAdminPage() {
                 <form onSubmit={handleSendNotification} className="space-y-5">
                   <div>
                     <label className="block text-sm font-semibold mb-1">Hedef Kitle</label>
-                    <select value={notifForm.targetType} onChange={e => setNotifForm({...notifForm, targetType: e.target.value})} className="w-full px-4 py-2.5 rounded-xl border outline-none bg-white">
-                      <option value="all">Sistemdeki Tüm İşletmelere (Herkes)</option>
-                      <option value="sector">Sadece Belirli Bir Sektöre</option>
-                      <option value="single">Sadece Tek Bir İşletmeye</option>
-                    </select>
+                    <CustomSelect
+                      value={notifForm.targetType}
+                      onChange={(val) => setNotifForm({ ...notifForm, targetType: val })}
+                      options={[
+                        { value: "all", label: "Sistemdeki Tüm İşletmelere (Herkes)" },
+                        { value: "sector", label: "Sadece Belirli Bir Sektöre" },
+                        { value: "single", label: "Sadece Tek Bir İşletmeye" },
+                      ]}
+                      buttonClassName="w-full flex items-center justify-between px-4 py-2.5 rounded-xl border outline-none bg-white cursor-pointer"
+                    />
                   </div>
 
                   {notifForm.targetType === "sector" && (
                     <div className="animate-in fade-in zoom-in-95">
                       <label className="block text-sm font-semibold mb-1 text-indigo-600">Sektör Seçin</label>
-                      <select value={notifForm.targetValue} onChange={e => setNotifForm({...notifForm, targetValue: e.target.value})} className="w-full px-4 py-2.5 rounded-xl border border-indigo-200 outline-none bg-indigo-50/30">
-                        {sectors.map(s => <option key={s.id} value={s.value}>{s.name}</option>)}
-                      </select>
+                      <CustomSelect
+                        value={notifForm.targetValue}
+                        onChange={(val) => setNotifForm({ ...notifForm, targetValue: val })}
+                        options={sectors.map((s) => ({ value: s.value, label: s.name }))}
+                        placeholder="Sektör Seçin"
+                        searchPlaceholder="Sektör ara..."
+                        buttonClassName="w-full flex items-center justify-between px-4 py-2.5 rounded-xl border border-indigo-200 outline-none bg-indigo-50/30 cursor-pointer"
+                      />
                     </div>
                   )}
 
                   {notifForm.targetType === "single" && (
                     <div className="animate-in fade-in zoom-in-95">
                       <label className="block text-sm font-semibold mb-1 text-indigo-600">İşletme Seçin</label>
-                      <select value={notifForm.targetValue} onChange={e => setNotifForm({...notifForm, targetValue: e.target.value})} className="w-full px-4 py-2.5 rounded-xl border border-indigo-200 outline-none bg-indigo-50/30">
-                        {tenants.map((t: TenantListItem) => <option key={t.tenantId} value={t.tenantId}>{t.tenantName}</option>)}
-                      </select>
+                      <CustomSelect
+                        value={notifForm.targetValue}
+                        onChange={(val) => setNotifForm({ ...notifForm, targetValue: val })}
+                        options={tenants.map((t: TenantListItem) => ({
+                          value: t.tenantId,
+                          label: t.tenantName,
+                        }))}
+                        placeholder="İşletme Seçin"
+                        searchPlaceholder="İşletme ara..."
+                        buttonClassName="w-full flex items-center justify-between px-4 py-2.5 rounded-xl border border-indigo-200 outline-none bg-indigo-50/30 cursor-pointer"
+                      />
                     </div>
                   )}
 

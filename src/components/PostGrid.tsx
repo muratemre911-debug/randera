@@ -1,22 +1,42 @@
 "use client";
 
 import React from "react";
-import { Heart, MessageCircle, Loader2 } from "lucide-react";
+import { Heart, MessageCircle, Star, Trash2, Loader2 } from "lucide-react";
 import { Post } from "@/types";
 import { formatNumber } from "@/lib/utils";
 
 interface PostGridProps {
   posts: Post[];
   onPostClick: (post: Post) => void;
+  onDelete?: (postId: string) => void;
+  onToggleFeature?: (postId: string) => void;
+  featuredPostIds?: string[];
+  columns?: 3 | 4;
   isLoading?: boolean;
 }
 
-export function PostGrid({ posts, onPostClick, isLoading = false }: PostGridProps) {
+export function PostGrid({
+  posts,
+  onPostClick,
+  onDelete,
+  onToggleFeature,
+  featuredPostIds = [],
+  columns = 3,
+  isLoading = false,
+}: PostGridProps) {
   if (isLoading) {
     return (
-      <div className="grid grid-cols-3 gap-1 md:gap-4" role="status" aria-label="Gönderiler yükleniyor">
+      <div
+        className={
+          columns === 4
+            ? "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 md:gap-3"
+            : "grid grid-cols-2 sm:grid-cols-3 gap-2 md:gap-3"
+        }
+        role="status"
+        aria-label="Gönderiler yükleniyor"
+      >
         {Array.from({ length: 9 }).map((_, i) => (
-          <div key={i} className="aspect-square bg-slate-200 dark:bg-slate-700 animate-pulse rounded-xl" />
+          <div key={i} className="aspect-square bg-slate-200 dark:bg-slate-700 animate-pulse rounded-2xl" />
         ))}
       </div>
     );
@@ -24,24 +44,36 @@ export function PostGrid({ posts, onPostClick, isLoading = false }: PostGridProp
 
   if (posts.length === 0) {
     return (
-      <div className="col-span-3 py-16 text-center text-gray-500 dark:text-slate-400">
+      <div className="py-16 text-center text-gray-500 dark:text-slate-400">
         <div className="flex flex-col items-center gap-3">
-          <div className="h-16 w-16 rounded-full bg-gray-100 dark:bg-slate-800 flex items-center justify-center">
+          <div className="h-16 w-16 rounded-3xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
             <svg className="h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
           </div>
-          <p className="text-sm font-medium">Henüz gönderi yok</p>
-          <p className="text-xs text-gray-400">İşletmenin ilk gönderisini paylaşın</p>
+          <p className="text-sm font-semibold text-slate-800 dark:text-white">Henüz gönderi yok</p>
+          <p className="text-xs text-slate-400">İşletmenizin fotoğraflarını yükleyerek vitrininizi oluşturun.</p>
         </div>
       </div>
     );
   }
 
+  const gridClass =
+    columns === 4
+      ? "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 md:gap-3.5"
+      : "grid grid-cols-2 sm:grid-cols-3 gap-2.5 md:gap-3.5";
+
   return (
-    <div className="grid grid-cols-3 gap-1 md:gap-4" role="list" aria-label="İşletme gönderileri">
+    <div className={gridClass} role="list" aria-label="İşletme gönderileri">
       {posts.map((post) => (
-        <PostGridItem key={post.id} post={post} onClick={onPostClick} />
+        <PostGridItem
+          key={post.id}
+          post={post}
+          onClick={onPostClick}
+          onDelete={onDelete}
+          onToggleFeature={onToggleFeature}
+          isFeatured={featuredPostIds.includes(post.id)}
+        />
       ))}
     </div>
   );
@@ -50,10 +82,12 @@ export function PostGrid({ posts, onPostClick, isLoading = false }: PostGridProp
 interface PostGridItemProps {
   post: Post;
   onClick: (post: Post) => void;
+  onDelete?: (postId: string) => void;
+  onToggleFeature?: (postId: string) => void;
+  isFeatured?: boolean;
 }
 
-function PostGridItem({ post, onClick }: PostGridItemProps) {
-  const [isHovered, setIsHovered] = React.useState(false);
+function PostGridItem({ post, onClick, onDelete, onToggleFeature, isFeatured = false }: PostGridItemProps) {
   const [imageError, setImageError] = React.useState(false);
 
   const handleClick = () => onClick(post);
@@ -69,13 +103,11 @@ function PostGridItem({ post, onClick }: PostGridItemProps) {
 
   return (
     <article
-      className="relative aspect-square overflow-hidden bg-slate-100 dark:bg-slate-800 cursor-pointer group rounded-xl md:rounded-2xl"
+      className="relative aspect-square overflow-hidden bg-slate-100 dark:bg-slate-800 cursor-pointer group rounded-2xl border border-slate-200/60 dark:border-slate-700/60 shadow-xs"
       role="listitem"
       tabIndex={0}
       onClick={handleClick}
       onKeyDown={handleKeyDown}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
       aria-label={`Gönderi: ${post.description?.slice(0, 100) || "Açıklama yok"} - ${formatNumber(likeCount)} beğeni, ${formatNumber(commentCount)} yorum`}
     >
       {imageError ? (
@@ -94,20 +126,58 @@ function PostGridItem({ post, onClick }: PostGridItemProps) {
         />
       )}
 
+      {isFeatured && (
+        <div className="absolute top-2 left-2 z-10 flex items-center gap-1 rounded-lg bg-amber-500/90 px-2 py-0.5 text-[10px] font-bold text-white shadow-xs backdrop-blur-xs">
+          <Star size={11} className="fill-white" />
+          <span>Öne Çıkan</span>
+        </div>
+      )}
+
+      {(onDelete || onToggleFeature) && (
+        <div className="absolute top-2 right-2 flex items-center gap-1.5 z-20 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+          {onToggleFeature && (
+            <button
+              type="button"
+              title={isFeatured ? "Öne çıkarmayı kaldır" : "Öne çıkar"}
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleFeature(post.id);
+              }}
+              className={`p-2 rounded-xl backdrop-blur-md shadow-md transition-all active:scale-90 ${
+                isFeatured
+                  ? "bg-amber-500 text-white"
+                  : "bg-white/90 text-slate-700 hover:bg-amber-500 hover:text-white dark:bg-slate-900/90 dark:text-slate-200"
+              }`}
+            >
+              <Star size={14} className={isFeatured ? "fill-white" : ""} />
+            </button>
+          )}
+          {onDelete && (
+            <button
+              type="button"
+              title="Sil"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(post.id);
+              }}
+              className="p-2 rounded-xl bg-white/90 text-rose-600 hover:bg-rose-600 hover:text-white dark:bg-slate-900/90 dark:text-rose-400 dark:hover:bg-rose-600 dark:hover:text-white shadow-md transition-all active:scale-90"
+            >
+              <Trash2 size={14} />
+            </button>
+          )}
+        </div>
+      )}
+
       <div
-        className="absolute inset-0 bg-black/50 flex items-center justify-center gap-4 opacity-0 transition-opacity duration-200 group-hover:opacity-100 pointer-events-none"
+        className="absolute inset-0 bg-black/40 flex items-center justify-center gap-4 opacity-0 transition-opacity duration-200 group-hover:opacity-100 pointer-events-none"
         aria-hidden="true"
       >
-        {isHovered || posts.length > 1 ? (
-          <>
-            <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm rounded-full p-2.5 shadow-lg transform transition-transform hover:scale-110">
-              <Heart className="h-5 w-5 text-red-500" aria-hidden="true" />
-            </div>
-            <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm rounded-full p-2.5 shadow-lg transform transition-transform hover:scale-110">
-              <MessageCircle className="h-5 w-5 text-indigo-600 dark:text-indigo-400" aria-hidden="true" />
-            </div>
-          </>
-        ) : null}
+        <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm rounded-full p-2.5 shadow-lg transform transition-transform hover:scale-110">
+          <Heart className="h-5 w-5 text-red-500" aria-hidden="true" />
+        </div>
+        <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm rounded-full p-2.5 shadow-lg transform transition-transform hover:scale-110">
+          <MessageCircle className="h-5 w-5 text-indigo-600 dark:text-indigo-400" aria-hidden="true" />
+        </div>
       </div>
 
       <div className="absolute bottom-2 right-2 flex items-center gap-1.5 px-2 py-1 rounded-full bg-black/60 backdrop-blur-sm text-white text-xs font-medium opacity-0 transition-opacity duration-200 group-hover:opacity-100 pointer-events-none">

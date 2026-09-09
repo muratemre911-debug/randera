@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { History, CalendarDays, X } from "lucide-react";
+import { CalendarDays, X } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useLanguage } from "@/context/LanguageContext";
+import CustomSelect from "@/components/CustomSelect";
 
 interface Service {
   id: string;
@@ -126,119 +127,171 @@ export default function GecmisRandevularPage() {
         </p>
       </div>
 
-      {/* Filters */}
-      <div className="rounded-[28px] border border-white/40 bg-white/60 p-5 backdrop-blur-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:border-slate-700/50 dark:bg-slate-900/60">
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-500">
+      {/* Filters Bar */}
+      <div className="rounded-2xl border border-slate-200 bg-white/80 p-3.5 backdrop-blur-2xl shadow-xs dark:border-slate-700 dark:bg-slate-900/70">
+        <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
+          <div className="flex-1 min-w-[200px]">
+            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
               {lang === "tr" ? "Hizmet" : "Service"}
             </label>
-            <select
+            <CustomSelect
               value={filterService}
-              onChange={(e) => setFilterService(e.target.value)}
-              className="rounded-xl border-0 bg-white/50 px-4 py-2.5 text-sm text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300/50 backdrop-blur-xl focus:ring-2 focus:ring-indigo-500 dark:bg-slate-800/50 dark:text-white dark:ring-slate-700/50"
-            >
-              <option value="">{lang === "tr" ? "Tüm Hizmetler" : "All Services"}</option>
-              {services.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
+              onChange={(val) => setFilterService(val)}
+              options={[
+                { value: "", label: lang === "tr" ? "Tüm Hizmetler" : "All Services" },
+                ...services.map((s) => ({
+                  value: s.id,
+                  label: s.name,
+                  badge: `₺${s.price}`,
+                })),
+              ]}
+              buttonClassName="w-full flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-white transition-all cursor-pointer"
+              placeholder={lang === "tr" ? "Tüm Hizmetler" : "All Services"}
+              searchPlaceholder={lang === "tr" ? "Hizmet ara..." : "Search services..."}
+            />
           </div>
 
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-500">
-              {lang === "tr" ? "Başlangıç Tarihi" : "From"}
+          <div className="flex-1 min-w-[150px]">
+            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+              {lang === "tr" ? "Başlangıç Tarihi" : "Start Date"}
             </label>
             <input
               type="date"
               value={filterFrom}
               onChange={(e) => setFilterFrom(e.target.value)}
-              className="rounded-xl border-0 bg-white/50 px-4 py-2.5 text-sm text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300/50 backdrop-blur-xl focus:ring-2 focus:ring-indigo-500 dark:bg-slate-800/50 dark:text-white dark:ring-slate-700/50"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-white"
             />
           </div>
 
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-500">
-              {lang === "tr" ? "Bitiş Tarihi" : "To"}
+          <div className="flex-1 min-w-[150px]">
+            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+              {lang === "tr" ? "Bitiş Tarihi" : "End Date"}
             </label>
             <input
               type="date"
               value={filterTo}
               onChange={(e) => setFilterTo(e.target.value)}
-              className="rounded-xl border-0 bg-white/50 px-4 py-2.5 text-sm text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300/50 backdrop-blur-xl focus:ring-2 focus:ring-indigo-500 dark:bg-slate-800/50 dark:text-white dark:ring-slate-700/50"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-white"
             />
           </div>
 
           {hasFilter && (
-            <button
-              onClick={clearFilters}
-              className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-bold text-red-600 transition-colors hover:bg-red-100 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-400"
-            >
-              <X size={16} />
-              {lang === "tr" ? "Temizle" : "Clear"}
-            </button>
+            <div className="self-end pb-0.5">
+              <button
+                onClick={clearFilters}
+                className="flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50/80 px-3.5 py-2 text-sm font-bold text-red-600 transition-colors hover:bg-red-100 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-400"
+              >
+                <X size={16} />
+                {lang === "tr" ? "Temizle" : "Clear"}
+              </button>
+            </div>
           )}
         </div>
       </div>
 
-      {/* List */}
-      <div className="overflow-hidden rounded-[32px] border border-white/50 bg-white/70 backdrop-blur-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:border-slate-700/50 dark:bg-slate-900/60">
-        {loading ? (
-          <div className="p-12 text-center text-sm font-medium text-gray-500 dark:text-slate-400">
-            {lang === "tr" ? "Yükleniyor..." : "Loading..."}
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="p-12 text-center">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 dark:bg-slate-800 mb-4">
-              <History className="h-8 w-8 text-gray-400" />
-            </div>
-            <p className="text-lg font-medium text-gray-900 dark:text-white">
-              {hasFilter
-                ? lang === "tr"
-                  ? "Filtrelere uygun randevu bulunamadı."
-                  : "No appointments match your filters."
-                : lang === "tr"
-                  ? "Henüz geçmiş randevunuz yok."
-                  : "No past appointments yet."}
-            </p>
-          </div>
-        ) : (
-          <div className="flex flex-col">
-            {filtered.map((a, index) => (
-              <div key={a.id} className="group relative">
-                {index !== 0 && (
-                  <div className="absolute top-0 right-0 left-[64px] h-[1px] bg-gray-200/50 dark:bg-slate-700/50" />
-                )}
-                <div className="flex items-center justify-between p-4 pl-5 hover:bg-white/40 dark:hover:bg-slate-800/40 transition-colors">
-                  <div className="flex items-center gap-4">
-                    <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400">
-                      <CalendarDays size={22} />
+      {/* Table */}
+      <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white/80 backdrop-blur-2xl shadow-sm dark:border-slate-700 dark:bg-slate-900/70">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            {/* Sabit Hafif Gri Başlık Satırı */}
+            <thead className="select-none">
+              <tr className="border-b border-slate-200 bg-slate-100/70 text-xs font-bold uppercase tracking-wider text-slate-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-400">
+                <th className="py-3.5 px-5">{lang === "tr" ? "Tarih" : "Date"}</th>
+                <th className="py-3.5 px-5">{lang === "tr" ? "Müşteri" : "Customer"}</th>
+                <th className="py-3.5 px-5">{lang === "tr" ? "Hizmet" : "Service"}</th>
+                <th className="py-3.5 px-5 text-right">{lang === "tr" ? "Tutar" : "Price"}</th>
+                <th className="py-3.5 px-5 text-center">{lang === "tr" ? "Durum" : "Status"}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={5} className="py-16 text-center text-sm font-medium text-slate-500 dark:text-slate-400">
+                    <div className="inline-flex items-center gap-2">
+                      <div className="h-5 w-5 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
+                      <span>{lang === "tr" ? "Yükleniyor..." : "Loading..."}</span>
                     </div>
-                    <div>
-                      <h3 className="text-[17px] font-semibold text-gray-900 dark:text-white tracking-tight">
-                        {getCustomerName(a)}
+                  </td>
+                </tr>
+              ) : filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="py-16 px-4">
+                    <div className="flex flex-col items-center justify-center text-center max-w-sm mx-auto">
+                      <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-3xl bg-indigo-50 text-indigo-600 ring-8 ring-indigo-50/50 dark:bg-indigo-950/40 dark:text-indigo-400 dark:ring-indigo-900/20">
+                        <CalendarDays className="h-10 w-10 stroke-[1.75]" />
+                      </div>
+                      <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                        {hasFilter
+                          ? (lang === "tr" ? "Filtrelere uygun randevu bulunamadı" : "No appointments match filters")
+                          : (lang === "tr" ? "Henüz geçmiş randevunuz yok" : "No past appointments yet")}
                       </h3>
-                      <p className="text-sm font-medium text-gray-500 dark:text-slate-400">
-                        {a.services?.name || (lang === "tr" ? "Hizmet" : "Service")}
+                      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                        {hasFilter
+                          ? (lang === "tr" ? "Farklı bir tarih aralığı veya hizmet seçerek tekrar deneyebilirsiniz." : "Try selecting a different date range or service.")
+                          : (lang === "tr" ? "Tamamlanan veya geçen randevularınız bu tabloda arşivlenecektir." : "Completed or past appointments will appear here.")}
                       </p>
+                      {hasFilter && (
+                        <button
+                          onClick={clearFilters}
+                          className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-slate-100 px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 transition-colors"
+                        >
+                          <X size={14} />
+                          {lang === "tr" ? "Filtreleri Sıfırla" : "Reset Filters"}
+                        </button>
+                      )}
                     </div>
-                  </div>
-
-                  <div className="flex flex-col items-end gap-1">
-                    <span className="text-sm font-semibold text-gray-700 dark:text-slate-200">
-                      {formatDate(a.start_time)} · {formatTime(a.start_time)}
-                    </span>
-                    <span className="flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400">
-                      ₺{a.services?.price ?? 0}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+                  </td>
+                </tr>
+              ) : (
+                filtered.map((a) => (
+                  <tr
+                    key={a.id}
+                    className="border-b border-slate-100 dark:border-slate-800/80 hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors"
+                  >
+                    {/* Tarih */}
+                    <td className="py-4 px-5 whitespace-nowrap">
+                      <div className="font-semibold text-slate-900 dark:text-white text-sm">
+                        {formatDate(a.start_time)}
+                      </div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400">
+                        {formatTime(a.start_time)}
+                      </div>
+                    </td>
+                    {/* Müşteri */}
+                    <td className="py-4 px-5">
+                      <div className="font-bold text-slate-900 dark:text-white text-sm">
+                        {getCustomerName(a)}
+                      </div>
+                      {a.profiles?.phone && (
+                        <div className="text-xs text-slate-500 dark:text-slate-400">
+                          {a.profiles.phone}
+                        </div>
+                      )}
+                    </td>
+                    {/* Hizmet */}
+                    <td className="py-4 px-5">
+                      <span className="inline-flex items-center rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                        {a.services?.name || (lang === "tr" ? "Hizmet" : "Service")}
+                      </span>
+                    </td>
+                    {/* Tutar */}
+                    <td className="py-4 px-5 text-right whitespace-nowrap">
+                      <span className="font-bold text-emerald-600 dark:text-emerald-400 text-sm">
+                        ₺{a.services?.price ?? 0}
+                      </span>
+                    </td>
+                    {/* Durum */}
+                    <td className="py-4 px-5 text-center whitespace-nowrap">
+                      <span className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800/50">
+                        {lang === "tr" ? "Tamamlandı" : "Completed"}
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

@@ -100,7 +100,7 @@ export default function DashboardLayoutClient({
 
       {/* Floating Sidebar */}
       <aside
-        className={`fixed inset-y-4 left-4 z-50 flex w-64 flex-col rounded-3xl bg-white/60 backdrop-blur-3xl border border-white/50 shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition-all duration-500 ease-out lg:static lg:translate-x-0 dark:bg-slate-900/60 dark:border-slate-700/50 dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] ${
+        className={`fixed inset-y-4 left-4 z-50 flex w-64 flex-col rounded-3xl bg-white/60 backdrop-blur-3xl border border-white/50 shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition-all duration-500 ease-out lg:static lg:translate-x-0 dark:bg-slate-900/60 dark:border-slate-700/50 dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] select-none ${
           sidebarOpen ? "translate-x-0" : "-translate-x-[120%]"
         }`}
       >
@@ -176,7 +176,7 @@ export default function DashboardLayoutClient({
       {/* Main content area */}
       <div className="flex flex-1 flex-col overflow-hidden relative z-10">
         {/* Floating Header */}
-        <header className="sticky top-4 z-40 mx-4 lg:mx-8 flex h-16 items-center justify-between rounded-3xl border border-white/50 bg-white/60 backdrop-blur-3xl px-5 shadow-[0_4px_20px_rgb(0,0,0,0.03)] dark:bg-slate-900/60 dark:border-slate-700/50 dark:shadow-[0_4px_20px_rgb(0,0,0,0.2)] transition-all">
+        <header className="sticky top-4 z-40 mx-4 lg:mx-8 flex h-16 items-center justify-between rounded-3xl border border-white/50 bg-white/60 backdrop-blur-3xl px-5 shadow-[0_4px_20px_rgb(0,0,0,0.03)] dark:bg-slate-900/60 dark:border-slate-700/50 dark:shadow-[0_4px_20px_rgb(0,0,0,0.2)] transition-all select-none">
           <button
             onClick={() => setSidebarOpen(true)}
             className="rounded-full p-2 text-gray-500 hover:bg-black/5 dark:text-slate-400 dark:hover:bg-white/10 lg:hidden transition-colors active:scale-90"

@@ -6,6 +6,7 @@ import { createClient } from "@/utils/supabase/client";
 import DynamicLogoLink from "@/components/DynamicLogoLink";
 import { Loader2, Zap, CheckCircle2, Building2 } from "lucide-react";
 import Link from "next/link";
+import CustomSelect from "@/components/CustomSelect";
 
 const BENEFITS = [
   "Sınırsız randevu yönetimi",
@@ -197,20 +198,18 @@ export default function UpgradePage() {
                 <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                   Sektör
                 </label>
-                <select
+                <CustomSelect
                   value={sector}
-                  onChange={(e) => setSector(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
-                >
-                                    <option value="" disabled>Sektör Seçin</option>
-                  {sectorsList.length > 0 ? (
-                    sectorsList.map((s) => (
-                      <option key={s.value} value={s.value}>{s.name}</option>
-                    ))
-                  ) : (
-                    <option value="other">Diğer</option>
-                  )}
-                </select>
+                  onChange={(val) => setSector(val)}
+                  options={
+                    sectorsList.length > 0
+                      ? sectorsList.map((s) => ({ value: s.value, label: s.name }))
+                      : [{ value: "other", label: "Diğer" }]
+                  }
+                  placeholder="Sektör Seçin"
+                  searchPlaceholder="Sektör ara..."
+                  buttonClassName="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 transition cursor-pointer"
+                />
               </div>
 
               {upgradeError && (

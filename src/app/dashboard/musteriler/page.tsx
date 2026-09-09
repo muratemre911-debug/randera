@@ -147,7 +147,7 @@ export default function MusterilerPage() {
 
                 <div className="flex items-center justify-between p-4 pl-5 hover:bg-white/40 dark:hover:bg-slate-800/40 transition-colors">
                   <div className="flex items-center gap-4">
-                    <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-gray-100 to-gray-200 text-lg font-semibold text-gray-700 shadow-inner dark:from-slate-700 dark:to-slate-800 dark:text-slate-300">
+                    <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-gray-100 to-gray-200 text-lg font-semibold text-gray-700 shadow-inner dark:from-slate-700 dark:to-slate-800 dark:text-slate-300 select-none">
                       {customer.full_name
                         .split(" ")
                         .map((n) => n[0])
@@ -156,24 +156,24 @@ export default function MusterilerPage() {
                     </div>
 
                     <div>
-                      <h3 className="text-[17px] font-semibold text-gray-900 dark:text-white tracking-tight">
+                      <h3 className="text-[17px] font-semibold text-gray-900 dark:text-white tracking-tight select-text">
                         {customer.full_name}
                       </h3>
                       {customer.phone && (
-                        <p className="flex items-center gap-1 text-sm font-medium text-gray-500 dark:text-slate-400">
-                          <Phone size={12} />
+                        <p className="flex items-center gap-1 text-sm font-medium text-gray-500 dark:text-slate-400 select-text">
+                          <Phone size={12} className="select-none text-indigo-500" />
                           {customer.phone}
                         </p>
                       )}
                     </div>
                   </div>
 
-                  <div className="flex flex-col items-end gap-1">
-                    <div className="flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400">
-                      <Wallet size={12} />
+                  <div className="flex flex-col items-end gap-1 select-none">
+                    <div className="flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400 select-text">
+                      <Wallet size={12} className="select-none" />
                       ₺{customer.total_spent}
                     </div>
-                    <div className="flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400">
+                    <div className="flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400 select-none">
                       <CalendarDays size={12} />
                       {customer.appointment_count}{" "}
                       {lang === "tr" ? "randevu" : "appts"}
