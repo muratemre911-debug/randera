@@ -82,6 +82,10 @@ export const en = {
   "login.signin": "Sign In",
   "login.logging_in": "Signing In...",
   "login.error": "Invalid email or password",
+  "login.google_signin": "Sign in with Google",
+  "login.google_signup": "Sign up with Google",
+  "login.or_email": "or with email",
+  "login.google_error": "An error occurred while authenticating with Google.",
 
   // Super Admin
   "admin.title": "Super Admin",

@@ -111,7 +111,7 @@ export default function BookPage() {
 
     if (!user) {
       alert(lang === 'tr' ? "Randevu almak için giriş yapmalısınız." : "You must log in to book an appointment.");
-      router.push('/login');
+      router.push(`/login?next=${encodeURIComponent(window.location.pathname)}`);
       return;
     }
 

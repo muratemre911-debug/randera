@@ -19,7 +19,7 @@ export default function DynamicLogoLink({ children, className }: { children: Rea
       if (profile?.role === "owner") {
         setHref("/dashboard");
       } else if (profile?.role === "customer") {
-        setHref("/my-appointments");
+        setHref("/discover");
       }
     };
     fetchRole();

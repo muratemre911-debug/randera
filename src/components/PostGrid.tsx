@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Heart, MessageCircle, Star, Trash2, Loader2 } from "lucide-react";
+import { Star, Trash2 } from "lucide-react";
 import { Post } from "@/types";
 import { formatNumber } from "@/lib/utils";
 
@@ -169,26 +169,7 @@ function PostGridItem({ post, onClick, onDelete, onToggleFeature, isFeatured = f
       )}
 
       <div
-        className="absolute inset-0 bg-black/40 flex items-center justify-center gap-4 opacity-0 transition-opacity duration-200 group-hover:opacity-100 pointer-events-none"
-        aria-hidden="true"
-      >
-        <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm rounded-full p-2.5 shadow-lg transform transition-transform hover:scale-110">
-          <Heart className="h-5 w-5 text-red-500" aria-hidden="true" />
-        </div>
-        <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm rounded-full p-2.5 shadow-lg transform transition-transform hover:scale-110">
-          <MessageCircle className="h-5 w-5 text-indigo-600 dark:text-indigo-400" aria-hidden="true" />
-        </div>
-      </div>
-
-      <div className="absolute bottom-2 right-2 flex items-center gap-1.5 px-2 py-1 rounded-full bg-black/60 backdrop-blur-sm text-white text-xs font-medium opacity-0 transition-opacity duration-200 group-hover:opacity-100 pointer-events-none">
-        <Heart className="h-3.5 w-3.5 text-red-400" aria-hidden="true" />
-        <span>{formatNumber(likeCount)}</span>
-        <MessageCircle className="h-3.5 w-3.5" aria-hidden="true" />
-        <span>{formatNumber(commentCount)}</span>
-      </div>
-
-      <div
-        className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 pointer-events-none"
+        className="absolute inset-0 bg-black/20 opacity-0 transition-opacity duration-300 group-hover:opacity-100 pointer-events-none"
         aria-hidden="true"
       />
     </article>

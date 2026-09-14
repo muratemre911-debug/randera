@@ -60,14 +60,14 @@ export async function updateSession(request: NextRequest) {
     // Redirect from login or root page to their respective panels
     if (isAuthPage || pathname === '/') {
       const url = request.nextUrl.clone();
-      url.pathname = userRole === 'customer' ? '/my-appointments' : '/dashboard';
+      url.pathname = userRole === 'customer' ? '/discover' : '/dashboard';
       return NextResponse.redirect(url);
     }
 
     // Prevent customers from accessing the business dashboard
     if (userRole === 'customer' && isDashboardPage) {
       const url = request.nextUrl.clone();
-      url.pathname = '/my-appointments';
+      url.pathname = '/discover';
       return NextResponse.redirect(url);
     }
   }

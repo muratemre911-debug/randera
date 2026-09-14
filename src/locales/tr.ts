@@ -82,6 +82,10 @@ export const tr = {
   "login.signin": "Giriş Yap",
   "login.logging_in": "Giriş Yapılıyor...",
   "login.error": "E-posta veya şifre hatalı",
+  "login.google_signin": "Google ile Giriş Yap",
+  "login.google_signup": "Google ile Kayıt Ol",
+  "login.or_email": "veya e-posta ile",
+  "login.google_error": "Google ile kimlik doğrulanırken bir hata oluştu.",
 
   // Super Admin
   "admin.title": "Süper Admin",

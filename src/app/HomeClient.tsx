@@ -55,7 +55,7 @@ export default function HomeClient() {
               {lang === "tr" ? "Giriş Yap" : "Login"}
             </Link>
             <Link 
-              href="/login"
+              href="/login?mode=register"
               className="bg-indigo-600 text-white font-semibold py-2.5 px-5 rounded-full shadow-lg shadow-indigo-200 dark:shadow-none hover:bg-indigo-700 hover:-translate-y-0.5 transition-all text-sm sm:text-base"
             >
               {lang === "tr" ? "Hemen Başla" : "Get Started"}
@@ -81,7 +81,7 @@ export default function HomeClient() {
             </p>
             <div className="flex flex-col sm:flex_row items-center justify-center gap-4">
               <Link 
-                href="/login"
+                href="/login?mode=register"
                 className="w-full sm:w-auto bg-indigo-600 text-white text-lg font-bold py-4 px-8 rounded-full shadow-xl shadow-indigo-200 dark:shadow-none hover:bg-indigo-700 hover:scale-105 transition-all flex items-center justify-center gap-2"
               >
                 {lang === "tr" ? "Ücretsiz Deneyin" : "Try for Free"} <ChevronRight size={20} />
@@ -130,8 +130,18 @@ export default function HomeClient() {
         </section>
       </main>
 
-      <footer className="bg-slate-900 dark:bg-black text-slate-400 py-12 text-center border-t border-slate-800">
-        <p>© 2026 Randera. {lang === "tr" ? "Tüm hakları saklıdır." : "All rights reserved."}</p>
+      <footer className="bg-slate-900 dark:bg-black text-slate-400 py-12 border-t border-slate-800">
+        <div className="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm">
+          <p>© 2026 Randera. {lang === "tr" ? "Tüm hakları saklıdır." : "All rights reserved."}</p>
+          <div className="flex items-center gap-6">
+            <Link href="/privacy" className="hover:text-white transition-colors">
+              {lang === "tr" ? "Gizlilik Politikası" : "Privacy Policy"}
+            </Link>
+            <Link href="/terms" className="hover:text-white transition-colors">
+              {lang === "tr" ? "Kullanım Koşulları" : "Terms of Service"}
+            </Link>
+          </div>
+        </div>
       </footer>
     </div>
   );
