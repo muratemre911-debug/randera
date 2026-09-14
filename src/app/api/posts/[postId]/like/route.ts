@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient as createServerClient } from "@/utils/supabase/server";
+import { createClient as createServerClient, createAdminClient } from "@/utils/supabase/server";
 import { likeToggleSchema, validateRequest } from "@/lib/validations";
 
 export async function POST(
@@ -20,7 +20,9 @@ export async function POST(
       return NextResponse.json({ error: validation.error }, { status: 400 });
     }
 
-    const { data: existingLike, error: checkError } = await supabase
+    const supabaseAdmin = createAdminClient();
+
+    const { data: existingLike, error: checkError } = await supabaseAdmin
       .from("post_likes")
       .select("id")
       .eq("post_id", postId)
@@ -34,7 +36,7 @@ export async function POST(
     let liked = false;
 
     if (existingLike) {
-      const { error: deleteError } = await supabase
+      const { error: deleteError } = await supabaseAdmin
         .from("post_likes")
         .delete()
         .eq("id", existingLike.id);
@@ -42,7 +44,7 @@ export async function POST(
       if (deleteError) throw deleteError;
       liked = false;
     } else {
-      const { error: insertError } = await supabase
+      const { error: insertError } = await supabaseAdmin
         .from("post_likes")
         .insert({ post_id: postId, user_id: user.id });
 
@@ -50,13 +52,19 @@ export async function POST(
       liked = true;
     }
 
-    const { count, error: countError } = await supabase
+    const { count, error: countError } = await supabaseAdmin
       .from("post_likes")
       .select("*", { count: "exact", head: true })
       .eq("post_id", postId);
 
     if (countError) throw countError;
     const likeCount = count || 0;
+
+    // Explicitly update like_count in posts table to ensure consistency
+    await supabaseAdmin
+      .from("posts")
+      .update({ like_count: likeCount })
+      .eq("id", postId);
 
     return NextResponse.json({ success: true, liked, likeCount });
   } catch (err: any) {

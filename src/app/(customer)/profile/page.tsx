@@ -1,10 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
-import { Camera } from "lucide-react";
+import { Camera, LogOut, Zap } from "lucide-react";
 
 export default function ProfilePage() {
+  const router = useRouter();
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
@@ -12,9 +15,16 @@ export default function ProfilePage() {
   const [avatarPreview, setAvatarPreview] = useState("");
   const [fetching, setFetching] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
   const [message, setMessage] = useState({ type: "", text: "" });
 
   const supabase = createClient();
+
+  const handleLogout = async () => {
+    setLoggingOut(true);
+    await supabase.auth.signOut();
+    router.push("/login");
+  };
 
   useEffect(() => {
     const getProfile = async () => {
@@ -200,6 +210,27 @@ export default function ProfilePage() {
             </button>
           </form>
         )}
+      </div>
+
+      {/* Ekstra İşlemler & Çıkış Yap */}
+      <div className="mt-6 flex flex-col gap-3">
+        <Link
+          href="/upgrade"
+          className="flex w-full items-center justify-center gap-2 rounded-2xl border border-indigo-200 bg-indigo-50/60 hover:bg-indigo-100/70 py-3.5 px-4 text-sm font-bold text-indigo-600 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:hover:bg-indigo-500/20 dark:text-indigo-400 transition-all active:scale-[0.98] shadow-xs"
+        >
+          <Zap size={18} strokeWidth={2.2} />
+          <span>İşletme Hesabına Geç</span>
+        </Link>
+
+        <button
+          type="button"
+          onClick={handleLogout}
+          disabled={loggingOut}
+          className="w-full flex items-center justify-center gap-2.5 rounded-2xl bg-red-50 hover:bg-red-100 text-red-600 dark:bg-red-500/10 dark:hover:bg-red-500/20 dark:text-red-400 border border-red-200/70 dark:border-red-500/20 py-3.5 px-4 text-sm font-bold transition-all active:scale-[0.98] shadow-xs cursor-pointer disabled:opacity-60"
+        >
+          <LogOut size={18} strokeWidth={2.2} />
+          <span>{loggingOut ? "Çıkış Yapılıyor..." : "Çıkış Yap"}</span>
+        </button>
       </div>
     </div>
   );

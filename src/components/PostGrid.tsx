@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Star, Trash2 } from "lucide-react";
+import { Star, Trash2, Heart, MessageCircle } from "lucide-react";
 import { Post } from "@/types";
 import { formatNumber } from "@/lib/utils";
 
@@ -169,9 +169,18 @@ function PostGridItem({ post, onClick, onDelete, onToggleFeature, isFeatured = f
       )}
 
       <div
-        className="absolute inset-0 bg-black/20 opacity-0 transition-opacity duration-300 group-hover:opacity-100 pointer-events-none"
+        className="absolute inset-0 bg-black/40 opacity-0 transition-opacity duration-200 group-hover:opacity-100 flex items-center justify-center gap-5 text-white font-semibold text-sm pointer-events-none"
         aria-hidden="true"
-      />
+      >
+        <div className="flex items-center gap-1.5 drop-shadow">
+          <Heart size={18} className={post.user_has_liked ? "fill-red-500 text-red-500" : "fill-white text-white"} />
+          <span>{formatNumber(likeCount)}</span>
+        </div>
+        <div className="flex items-center gap-1.5 drop-shadow">
+          <MessageCircle size={18} className="fill-white text-white" />
+          <span>{formatNumber(commentCount)}</span>
+        </div>
+      </div>
     </article>
   );
 }

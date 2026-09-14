@@ -44,6 +44,7 @@ function LoginForm() {
   const [isRegister, setIsRegister] = useState(false);
   const [fullName, setFullName] = useState("");
   const [nickname, setNickname] = useState("");
+  const [phone, setPhone] = useState("");
 
   // Check URL params for errors or register mode
   useEffect(() => {
@@ -101,11 +102,16 @@ function LoginForm() {
       const next = searchParams.get("next");
 
       if (isRegister) {
+        const cleanPhone = phone.replace(/\D/g, "");
+        if (cleanPhone.length < 10) {
+          throw new Error(lang === "tr" ? "Lütfen geçerli bir telefon numarası girin (Örn: 05XX XXX XX XX)." : "Please enter a valid phone number.");
+        }
+
         // 1. Sunucu tarafında kullanıcıyı ve profili oluştur
         const res = await fetch("/api/auth/register", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, password, fullName, nickname }),
+          body: JSON.stringify({ email, password, fullName, nickname, phone: cleanPhone }),
         });
 
         const resData = await res.json();
@@ -253,6 +259,23 @@ function LoginForm() {
                   value={nickname}
                   onChange={(e) => setNickname(e.target.value)}
                   placeholder="ahmet_yilmaz"
+                  className="mt-1 block w-full rounded-lg border border-white/40 bg-white/60 px-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 backdrop-blur-xl focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/30"
+                />
+              </div>
+            )}
+
+            {isRegister && (
+              <div>
+                <label className="block text-sm font-medium text-gray-600">
+                  {lang === "tr" ? "Telefon Numarası" : "Phone Number"}{" "}
+                  <span className="text-red-500 font-bold">*</span>
+                </label>
+                <input
+                  type="tel"
+                  required
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="05XX XXX XX XX"
                   className="mt-1 block w-full rounded-lg border border-white/40 bg-white/60 px-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 backdrop-blur-xl focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/30"
                 />
               </div>

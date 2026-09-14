@@ -155,7 +155,27 @@ export default function IceriklerPage() {
 
   const handleLikeToggle = async (postId: string) => {
     const res = await fetch(`/api/posts/${postId}/like`, { method: "POST" });
-    if (!res.ok) throw new Error("Failed to toggle like");
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || "Failed to toggle like");
+    }
+    const data = await res.json();
+
+    setPosts((prevPosts) =>
+      prevPosts.map((p) =>
+        p.id === postId
+          ? { ...p, user_has_liked: data.liked, like_count: data.likeCount }
+          : p
+      )
+    );
+
+    setSelectedPost((prev) =>
+      prev && prev.id === postId
+        ? { ...prev, user_has_liked: data.liked, like_count: data.likeCount }
+        : prev
+    );
+
+    return data;
   };
 
   const handleAddComment = async (postId: string, text: string) => {
@@ -164,7 +184,27 @@ export default function IceriklerPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text }),
     });
-    if (!res.ok) throw new Error("Failed to add comment");
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || "Failed to add comment");
+    }
+    const data = await res.json();
+
+    setPosts((prevPosts) =>
+      prevPosts.map((p) =>
+        p.id === postId
+          ? { ...p, comment_count: data.commentCount ?? ((p.comment_count || 0) + 1) }
+          : p
+      )
+    );
+
+    setSelectedPost((prev) =>
+      prev && prev.id === postId
+        ? { ...prev, comment_count: data.commentCount ?? ((prev.comment_count || 0) + 1) }
+        : prev
+    );
+
+    return data;
   };
 
   const handlePostClick = (post: PostWithTenant) => {

@@ -3,10 +3,15 @@ import { createAdminClient } from "@/utils/supabase/server";
 
 export async function POST(req: Request) {
   try {
-    const { email, password, fullName, nickname } = await req.json();
+    const { email, password, fullName, nickname, phone } = await req.json();
 
-    if (!email || !password || !fullName || !nickname) {
-      return NextResponse.json({ error: "Lütfen tüm alanları doldurun." }, { status: 400 });
+    if (!email || !password || !fullName || !nickname || !phone) {
+      return NextResponse.json({ error: "Lütfen tüm zorunlu alanları (telefon dahil) doldurun." }, { status: 400 });
+    }
+
+    const cleanPhone = phone.replace(/\D/g, "");
+    if (cleanPhone.length < 10 || cleanPhone.length > 13) {
+      return NextResponse.json({ error: "Lütfen geçerli bir telefon numarası girin (Örn: 05XX XXX XX XX)." }, { status: 400 });
     }
 
     const normalizedNickname = nickname.trim().toLowerCase();
@@ -58,6 +63,7 @@ export async function POST(req: Request) {
       id: userId,
       full_name: fullName,
       nickname: normalizedNickname,
+      phone: cleanPhone,
       role: "customer",
       tenant_id: null
     });

@@ -9,6 +9,9 @@ import {
   Trash2,
   Edit2,
   Phone,
+  MessageSquare,
+  Check,
+  CheckCircle2,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useLanguage } from "@/context/LanguageContext";
@@ -57,7 +60,7 @@ interface Service {
 interface Appointment {
   id: string;
   service_id: string;
-  customer_id: string;
+  customer_id: string | null;
   start_time: string;
   end_time: string;
   status: string;
@@ -141,7 +144,8 @@ export default function TakvimPage() {
     useState<Appointment | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const [formCustomer, setFormCustomer] = useState("");
+  const [formCustomerName, setFormCustomerName] = useState("");
+  const [formCustomerPhone, setFormCustomerPhone] = useState("");
   const [formService, setFormService] = useState("");
   const [editingApptId, setEditingApptId] = useState<string | null>(null);
 
@@ -172,17 +176,17 @@ export default function TakvimPage() {
     return { start: start.toISOString(), end: end.toISOString() };
   }, [days]);
 
-  const fetchData = async () => {
-    setLoading(true);
+  const fetchData = async (quiet = false) => {
+    if (!quiet) setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      setLoading(false);
+      if (!quiet) setLoading(false);
       return;
     }
     
     const { data: profile } = await supabase.from("profiles").select("tenant_id").eq("id", user.id).single();
     if (!profile) {
-      setLoading(false);
+      if (!quiet) setLoading(false);
       return;
     }
     setTenantId(profile.tenant_id);
@@ -223,12 +227,37 @@ export default function TakvimPage() {
     if (apptRes.data) setAppointments(apptRes.data as Appointment[]);
     if (svcRes.data) setServices(svcRes.data);
     if (custRes.data) setCustomers(custRes.data);
-    setLoading(false);
+    if (!quiet) setLoading(false);
   };
 
   useEffect(() => {
     fetchData();
   }, [dateRange.start, dateRange.end]);
+
+  // Müşteri iptal isteği gönderdiğinde / geri çektiğinde takvimi otomatik güncelle
+  useEffect(() => {
+    if (!tenantId) return;
+    const channel = supabase
+      .channel(`appointments-${tenantId}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "appointments", filter: `tenant_id=eq.${tenantId}` },
+        (payload) => {
+          const updated = payload.new as Appointment;
+          setAppointments((prev) =>
+            prev.map((a) => (a.id === updated.id ? { ...a, ...updated } : a))
+          );
+          setSelectedAppointment((prev) =>
+            prev && prev.id === updated.id ? { ...prev, ...updated } : prev
+          );
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [tenantId]);
 
   const navigate = (dir: number) => {
     const d = new Date(currentDate);
@@ -277,7 +306,7 @@ export default function TakvimPage() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedSlot || !formService) return;
-    if (!editingApptId && !formCustomer) return;
+    if (!editingApptId && !formCustomerName.trim()) return;
     setSaving(true);
 
     const service = services.find((s) => s.id === formService);
@@ -298,26 +327,29 @@ export default function TakvimPage() {
       if (!error) {
         setSelectedSlot(null);
         setEditingApptId(null);
-        setFormCustomer("");
+        setFormCustomerName("");
+        setFormCustomerPhone("");
         setFormService("");
         fetchData();
       }
     } else {
-      const customerName = customers.find((c) => c.id === formCustomer)?.full_name || "";
-
       const { error } = await supabase.from("appointments").insert({
         tenant_id: tenantId,
-        customer_id: formCustomer,
+        customer_id: null,
         service_id: formService,
         start_time: start.toISOString(),
         end_time: end.toISOString(),
         status: "confirmed",
-        custom_fields: { customer_name: customerName },
+        custom_fields: {
+          customer_name: formCustomerName.trim(),
+          phone: formCustomerPhone.trim(),
+        },
       });
 
       if (!error) {
         setSelectedSlot(null);
-        setFormCustomer("");
+        setFormCustomerName("");
+        setFormCustomerPhone("");
         setFormService("");
         fetchData();
       }
@@ -335,6 +367,96 @@ export default function TakvimPage() {
 
     if (!error) {
       setSelectedAppointment(null);
+      fetchData();
+    }
+  };
+
+  const handleToggleCompleted = async () => {
+    if (!selectedAppointment) return;
+    const newStatus = selectedAppointment.status === "completed" ? "confirmed" : "completed";
+    const { error } = await supabase
+      .from("appointments")
+      .update({ status: newStatus })
+      .eq("id", selectedAppointment.id);
+
+    if (!error) {
+      setSelectedAppointment((prev) => (prev ? { ...prev, status: newStatus } : null));
+      fetchData();
+    }
+  };
+
+  const handleApprove = async () => {
+    if (!selectedAppointment) return;
+    const { error } = await supabase
+      .from("appointments")
+      .update({ status: "confirmed" })
+      .eq("id", selectedAppointment.id);
+
+    if (!error) {
+      setSelectedAppointment((prev) => (prev ? { ...prev, status: "confirmed" } : null));
+      fetchData();
+    }
+  };
+
+  const handleReject = async () => {
+    if (!selectedAppointment) return;
+    if (
+      !confirm(
+        lang === "tr"
+          ? "Bu randevu talebini reddetmek istediğinize emin misiniz?"
+          : "Are you sure you want to decline this appointment request?"
+      )
+    ) {
+      return;
+    }
+    const { error } = await supabase
+      .from("appointments")
+      .update({ status: "cancelled" })
+      .eq("id", selectedAppointment.id);
+
+    if (!error) {
+      setSelectedAppointment(null);
+      fetchData();
+    }
+  };
+
+  // Müşterinin iptal talebini onayla (randevuyu iptal et)
+  const handleApproveCancelRequest = async () => {
+    if (!selectedAppointment) return;
+    if (
+      !confirm(
+        lang === "tr"
+          ? "Müşterinin iptal talebini onaylayıp randevuyu iptal etmek istediğinize emin misiniz?"
+          : "Approve the cancellation request and cancel this appointment?"
+      )
+    ) {
+      return;
+    }
+    const { error } = await supabase
+      .from("appointments")
+      .update({ status: "cancelled" })
+      .eq("id", selectedAppointment.id);
+
+    if (!error) {
+      setSelectedAppointment(null);
+      fetchData();
+    }
+  };
+
+  // Müşterinin iptal talebini reddet (randevu aynen devam eder)
+  const handleRejectCancelRequest = async () => {
+    if (!selectedAppointment) return;
+    const prevFields = (selectedAppointment.custom_fields || {}) as Record<string, unknown>;
+    const { cancel_requested, cancel_reason, cancel_requested_at, ...rest } = prevFields;
+    const { error } = await supabase
+      .from("appointments")
+      .update({ custom_fields: rest })
+      .eq("id", selectedAppointment.id);
+
+    if (!error) {
+      setSelectedAppointment((prev) =>
+        prev ? { ...prev, custom_fields: rest as typeof prev.custom_fields } : null
+      );
       fetchData();
     }
   };
@@ -388,15 +510,30 @@ export default function TakvimPage() {
                 </span>
               </div>
               <div className="mt-1.5 space-y-1">
-                {dayAppts.slice(0, 3).map((a) => (
-                  <button
-                    key={a.id}
-                    onClick={() => setSelectedAppointment(a)}
-                    className="w-full truncate rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 border-l-[3px] border-l-indigo-600 px-2 py-1 text-[11px] font-bold text-slate-800 dark:text-slate-200 hover:bg-indigo-50/50 dark:hover:bg-slate-700/60 shadow-xs transition-colors text-left"
-                  >
-                    {formatTime(a.start_time)} {getCustomerName(a)}
-                  </button>
-                ))}
+                {dayAppts.slice(0, 3).map((a) => {
+                  const isPending = a.status === "pending";
+                  const isCompleted = a.status === "completed";
+                  const hasCancelRequest = (a.custom_fields as Record<string, unknown>)?.cancel_requested === true;
+
+                  return (
+                    <button
+                      key={a.id}
+                      onClick={() => setSelectedAppointment(a)}
+                      className={`w-full truncate rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 border-l-[3px] px-2 py-1 text-[11px] font-bold text-slate-800 dark:text-slate-200 hover:bg-indigo-50/50 dark:hover:bg-slate-700/60 shadow-xs transition-colors text-left ${
+                        hasCancelRequest
+                          ? "border-l-rose-500 bg-rose-50/40"
+                          : isCompleted
+                          ? "border-l-emerald-500"
+                          : isPending
+                          ? "border-l-amber-500 bg-amber-50/40"
+                          : "border-l-indigo-600"
+                      }`}
+                    >
+                      {formatTime(a.start_time)} {getCustomerName(a)}
+                      {hasCancelRequest ? " • İptal Talebi" : ""}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           );
@@ -408,67 +545,69 @@ export default function TakvimPage() {
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 space-y-5">
       {/* Navigation Header */}
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between mb-4 select-none">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between mb-4 select-none">
         
         {/* Sol Taraf: Başlık */}
-        <div className="lg:w-1/3 flex justify-start">
+        <div className="flex items-center justify-between">
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-gray-900 dark:text-white">
             {headerLabel}
           </h1>
         </div>
 
-        {/* Orta Kısım: Yön Okları (Sabit Konum) */}
-        <div className="lg:w-1/3 flex justify-center">
-          <div className="flex items-center gap-2 rounded-2xl bg-white/70 p-1 backdrop-blur-xl border border-slate-200/80 shadow-xs dark:bg-slate-800/60 dark:border-slate-700/80">
+        {/* Kontroller: Sol (kırmızı kutu) Yön Okları | Sağ: Sekmeler ve Ekle Butonu */}
+        <div className="flex items-center justify-between lg:justify-end gap-2 sm:gap-4 w-full lg:w-auto">
+          {/* Yön Okları (Bugüne Dön) */}
+          <div className="flex items-center gap-1 sm:gap-2 rounded-2xl bg-white/70 p-1 backdrop-blur-xl border border-slate-200/80 shadow-xs dark:bg-slate-800/60 dark:border-slate-700/80">
             <button
               onClick={() => navigate(-1)}
-              className="rounded-xl p-2.5 text-gray-600 hover:bg-white hover:shadow-xs dark:text-slate-300 dark:hover:bg-slate-700 transition-all active:scale-95"
+              className="rounded-xl p-1.5 sm:p-2 text-gray-600 hover:bg-white hover:shadow-xs dark:text-slate-300 dark:hover:bg-slate-700 transition-all active:scale-95 cursor-pointer"
             >
-              <ChevronLeft size={22} />
+              <ChevronLeft size={18} />
             </button>
             <button
               onClick={goToday}
-              className="px-5 py-2.5 text-sm font-bold text-gray-700 hover:bg-white hover:shadow-xs rounded-xl dark:text-slate-200 dark:hover:bg-slate-700 transition-all active:scale-95"
+              className="px-2.5 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-bold text-gray-700 hover:bg-white hover:shadow-xs rounded-xl dark:text-slate-200 dark:hover:bg-slate-700 transition-all active:scale-95 whitespace-nowrap cursor-pointer"
             >
               {t("calendar.today")}
             </button>
             <button
               onClick={() => navigate(1)}
-              className="rounded-xl p-2.5 text-gray-600 hover:bg-white hover:shadow-xs dark:text-slate-300 dark:hover:bg-slate-700 transition-all active:scale-95"
+              className="rounded-xl p-1.5 sm:p-2 text-gray-600 hover:bg-white hover:shadow-xs dark:text-slate-300 dark:hover:bg-slate-700 transition-all active:scale-95 cursor-pointer"
             >
-              <ChevronRight size={22} />
+              <ChevronRight size={18} />
             </button>
           </div>
-        </div>
 
-        {/* Sağ Taraf: Sekmeler ve Ekle Butonu */}
-        <div className="lg:w-1/3 flex items-center justify-end gap-3">
-          <div className="flex rounded-2xl bg-slate-200/60 p-1 dark:bg-slate-800/60 border border-slate-200/50 dark:border-slate-700/50">
-            {(["today", "weekly", "monthly"] as const).map((mode) => (
-              <button
-                key={mode}
-                onClick={() => setViewMode(mode)}
-                className={`rounded-xl px-4 py-2 text-sm font-bold transition-all ${
-                  viewMode === mode
-                    ? "bg-white text-indigo-600 shadow-xs dark:bg-slate-700 dark:text-indigo-400"
-                    : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
-                }`}
-              >
-                {mode === "today" ? t("calendar.day") : mode === "weekly" ? t("calendar.week") : t("calendar.month")}
-              </button>
-            ))}
+          {/* Sağ Taraf: Sekmeler ve Ekle Butonu */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="flex rounded-2xl bg-slate-200/60 p-1 dark:bg-slate-800/60 border border-slate-200/50 dark:border-slate-700/50">
+              {(["today", "weekly", "monthly"] as const).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => setViewMode(mode)}
+                  className={`rounded-xl px-2.5 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                    viewMode === mode
+                      ? "bg-white text-indigo-600 shadow-xs dark:bg-slate-700 dark:text-indigo-400"
+                      : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
+                  }`}
+                >
+                  {mode === "today" ? t("calendar.day") : mode === "weekly" ? t("calendar.week") : t("calendar.month")}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => {
+                setEditingApptId(null);
+                setFormCustomerName("");
+                setFormCustomerPhone("");
+                setFormService("");
+                setSelectedSlot({ day: new Date(), hour: new Date().getHours() });
+              }}
+              className="flex items-center justify-center rounded-full bg-indigo-600 h-9 w-9 sm:h-11 sm:w-11 text-white shadow-lg shadow-indigo-500/30 transition-all hover:bg-indigo-500 active:scale-90 shrink-0 cursor-pointer"
+            >
+              <Plus size={20} strokeWidth={3} />
+            </button>
           </div>
-          <button
-            onClick={() => {
-              setEditingApptId(null);
-              setFormCustomer("");
-              setFormService("");
-              setSelectedSlot({ day: new Date(), hour: new Date().getHours() });
-            }}
-            className="flex items-center justify-center rounded-full bg-indigo-600 h-11 w-11 text-white shadow-lg shadow-indigo-500/30 transition-all hover:bg-indigo-500 active:scale-90"
-          >
-            <Plus size={24} strokeWidth={3} />
-          </button>
         </div>
       </div>
 
@@ -566,40 +705,72 @@ export default function TakvimPage() {
                             onClick={(e) => {
                               if (e.target === e.currentTarget && isWithinHours) {
                                   setEditingApptId(null);
-                                  setFormCustomer("");
+                                  setFormCustomerName("");
+                                  setFormCustomerPhone("");
                                   setFormService("");
                                   setSelectedSlot({ day, hour });
                               }
                             }}
                           >
-                            {hasContent && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedAppointment(realApps[0]);
-                              }}
-                              className="w-full h-full min-w-0 rounded-xl p-2.5 text-left transition-all hover:shadow-md hover:scale-[0.99] bg-white dark:bg-slate-800 border border-slate-200/90 dark:border-slate-700/80 border-l-[5px] border-l-indigo-600 dark:border-l-indigo-500 shadow-xs overflow-hidden flex flex-col justify-between group"
-                            >
-                              <div className="min-w-0 w-full">
-                                <div className="flex items-center justify-between gap-1 mb-1 min-w-0">
-                                  <p className="text-[13px] font-bold text-slate-900 dark:text-white leading-tight truncate min-w-0">
-                                    {realApps[0]?.services?.name || "Randevu"}
-                                  </p>
-                                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 shrink-0 select-none">
-                                    {formatTime(realApps[0].start_time)}
-                                  </span>
-                                </div>
-                                <p className="text-[12px] font-semibold text-slate-600 dark:text-slate-300 leading-tight truncate">
-                                  {getCustomerName(realApps[0])}
-                                </p>
-                              </div>
-                              {realApps.length > 1 && (
-                                <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 mt-1">
-                                  +{realApps.length - 1} randevu daha
-                                </span>
-                              )}
-                            </button>
-                            )}
+                            {hasContent && (() => {
+                              const isCompleted = realApps[0]?.status === "completed";
+                              const isPending = realApps[0]?.status === "pending";
+                              const hasCancelRequest =
+                                (realApps[0]?.custom_fields as Record<string, unknown>)?.cancel_requested === true;
+                              return (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedAppointment(realApps[0]);
+                                  }}
+                                  className={`w-full h-full min-w-0 rounded-xl p-2.5 text-left transition-all hover:shadow-md hover:scale-[0.99] border shadow-xs overflow-hidden flex flex-col justify-between group ${
+                                    isPending
+                                      ? "bg-amber-50/80 dark:bg-amber-950/20 border-amber-200/80 dark:border-amber-800/60 border-l-[5px] border-l-amber-500"
+                                      : isCompleted
+                                      ? "bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200/80 dark:border-emerald-800/60 border-l-[5px] border-l-emerald-500"
+                                      : "bg-white dark:bg-slate-800 border-slate-200/90 dark:border-slate-700/80 border-l-[5px] border-l-indigo-600 dark:border-l-indigo-500"
+                                  }`}
+                                >
+                                  <div className="min-w-0 w-full">
+                                    <div className="flex items-center justify-between gap-1 mb-1 min-w-0">
+                                      <p className="text-[13px] font-bold text-slate-900 dark:text-white leading-tight truncate min-w-0">
+                                        {realApps[0]?.services?.name || "Randevu"}
+                                      </p>
+                                      <span
+                                        className={`text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 select-none flex items-center gap-1 ${
+                                          isPending
+                                            ? "bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300"
+                                            : isCompleted
+                                            ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300"
+                                            : "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300"
+                                        }`}
+                                      >
+                                        {isPending && <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />}
+                                        {formatTime(realApps[0].start_time)}
+                                      </span>
+                                    </div>
+                                    <p className="text-[12px] font-semibold text-slate-600 dark:text-slate-300 leading-tight truncate">
+                                      {getCustomerName(realApps[0])}
+                                    </p>
+                                    {isPending && (
+                                      <span className="inline-block mt-1 text-[9px] font-extrabold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                                        Onay Bekliyor
+                                      </span>
+                                    )}
+                                    {hasCancelRequest && (
+                                      <span className="inline-block mt-1 text-[9px] font-extrabold uppercase tracking-wider text-rose-600 dark:text-rose-400">
+                                        • İptal Talebi Var
+                                      </span>
+                                    )}
+                                  </div>
+                                  {realApps.length > 1 && (
+                                    <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 mt-1">
+                                      +{realApps.length - 1} randevu daha
+                                    </span>
+                                  )}
+                                </button>
+                              );
+                            })()}
                           </div>
                         );
                       })}
@@ -644,22 +815,32 @@ export default function TakvimPage() {
 
             <form onSubmit={handleCreate} className="space-y-5">
               {!editingApptId && (
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-1.5">
-                    Müşteri Seçimi
-                  </label>
-                  <CustomSelect
-                    value={formCustomer}
-                    onChange={(val) => setFormCustomer(val)}
-                    options={customers.map((c) => ({
-                      value: c.id,
-                      label: c.full_name,
-                    }))}
-                    placeholder="Müşteri seçin..."
-                    searchPlaceholder="Müşteri ara..."
-                    buttonClassName="w-full flex items-center justify-between rounded-2xl border-0 bg-white/60 px-4 py-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300/50 backdrop-blur-xl focus:ring-2 focus:ring-inset focus:ring-indigo-600 dark:bg-slate-800/60 dark:text-white dark:ring-slate-700/50 dark:focus:ring-indigo-500 transition-all cursor-pointer"
-                  />
-                </div>
+                <>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-1.5">
+                      Müşteri Adı
+                    </label>
+                    <input
+                      type="text"
+                      value={formCustomerName}
+                      onChange={(e) => setFormCustomerName(e.target.value)}
+                      placeholder="Ad Soyad"
+                      className="w-full rounded-2xl border-0 bg-white/60 px-4 py-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300/50 backdrop-blur-xl focus:ring-2 focus:ring-inset focus:ring-indigo-600 dark:bg-slate-800/60 dark:text-white dark:ring-slate-700/50 dark:focus:ring-indigo-500 transition-all outline-none placeholder:text-gray-400 dark:placeholder:text-slate-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-1.5">
+                      Telefon Numarası
+                    </label>
+                    <input
+                      type="tel"
+                      value={formCustomerPhone}
+                      onChange={(e) => setFormCustomerPhone(e.target.value)}
+                      placeholder="05__ ___ __ __"
+                      className="w-full rounded-2xl border-0 bg-white/60 px-4 py-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300/50 backdrop-blur-xl focus:ring-2 focus:ring-inset focus:ring-indigo-600 dark:bg-slate-800/60 dark:text-white dark:ring-slate-700/50 dark:focus:ring-indigo-500 transition-all outline-none placeholder:text-gray-400 dark:placeholder:text-slate-500"
+                    />
+                  </div>
+                </>
               )}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-1.5">
@@ -778,26 +959,151 @@ export default function TakvimPage() {
                 </div>
               )}
 
-              <div className="mt-8 flex gap-3">
+              {/* Müşteri İptal Talebi */}
+              {(selectedAppointment.custom_fields as Record<string, unknown>)?.cancel_requested === true && (
+                <div className="p-4 rounded-2xl bg-rose-50/90 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800/40 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span className="relative flex h-2.5 w-2.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500"></span>
+                    </span>
+                    <span className="text-xs font-bold text-rose-800 dark:text-rose-300">
+                      {lang === "tr" ? "Müşteri İptal Talebinde Bulundu" : "Customer Requested Cancellation"}
+                    </span>
+                  </div>
+                  {typeof (selectedAppointment.custom_fields as Record<string, unknown>)?.cancel_reason === "string" &&
+                    ((selectedAppointment.custom_fields as Record<string, unknown>).cancel_reason as string) && (
+                    <p className="text-[13px] font-medium text-rose-900 dark:text-rose-200 whitespace-pre-wrap">
+                      &ldquo;{(selectedAppointment.custom_fields as Record<string, unknown>).cancel_reason as string}&rdquo;
+                    </p>
+                  )}
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={handleApproveCancelRequest}
+                      className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-sm transition-all active:scale-95"
+                    >
+                      <Check size={14} strokeWidth={3} />
+                      <span>{lang === "tr" ? "Talebi Onayla (İptal Et)" : "Approve (Cancel)"}</span>
+                    </button>
+                    <button
+                      onClick={handleRejectCancelRequest}
+                      className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-white hover:bg-gray-50 text-gray-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 border border-gray-200 dark:border-slate-700 text-xs font-bold transition-all active:scale-95"
+                    >
+                      <X size={14} strokeWidth={2.5} />
+                      <span>{lang === "tr" ? "Talebi Reddet" : "Decline Request"}</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Contact & Status Actions */}
+              {(() => {
+                const phone = selectedAppointment.profiles?.phone || selectedAppointment.custom_fields?.phone;
+                const cleanPhone = phone ? phone.replace(/\D/g, "") : "";
+                const isCompleted = selectedAppointment.status === "completed";
+                const isPending = selectedAppointment.status === "pending";
+                const customerName = getCustomerName(selectedAppointment);
+
+                return (
+                  <div className="space-y-3 pt-2">
+                    {/* Status Badge & Toggle / Approval Actions */}
+                    {isPending ? (
+                      <div className="p-3.5 rounded-2xl bg-amber-50/90 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/40 space-y-3">
+                        <div className="flex items-center gap-2">
+                          <span className="relative flex h-2.5 w-2.5">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+                          </span>
+                          <span className="text-xs font-bold text-amber-800 dark:text-amber-300">
+                            {lang === "tr" ? "Randevu Onayı Bekleniyor" : "Approval Pending"}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            onClick={handleApprove}
+                            className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm transition-all active:scale-95"
+                          >
+                            <Check size={14} strokeWidth={3} />
+                            <span>{lang === "tr" ? "Onayla" : "Approve"}</span>
+                          </button>
+                          <button
+                            onClick={handleReject}
+                            className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 border border-rose-200 dark:border-rose-800/50 text-xs font-bold transition-all active:scale-95"
+                          >
+                            <X size={14} strokeWidth={2.5} />
+                            <span>{lang === "tr" ? "Reddet" : "Decline"}</span>
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between p-3 rounded-2xl bg-gray-100/70 dark:bg-slate-800/70 border border-gray-200/50 dark:border-slate-700/50">
+                        <div className="flex items-center gap-2">
+                          <span className={`inline-block h-2.5 w-2.5 rounded-full ${isCompleted ? 'bg-emerald-500' : 'bg-indigo-500'}`} />
+                          <span className="text-xs font-bold text-gray-700 dark:text-slate-300">
+                            {isCompleted ? "Tamamlandı" : "Onaylandı"}
+                          </span>
+                        </div>
+                        <button
+                          onClick={handleToggleCompleted}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all active:scale-95 ${
+                            isCompleted
+                              ? "bg-amber-100 text-amber-800 hover:bg-amber-200 dark:bg-amber-950/40 dark:text-amber-300"
+                              : "bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm"
+                          }`}
+                        >
+                          <Check size={14} strokeWidth={3} />
+                          <span>{isCompleted ? "Geri Al" : "Tamamla"}</span>
+                        </button>
+                      </div>
+                    )}
+
+                    {/* WhatsApp & Call Buttons */}
+                    {cleanPhone && (
+                      <div className="grid grid-cols-2 gap-2.5">
+                        <a
+                          href={`https://wa.me/${cleanPhone.startsWith("90") ? cleanPhone : `90${cleanPhone}`}?text=${encodeURIComponent(
+                            `Merhaba ${customerName}, Randera üzerinden randevunuz hakkında bilgi vermek istiyoruz.`
+                          )}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-2xl bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/40 text-xs font-bold hover:bg-emerald-100 transition-colors"
+                        >
+                          <MessageSquare size={15} />
+                          <span>WhatsApp</span>
+                        </a>
+
+                        <a
+                          href={`tel:${cleanPhone}`}
+                          className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-2xl bg-gray-100 text-gray-700 dark:bg-slate-800 dark:text-slate-200 border border-gray-200 dark:border-slate-700 text-xs font-bold hover:bg-gray-200 transition-colors"
+                        >
+                          <Phone size={15} />
+                          <span>Ara</span>
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
+              <div className="mt-6 flex gap-3">
                 <button
                   onClick={() => {
                     const start = new Date(selectedAppointment.start_time);
                     setEditingApptId(selectedAppointment.id);
-                    setFormCustomer(selectedAppointment.customer_id);
                     setFormService(selectedAppointment.service_id);
                     setSelectedSlot({ day: start, hour: start.getHours() });
                     setSelectedAppointment(null);
                   }}
-                  className="w-full flex items-center justify-center gap-2 rounded-full bg-indigo-500/10 px-4 py-3.5 text-base font-bold text-indigo-600 transition-colors hover:bg-indigo-500/20 dark:text-indigo-400"
+                  className="w-full flex items-center justify-center gap-2 rounded-2xl bg-indigo-500/10 px-4 py-3 text-sm font-bold text-indigo-600 transition-colors hover:bg-indigo-500/20 dark:text-indigo-400"
                 >
-                  <Edit2 size={18} strokeWidth={2.5} />
+                  <Edit2 size={16} strokeWidth={2.5} />
                   Düzenle
                 </button>
                 <button
                   onClick={handleCancel}
-                  className="w-full flex items-center justify-center gap-2 rounded-full bg-red-500/10 px-4 py-3.5 text-base font-bold text-red-600 transition-colors hover:bg-red-500/20 dark:text-red-400"
+                  className="w-full flex items-center justify-center gap-2 rounded-2xl bg-red-500/10 px-4 py-3 text-sm font-bold text-red-600 transition-colors hover:bg-red-500/20 dark:text-red-400"
                 >
-                  <Trash2 size={18} strokeWidth={2.5} />
+                  <Trash2 size={16} strokeWidth={2.5} />
                   Sil
                 </button>
               </div>

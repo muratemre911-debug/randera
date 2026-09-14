@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient as createServerClient } from "@/utils/supabase/server";
+import { createClient as createServerClient, createAdminClient } from "@/utils/supabase/server";
 import { createCommentSchema, validateRequest } from "@/lib/validations";
 
 export async function POST(
@@ -23,7 +23,9 @@ export async function POST(
 
     const { text } = validation.data;
 
-    const { data: profile } = await supabase
+    const supabaseAdmin = createAdminClient();
+
+    const { data: profile } = await supabaseAdmin
       .from("profiles")
       .select("nickname, full_name")
       .eq("id", user.id)
@@ -31,7 +33,7 @@ export async function POST(
 
     const username = profile?.nickname || profile?.full_name || "Kullanıcı";
 
-    const { data: comment, error: insertError } = await supabase
+    const { data: comment, error: insertError } = await supabaseAdmin
       .from("post_comments")
       .insert({
         post_id: postId,
@@ -44,13 +46,19 @@ export async function POST(
 
     if (insertError) throw insertError;
 
-    const { count, error: countError } = await supabase
+    const { count, error: countError } = await supabaseAdmin
       .from("post_comments")
       .select("*", { count: "exact", head: true })
       .eq("post_id", postId);
 
     if (countError) throw countError;
     const commentCount = count || 0;
+
+    // Explicitly update comment_count in posts table to ensure consistency
+    await supabaseAdmin
+      .from("posts")
+      .update({ comment_count: commentCount })
+      .eq("id", postId);
 
     return NextResponse.json({ success: true, comment, commentCount });
   } catch (err: any) {

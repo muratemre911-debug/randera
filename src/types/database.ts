@@ -18,7 +18,7 @@ export type Database = {
         Row: {
           created_at: string
           custom_fields: Json
-          customer_id: string
+          customer_id: string | null
           end_time: string
           id: string
           notes: string | null
@@ -32,7 +32,7 @@ export type Database = {
         Insert: {
           created_at?: string
           custom_fields?: Json
-          customer_id: string
+          customer_id?: string | null
           end_time: string
           id?: string
           notes?: string | null

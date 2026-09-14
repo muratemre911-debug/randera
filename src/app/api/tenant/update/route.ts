@@ -20,7 +20,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: validation.error }, { status: 400 });
     }
 
-    const { tenantId, name, phone, email, address, description, province, district, profile_image_url, cover_image_url, sector, working_hours } = validation.data;
+    const { tenantId, name, phone, email, address, description, province, district, profile_image_url, cover_image_url, sector, working_hours, booking_rules } = validation.data;
 
     const supabaseAdmin = createAdminClient();
     const { data: profile, error: profileError } = await supabaseAdmin.from("profiles").select("tenant_id, role").eq("id", user.id).single();
@@ -49,7 +49,8 @@ export async function POST(req: Request) {
       profile_image_url,
       cover_image_url,
       sector,
-      working_hours
+      working_hours,
+      booking_rules
     }).eq("id", tenantId);
 
     if (error) {

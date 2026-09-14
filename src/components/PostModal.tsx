@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
+import { useRouter } from "next/navigation";
 import { X, Heart, MessageCircle, Send, Loader2, MoreVertical, User, AtSign } from "lucide-react";
 import { Post, PostComment } from "@/types";
 import { createClient } from "@/utils/supabase/client";
@@ -12,8 +13,8 @@ interface PostModalProps {
   post: Post | null;
   isOpen: boolean;
   onClose: () => void;
-  onLikeToggle: (postId: string) => Promise<void>;
-  onAddComment: (postId: string, text: string) => Promise<void>;
+  onLikeToggle: (postId: string) => Promise<{ liked?: boolean; likeCount?: number } | void>;
+  onAddComment: (postId: string, text: string) => Promise<{ comment?: any; commentCount?: number } | void>;
 }
 
 export function PostModal({
@@ -24,6 +25,7 @@ export function PostModal({
   onAddComment,
 }: PostModalProps) {
   const { t } = useLanguage();
+  const router = useRouter();
   const supabase = createClient();
   const [comments, setComments] = useState<PostComment[]>([]);
   const [loadingComments, setLoadingComments] = useState(false);
@@ -58,7 +60,7 @@ export function PostModal({
     return () => {
       document.body.style.overflow = "unset";
     };
-  }, [isOpen, post?.id]);
+  }, [isOpen, post?.id, post?.user_has_liked, post?.like_count, post?.comment_count]);
 
   const fetchCurrentUser = async () => {
     setLoadingUser(true);
@@ -129,14 +131,25 @@ export function PostModal({
 
   const handleLikeClick = async () => {
     if (!post) return;
+    if (requireAuth || (!user && !loadingUser)) {
+      router.push("/login");
+      return;
+    }
+
     const wasLiked = liked;
-    const newLikeCount = wasLiked ? likeCount - 1 : likeCount + 1;
+    const newLikeCount = wasLiked ? Math.max(0, likeCount - 1) : likeCount + 1;
 
     setLiked(!wasLiked);
     setLikeCount(newLikeCount);
 
     try {
-      await onLikeToggle(post.id);
+      const res = await onLikeToggle(post.id);
+      if (res && typeof res.liked === "boolean") {
+        setLiked(res.liked);
+      }
+      if (res && typeof res.likeCount === "number") {
+        setLikeCount(res.likeCount);
+      }
     } catch (err) {
       setLiked(wasLiked);
       setLikeCount(likeCount);
@@ -316,6 +329,7 @@ export function PostModal({
                     className="flex items-center gap-1 text-gray-500 hover:text-red-500 transition-colors"
                     aria-label={liked ? (t("posts.unlike") || "Beğeniyi geri al") : (t("posts.like") || "Beğen")}
                     aria-pressed={liked}
+                    title={requireAuth ? (t("posts.login_to_like") || "Beğenmek için giriş yapın") : undefined}
                   >
                     <Heart className={`h-5 w-5 ${liked ? "fill-current text-red-500" : "stroke-current"}`} />
                     <span className="text-sm font-medium leading-none">{formatNumber(likeCount)}</span>
@@ -390,6 +404,7 @@ function t(key: string): string {
     "posts.more": "Daha fazla",
     "posts.you": "Sen",
     "posts.login_to_comment": "Giriş yaparak yorum yapın",
+    "posts.login_to_like": "Beğenmek için giriş yapın",
   };
   return dict[key] || key;
 }

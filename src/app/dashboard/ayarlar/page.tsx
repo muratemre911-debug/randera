@@ -37,6 +37,7 @@ interface BookingRules {
   notifyEmail: boolean;
   notifySms: boolean;
   notifyWhatsapp: boolean;
+  cancelDeadlineHours: number;
 }
 
 const defaultWorkingHours: WorkingHours = {
@@ -55,6 +56,7 @@ const defaultBookingRules: BookingRules = {
   notifyEmail: true,
   notifySms: false,
   notifyWhatsapp: false,
+  cancelDeadlineHours: 24,
 };
 
 const daysTranslationTR: { [key: string]: string } = {
@@ -136,7 +138,7 @@ export default function AyarlarPage() {
 
         const { data, error } = await supabase
           .from("tenants")
-          .select("name, phone, email, address, description, province, district, profile_image_url, cover_image_url, sector, working_hours")
+          .select("name, phone, email, address, description, province, district, profile_image_url, cover_image_url, sector, working_hours, booking_rules")
           .eq("id", currentTenantId)
           .single();
 
@@ -164,6 +166,9 @@ export default function AyarlarPage() {
 
           if (data.working_hours) {
             setWorkingHours(data.working_hours);
+          }
+          if (data.booking_rules) {
+            setBookingRules({ ...defaultBookingRules, ...data.booking_rules });
           }
           
           localStorage.setItem(
@@ -228,6 +233,7 @@ export default function AyarlarPage() {
           cover_image_url: coverImageUrl,
           sector,
           working_hours: normalizedHours,
+          booking_rules: bookingRules,
         })
       });
       const data = await res.json();
@@ -621,6 +627,26 @@ export default function AyarlarPage() {
                           ]}
                           buttonClassName="w-full flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2 text-sm font-medium text-slate-900 transition-all hover:border-slate-300 focus:outline-none dark:border-slate-700 dark:bg-slate-800/60 dark:text-white cursor-pointer"
                         />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between px-4 py-3 min-h-[44px]">
+                      <div className="flex flex-col pr-3">
+                        <span className="text-[17px] text-gray-900 dark:text-white">İptal Süresi</span>
+                        <span className="text-[13px] text-gray-500 dark:text-slate-400">Müşteri randevuya bu süreden az kala doğrudan iptal edemez, size istek gönderir</span>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <input
+                          type="number"
+                          min={0}
+                          max={168}
+                          value={bookingRules.cancelDeadlineHours}
+                          onChange={(e) =>
+                            setBookingRules({ ...bookingRules, cancelDeadlineHours: Math.max(0, Math.min(168, parseInt(e.target.value) || 0)) })
+                          }
+                          className="w-20 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2 text-sm font-bold text-slate-900 text-center focus:outline-none focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-white"
+                        />
+                        <span className="text-[15px] font-medium text-gray-500 dark:text-slate-400">saat</span>
                       </div>
                     </div>
 

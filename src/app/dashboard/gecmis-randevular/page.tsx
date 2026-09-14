@@ -15,7 +15,7 @@ interface Service {
 interface PastAppointment {
   id: string;
   service_id: string;
-  customer_id: string;
+  customer_id: string | null;
   start_time: string;
   end_time: string;
   status: string;

@@ -48,6 +48,14 @@ export const updateTenantProfileSchema = z.object({
     openTime: z.string(),
     closeTime: z.string(),
   })).optional(),
+  booking_rules: z.object({
+    slotDuration: z.number().int().min(15).max(120).optional(),
+    autoApprove: z.boolean().optional(),
+    notifyEmail: z.boolean().optional(),
+    notifySms: z.boolean().optional(),
+    notifyWhatsapp: z.boolean().optional(),
+    cancelDeadlineHours: z.number().int().min(0).max(168).optional(),
+  }).optional(),
 });
 
 export const createSectorSchema = z.object({

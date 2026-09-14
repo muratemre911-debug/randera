@@ -38,7 +38,7 @@ export interface Service {
 export interface Appointment {
   id: string;
   tenant_id: string;
-  customer_id: string;
+  customer_id: string | null;
   service_id: string;
   start_time: string;
   end_time: string;

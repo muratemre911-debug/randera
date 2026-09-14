@@ -83,7 +83,7 @@ export async function POST(req: Request) {
     // Hizmetin bu işletmeye ait ve aktif olduğunu doğrula
     const { data: service, error: serviceError } = await supabaseAdmin
       .from("services")
-      .select("id, tenant_id, is_active")
+      .select("id, tenant_id, is_active, name")
       .eq("id", service_id)
       .single();
 
@@ -151,17 +151,24 @@ export async function POST(req: Request) {
       .eq("id", user.id)
       .single();
 
+    if (!profile?.phone) {
+      return NextResponse.json(
+        { error: "Randevu oluşturmak için lütfen profilinize geçerli bir telefon numarası ekleyin." },
+        { status: 400 }
+      );
+    }
+
     const customerName = profile?.full_name || "Bir müşteri";
     const customerPhone = profile?.phone || "";
 
-    // 1. Randevuyu kaydet (RLS'yi atlar)
+    // 1. Randevuyu kaydet (Onay bekliyor / pending olarak)
     const { error: apptError } = await supabaseAdmin.from("appointments").insert({
       tenant_id,
       customer_id: user.id,
       service_id,
       start_time,
       end_time,
-      status: "confirmed",
+      status: "pending",
       custom_fields: {
         customer_name: customerName,
         note: note || "",
@@ -175,11 +182,12 @@ export async function POST(req: Request) {
     }
 
     // 2. İşletmeye in-app bildirim kaydet
-    const message = `${customerName} tarafından ${format(new Date(start_time), "dd MMM yyyy HH:mm", { locale: tr })} için yeni bir randevu oluşturuldu.`;
+    const formattedDate = format(new Date(start_time), "dd MMMM yyyy HH:mm", { locale: tr });
+    const message = `${customerName} (${customerPhone}), ${formattedDate} için ${service.name} randevusu talep etti. Onayınızı bekliyor.`;
 
     const { error: notifError } = await supabaseAdmin.from("notifications").insert({
       tenant_id,
-      title: "Yeni Randevu",
+      title: "Yeni Randevu Talebi (Onay Bekliyor)",
       message,
       is_read: false,
     });
@@ -205,7 +213,10 @@ export async function POST(req: Request) {
         .eq("tenant_id", tenant_id);
 
       if (subscriptions && subscriptions.length > 0) {
-        const payload = JSON.stringify({ title: "Yeni Randevu", body: message });
+        const payload = JSON.stringify({
+          title: "Yeni Randevu Talebi (Onay Bekliyor)",
+          body: `${customerName}, ${service.name} için randevu oluşturdu. Onaylamak için dokunun.`,
+        });
 
         await Promise.allSettled(
           subscriptions.map((sub) => {
