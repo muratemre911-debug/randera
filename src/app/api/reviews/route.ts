@@ -73,18 +73,29 @@ export async function GET(req: Request) {
       service_name?: string;
     }> = [];
 
-    const distribution: Record<number, number> = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+    const distribution: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
     let totalScore = 0;
-    let eligibleAppointmentId: string | null = null;
-    let userHasReviewed = false;
 
-    const now = new Date();
+    const userReviews: Array<{
+      appointment_id: string;
+      rating: number;
+      comment: string;
+      created_at: string;
+      service_name?: string;
+      start_time: string;
+    }> = [];
+
+    const eligibleAppointments: Array<{
+      id: string;
+      service_name?: string;
+      start_time: string;
+    }> = [];
 
     appts?.forEach((a: any) => {
       const review = a.custom_fields?.review;
       const srvName = a.services?.name;
 
-      // Extract existing review
+      // Extract existing review for public listing
       if (review && typeof review.rating === 'number') {
         const star = Math.min(Math.max(Math.round(review.rating), 1), 5);
         distribution[star] = (distribution[star] || 0) + 1;
@@ -101,19 +112,26 @@ export async function GET(req: Request) {
           service_name: srvName,
         });
 
+        // User's own review
         if (user && a.customer_id === user.id) {
-          userHasReviewed = true;
+          userReviews.push({
+            appointment_id: a.id,
+            rating: review.rating,
+            comment: review.comment || '',
+            created_at: review.created_at || a.start_time,
+            service_name: srvName,
+            start_time: a.start_time,
+          });
         }
-      }
-
-      // Check if user is eligible to write a review (appointment past/completed)
-      if (
-        user &&
-        a.customer_id === user.id &&
-        !eligibleAppointmentId &&
-        (a.status === 'completed' || (new Date(a.start_time) < now && a.status !== 'cancelled'))
-      ) {
-        eligibleAppointmentId = a.id;
+      } else {
+        // Unreviewed appointment: Eligible only if status is completed (each completed appointment = 1 review right)
+        if (user && a.customer_id === user.id && a.status === 'completed') {
+          eligibleAppointments.push({
+            id: a.id,
+            service_name: srvName,
+            start_time: a.start_time,
+          });
+        }
       }
     });
 
@@ -125,8 +143,11 @@ export async function GET(req: Request) {
       total_reviews: totalReviews,
       average_rating: averageRating,
       distribution,
-      eligible_appointment_id: eligibleAppointmentId,
-      user_has_reviewed: userHasReviewed,
+      eligible_appointment_id: eligibleAppointments[0]?.id || null,
+      eligible_appointments: eligibleAppointments,
+      can_review: eligibleAppointments.length > 0,
+      user_reviews: userReviews,
+      user_has_reviewed: userReviews.length > 0,
     });
   } catch (err: any) {
     console.error('Reviews GET error:', err);
@@ -190,10 +211,12 @@ export async function POST(req: Request) {
     const customerName = profile?.full_name || appt.custom_fields?.customer_name || 'Müşteri';
     const customerAvatar = profile?.avatar_url || appt.custom_fields?.avatar_url || null;
 
+    const existingReview = appt.custom_fields?.review;
     const reviewData = {
       rating: Math.round(rating),
       comment: (comment || '').trim(),
-      created_at: new Date().toISOString(),
+      created_at: existingReview?.created_at || new Date().toISOString(),
+      updated_at: new Date().toISOString(),
       customer_name: customerName,
       avatar_url: customerAvatar,
     };
