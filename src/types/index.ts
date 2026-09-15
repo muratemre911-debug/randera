@@ -29,7 +29,8 @@ export interface Service {
   name: string;
   description: string | null;
   price: number;
-  duration_minutes: number;
+  duration?: number;
+  duration_minutes?: number;
   is_active: boolean;
   created_at: string;
   updated_at: string;

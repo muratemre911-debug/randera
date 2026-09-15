@@ -15,17 +15,16 @@ import {
   ArrowRight,
   Phone,
   MessageSquare,
-  Sparkles,
   Calendar,
   X,
   AlertCircle,
-  Bell,
-  Tag
+  Bell
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useLanguage } from "@/context/LanguageContext";
 import type { DashboardStats, Service, Profile } from "@/types";
 import { PageSkeleton } from "@/components/Skeleton";
+import CustomSelect from "@/components/CustomSelect";
 
 interface TodayAppointment {
   id: string;
@@ -114,7 +113,7 @@ export default function DashboardPage() {
       await Promise.all([
         supabase
           .from("appointments")
-          .select("*, services(name, price, duration_minutes), profiles!appointments_customer_id_fkey(full_name, phone)")
+          .select("*, services(name, price, duration, duration_minutes), profiles!appointments_customer_id_fkey(full_name, phone)")
           .eq("tenant_id", tId)
           .neq("status", "cancelled")
           .gte("start_time", todayStart.toISOString())
@@ -123,8 +122,9 @@ export default function DashboardPage() {
 
         supabase
           .from("appointments")
-          .select("*, services(name, price, duration_minutes), profiles!appointments_customer_id_fkey(full_name, phone)")
+          .select("*, services(name, price, duration, duration_minutes), profiles!appointments_customer_id_fkey(full_name, phone)")
           .eq("tenant_id", tId)
+          .neq("status", "cancelled")
           .eq("status", "pending")
           .order("start_time", { ascending: true }),
 
@@ -180,7 +180,7 @@ export default function DashboardPage() {
         customer_phone: phone,
         service_name: app.services?.name || (lang === "tr" ? "Hizmet" : "Service"),
         service_price: app.services?.price || 0,
-        service_duration: app.services?.duration_minutes || 30,
+        service_duration: (app.services as any)?.duration || app.services?.duration_minutes || 30,
         note: app.custom_fields?.note || "",
       };
     });
@@ -201,7 +201,7 @@ export default function DashboardPage() {
         customer_phone: phone,
         service_name: app.services?.name || (lang === "tr" ? "Hizmet" : "Service"),
         service_price: app.services?.price || 0,
-        service_duration: app.services?.duration_minutes || 30,
+        service_duration: (app.services as any)?.duration || app.services?.duration_minutes || 30,
         note: app.custom_fields?.note || "",
       };
     });
@@ -373,7 +373,7 @@ export default function DashboardPage() {
     }
 
     const selectedService = services.find((s) => s.id === selectedServiceId);
-    const duration = selectedService?.duration_minutes || 30;
+    const duration = (selectedService as any)?.duration || selectedService?.duration_minutes || 30;
 
     const [hours, minutes] = appointmentTime.split(":").map(Number);
     const [year, month, day] = appointmentDate.split("-").map(Number);
@@ -456,29 +456,13 @@ export default function DashboardPage() {
     <div className="max-w-6xl mx-auto space-y-8 pb-12">
       {/* 1. TOP HEADER & QUICK ACTIONS BAR */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-amber-50/90 text-amber-800 dark:bg-amber-500/10 dark:text-amber-300 border border-amber-200/80 dark:border-amber-500/25 shadow-xs transition-colors">
-              <Sparkles size={13} className="text-amber-500 fill-amber-400 shrink-0" />
-              <span>{tenant?.name || "Randera"}</span>
-            </span>
-            {tenant?.sector && (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-indigo-50/90 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-500/25 shadow-xs capitalize">
-                <Tag size={12} className="text-indigo-500 dark:text-indigo-400 shrink-0" />
-                <span>{tenant.sector}</span>
-              </span>
-            )}
-            <span className="text-xs text-gray-400 font-medium">
-              {new Date().toLocaleDateString(lang === "tr" ? "tr-TR" : "en-US", {
-                weekday: "long",
-                day: "numeric",
-                month: "long",
-              })}
-            </span>
-          </div>
-          <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-gray-900 dark:text-white mt-1">
+        <div className="space-y-1">
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-gray-900 dark:text-white">
             {t("nav.overview")}
           </h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">
+            {tenant?.name || "Randera"} • {new Date().toLocaleDateString(lang === "tr" ? "tr-TR" : "en-US", { day: "numeric", month: "long", year: "numeric" })}, {new Date().toLocaleDateString(lang === "tr" ? "tr-TR" : "en-US", { weekday: "long" })}
+          </p>
         </div>
 
         {/* Action Buttons Toolbar */}
@@ -1021,21 +1005,22 @@ export default function DashboardPage() {
                 <label className="block text-xs font-bold text-gray-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
                   {t("dashboard.service")}
                 </label>
-                <select
+                <CustomSelect
                   value={selectedServiceId}
-                  onChange={(e) => setSelectedServiceId(e.target.value)}
-                  className="w-full rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 text-sm text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  required
-                >
-                  <option value="" disabled>
-                    {lang === "tr" ? "Hizmet seçin..." : "Select service..."}
-                  </option>
-                  {services.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name} - ₺{s.price} ({s.duration_minutes} {lang === "tr" ? "dk" : "min"})
-                    </option>
-                  ))}
-                </select>
+                  onChange={(val) => setSelectedServiceId(val)}
+                  options={services.map((s) => {
+                    const dur = (s as any).duration || s.duration_minutes || 30;
+                    return {
+                      value: s.id,
+                      label: s.name,
+                      badge: `₺${s.price}`,
+                      sublabel: `${dur} ${lang === "tr" ? "dk" : "min"}`,
+                    };
+                  })}
+                  placeholder={lang === "tr" ? "Hizmet seçin..." : "Select service..."}
+                  searchable={true}
+                  searchPlaceholder={lang === "tr" ? "Hizmet ara (örn: Saç Tasarım)..." : "Search service..."}
+                />
               </div>
 
               {/* Customer Mode Switch */}
@@ -1089,21 +1074,18 @@ export default function DashboardPage() {
                     />
                   </div>
                 ) : (
-                  <select
+                  <CustomSelect
                     value={selectedCustomerId}
-                    onChange={(e) => setSelectedCustomerId(e.target.value)}
-                    className="w-full rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 text-sm text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    required
-                  >
-                    <option value="" disabled>
-                      {lang === "tr" ? "Kayıtlı müşteri seçin..." : "Select existing customer..."}
-                    </option>
-                    {customers.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.full_name} {c.phone ? `(${c.phone})` : ""}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setSelectedCustomerId(val)}
+                    options={customers.map((c) => ({
+                      value: c.id,
+                      label: c.full_name || (lang === "tr" ? "İsimsiz Müşteri" : "Customer"),
+                      sublabel: c.phone || undefined,
+                    }))}
+                    placeholder={lang === "tr" ? "Kayıtlı müşteri seçin..." : "Select existing customer..."}
+                    searchable={true}
+                    searchPlaceholder={lang === "tr" ? "Müşteri ara..." : "Search customer..."}
+                  />
                 )}
               </div>
 

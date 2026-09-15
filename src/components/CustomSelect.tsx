@@ -83,7 +83,8 @@ export default function CustomSelect({
     return normalizedOptions.filter(
       (opt) =>
         opt.label.toLowerCase().includes(q) ||
-        (opt.sublabel && opt.sublabel.toLowerCase().includes(q))
+        (opt.sublabel && opt.sublabel.toLowerCase().includes(q)) ||
+        (opt.badge && opt.badge.toLowerCase().includes(q))
     );
   }, [normalizedOptions, searchQuery]);
 
@@ -231,15 +232,27 @@ export default function CustomSelect({
           `w-full flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-[15px] font-medium text-slate-900 transition-all hover:border-slate-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-white dark:hover:border-slate-600 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none select-none`
         }
       >
-        <span
-          className={`truncate mr-2 ${
-            !selectedOption
-              ? 'text-slate-400 dark:text-slate-500 font-normal'
-              : ''
-          }`}
-        >
-          {selectedOption ? selectedOption.label : placeholder}
-        </span>
+        <div className="flex items-center gap-2 truncate mr-2 min-w-0">
+          <span
+            className={`truncate ${
+              !selectedOption
+                ? 'text-slate-400 dark:text-slate-500 font-normal'
+                : 'text-slate-900 dark:text-white font-medium'
+            }`}
+          >
+            {selectedOption ? selectedOption.label : placeholder}
+          </span>
+          {selectedOption?.badge && (
+            <span className="text-xs px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-bold shrink-0 border border-indigo-100/80 dark:border-indigo-900/40">
+              {selectedOption.badge}
+            </span>
+          )}
+          {selectedOption?.sublabel && (
+            <span className="text-xs text-slate-400 dark:text-slate-500 shrink-0 font-normal">
+              ({selectedOption.sublabel})
+            </span>
+          )}
+        </div>
 
         <ChevronDown
           size={16}
