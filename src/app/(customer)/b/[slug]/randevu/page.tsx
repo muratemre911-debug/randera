@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { useParams, useRouter } from "next/navigation";
 import { useLanguage } from "@/context/LanguageContext";
@@ -8,20 +8,18 @@ import {
   Calendar as CalendarIcon,
   Clock,
   Loader2,
-  CheckCircle2,
   ChevronRight,
   ChevronLeft,
   Search,
   Check,
   CalendarPlus,
   Download,
-  MessageSquare,
-  Sparkles,
   ArrowRight,
   Info,
 } from "lucide-react";
 import { format, addDays, isSameDay } from "date-fns";
 import { tr, enUS } from "date-fns/locale";
+import { getPalette, paletteCss } from "@/lib/palettes";
 import RequirePhoneModal from "@/components/RequirePhoneModal";
 
 const dayMap: Record<string, number> = {
@@ -61,9 +59,20 @@ interface TenantItem {
   id: string;
   name: string;
   slug: string;
+  /** İşletmenin seçtiği vitrin paleti — randevu ekranı da bu paleti kullanır */
+  theme_palette?: string | null;
   profile_image_url?: string | null;
-  working_hours?: Record<string, { isOpen: boolean; openTime: string; closeTime: string }>;
-  booking_rules?: { slotDuration?: number; autoApprove?: boolean; notifyEmail?: boolean; notifySms?: boolean; notifyWhatsapp?: boolean };
+  working_hours?: Record<
+    string,
+    { isOpen: boolean; openTime: string; closeTime: string }
+  >;
+  booking_rules?: {
+    slotDuration?: number;
+    autoApprove?: boolean;
+    notifyEmail?: boolean;
+    notifySms?: boolean;
+    notifyWhatsapp?: boolean;
+  };
   phone?: string | null;
   address?: string | null;
 }
@@ -83,7 +92,9 @@ export default function BookPage() {
 
   // Stepper: 1 = Hizmet, 2 = Tarih & Saat, 3 = Onay & Özet
   const [step, setStep] = useState(1);
-  const [selectedService, setSelectedService] = useState<ServiceItem | null>(null);
+  const [selectedService, setSelectedService] = useState<ServiceItem | null>(
+    null,
+  );
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [timeFilter, setTimeFilter] = useState<TimeFilter>("all");
@@ -97,70 +108,71 @@ export default function BookPage() {
 
   const availableDates = useMemo(
     () => Array.from({ length: 14 }, (_, i) => addDays(new Date(), i)),
-    []
+    [],
   );
 
-  const fetchTenantData = useCallback(async () => {
-    setLoading(true);
-    const { data: tenantData, error: tenantError } = await supabase
-      .from("tenants")
-      .select("*")
-      .eq("slug", slug)
-      .single();
+  // İşletme + hizmetleri yükle. (Veri yükleme effect'in kendi içinde:
+  // effect gövdesinde senkron setState çağıran dış fonksiyon çağrılmamalı.)
+  useEffect(() => {
+    const loadTenant = async () => {
+      const { data: tenantData, error: tenantError } = await supabase
+        .from("tenants")
+        .select("*")
+        .eq("slug", slug)
+        .single();
 
-    if (tenantError || !tenantData) {
-      setError(lang === "tr" ? "İşletme bulunamadı" : "Business not found");
+      if (tenantError || !tenantData) {
+        setError(lang === "tr" ? "İşletme bulunamadı" : "Business not found");
+        setLoading(false);
+        return;
+      }
+      setTenant(tenantData as TenantItem);
+
+      const { data: serviceData } = await supabase
+        .from("services")
+        .select("*")
+        .eq("tenant_id", tenantData.id)
+        .eq("is_active", true)
+        .order("name");
+
+      if (serviceData) {
+        setServices(serviceData as ServiceItem[]);
+      }
+
       setLoading(false);
-      return;
-    }
-    setTenant(tenantData as TenantItem);
+    };
 
-    const { data: serviceData } = await supabase
-      .from("services")
-      .select("*")
-      .eq("tenant_id", tenantData.id)
-      .eq("is_active", true)
-      .order("name");
-
-    if (serviceData) {
-      setServices(serviceData as ServiceItem[]);
-    }
-
-    setLoading(false);
+    loadTenant();
   }, [slug, supabase, lang]);
 
+  // Seçilen günün dolu saatleri (çakışan randevuyu önlemek için)
   useEffect(() => {
-    fetchTenantData();
-  }, [fetchTenantData]);
+    const loadBookedSlots = async () => {
+      if (!tenant || !selectedDate) return;
+      const startOfDay = new Date(selectedDate);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(selectedDate);
+      endOfDay.setHours(23, 59, 59, 999);
 
-  // Fetch booked slots for the selected date to prevent conflicts
-  const fetchBookedSlots = useCallback(async () => {
-    if (!tenant || !selectedDate) return;
-    const startOfDay = new Date(selectedDate);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(selectedDate);
-    endOfDay.setHours(23, 59, 59, 999);
+      const { data: appts } = await supabase
+        .from("appointments")
+        .select("start_time")
+        .eq("tenant_id", tenant.id)
+        .neq("status", "cancelled")
+        .gte("start_time", startOfDay.toISOString())
+        .lte("start_time", endOfDay.toISOString());
 
-    const { data: appts } = await supabase
-      .from("appointments")
-      .select("start_time")
-      .eq("tenant_id", tenant.id)
-      .neq("status", "cancelled")
-      .gte("start_time", startOfDay.toISOString())
-      .lte("start_time", endOfDay.toISOString());
+      if (appts) {
+        const taken = appts.map((a) => {
+          const d = new Date(a.start_time);
+          return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
+        });
+        setBookedSlots(taken);
+      }
+    };
 
-    if (appts) {
-      const taken = appts.map((a) => {
-        const d = new Date(a.start_time);
-        return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
-      });
-      setBookedSlots(taken);
-    }
+    loadBookedSlots();
   }, [tenant, selectedDate, supabase]);
-
-  useEffect(() => {
-    fetchBookedSlots();
-  }, [fetchBookedSlots]);
 
   const getServiceDuration = (svc: ServiceItem) => {
     return svc.duration || svc.duration_minutes || 30;
@@ -172,7 +184,9 @@ export default function BookPage() {
     const slotDuration = tenant?.booking_rules?.slotDuration || 30;
 
     const dayOfWeek = date.getDay();
-    const dayName = Object.keys(dayMap).find((key) => dayMap[key] === dayOfWeek);
+    const dayName = Object.keys(dayMap).find(
+      (key) => dayMap[key] === dayOfWeek,
+    );
     if (!dayName) return [];
 
     const hours = hoursSource[dayName];
@@ -192,7 +206,9 @@ export default function BookPage() {
       if (isToday && m < nowTotal) continue;
       const h = Math.floor(m / 60);
       const min = m % 60;
-      slots.push(`${h.toString().padStart(2, "0")}:${min.toString().padStart(2, "0")}`);
+      slots.push(
+        `${h.toString().padStart(2, "0")}:${min.toString().padStart(2, "0")}`,
+      );
     }
     return slots;
   };
@@ -205,7 +221,8 @@ export default function BookPage() {
       const min = parseInt(minStr);
       const total = hour * 60 + min;
       if (timeFilter === "morning") return total < 12 * 60;
-      if (timeFilter === "afternoon") return total >= 12 * 60 && total < 17 * 60;
+      if (timeFilter === "afternoon")
+        return total >= 12 * 60 && total < 17 * 60;
       if (timeFilter === "evening") return total >= 17 * 60;
       return true;
     });
@@ -217,7 +234,7 @@ export default function BookPage() {
     return services.filter(
       (s) =>
         s.name.toLowerCase().includes(q) ||
-        (s.description && s.description.toLowerCase().includes(q))
+        (s.description && s.description.toLowerCase().includes(q)),
     );
   }, [services, serviceSearch]);
 
@@ -233,9 +250,11 @@ export default function BookPage() {
       alert(
         lang === "tr"
           ? "Randevu almak için giriş yapmalısınız."
-          : "You must log in to book an appointment."
+          : "You must log in to book an appointment.",
       );
-      router.push(`/login?next=${encodeURIComponent(window.location.pathname)}`);
+      router.push(
+        `/login?next=${encodeURIComponent(window.location.pathname)}`,
+      );
       return;
     }
 
@@ -279,7 +298,7 @@ export default function BookPage() {
         data.error ||
           (lang === "tr"
             ? "Randevu oluşturulurken bir hata oluştu."
-            : "An error occurred while booking.")
+            : "An error occurred while booking."),
       );
     } else {
       setBookingSuccess(true);
@@ -288,18 +307,20 @@ export default function BookPage() {
 
   // Google Calendar URL Generator
   const getGoogleCalendarUrl = () => {
-    if (!selectedService || !selectedDate || !selectedTime || !tenant) return "#";
+    if (!selectedService || !selectedDate || !selectedTime || !tenant)
+      return "#";
     const [hour, min] = selectedTime.split(":");
     const start = new Date(selectedDate);
     start.setHours(parseInt(hour), parseInt(min), 0, 0);
     const duration = getServiceDuration(selectedService);
     const end = new Date(start.getTime() + duration * 60000);
 
-    const formatGCal = (d: Date) => d.toISOString().replace(/-|:|\.\d\d\d/g, "");
+    const formatGCal = (d: Date) =>
+      d.toISOString().replace(/-|:|\.\d\d\d/g, "");
     return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(
-      `${selectedService.name} - ${tenant.name}`
+      `${selectedService.name} - ${tenant.name}`,
     )}&dates=${formatGCal(start)}/${formatGCal(end)}&details=${encodeURIComponent(
-      `Randera randevusu: ${selectedService.name} (${tenant.name})`
+      `Randera randevusu: ${selectedService.name} (${tenant.name})`,
     )}`;
   };
 
@@ -327,7 +348,9 @@ export default function BookPage() {
       "END:VCALENDAR",
     ].join("\r\n");
 
-    const blob = new Blob([icsContent], { type: "text/calendar;charset=utf-8" });
+    const blob = new Blob([icsContent], {
+      type: "text/calendar;charset=utf-8",
+    });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
@@ -337,12 +360,21 @@ export default function BookPage() {
     document.body.removeChild(link);
   };
 
+  // İşletmenin vitrin paleti: randevu ekranı da işletme sayfasıyla aynı
+  // vurgu rengini kullanır (`.brand-scope` → --brand* değişkenleri).
+  const paletteStyle = (
+    <style>{paletteCss(getPalette(tenant?.theme_palette))}</style>
+  );
+
   if (loading) {
     return (
-      <div className="w-full h-80 flex flex-col items-center justify-center gap-3">
-        <Loader2 className="animate-spin text-indigo-600 h-9 w-9" />
+      <div className="brand-scope w-full h-80 flex flex-col items-center justify-center gap-3">
+        {paletteStyle}
+        <Loader2 className="animate-spin text-[var(--brand)] h-9 w-9" />
         <p className="text-xs text-gray-400 font-medium">
-          {lang === "tr" ? "Randevu takvimi yükleniyor..." : "Loading booking calendar..."}
+          {lang === "tr"
+            ? "Randevu takvimi yükleniyor..."
+            : "Loading booking calendar..."}
         </p>
       </div>
     );
@@ -350,7 +382,8 @@ export default function BookPage() {
 
   if (error || !tenant) {
     return (
-      <div className="w-full h-64 flex flex-col items-center justify-center text-red-500 dark:text-red-400 font-medium gap-2">
+      <div className="brand-scope w-full h-64 flex flex-col items-center justify-center text-red-500 dark:text-red-400 font-medium gap-2">
+        {paletteStyle}
         <Info size={28} />
         <span>{error}</span>
       </div>
@@ -359,7 +392,8 @@ export default function BookPage() {
 
   if (bookingSuccess) {
     return (
-      <div className="w-full max-w-lg mx-auto flex flex-col items-center justify-center py-12 px-4 font-sans animate-in fade-in zoom-in-95 duration-500">
+      <div className="brand-scope w-full max-w-lg mx-auto flex flex-col items-center justify-center py-12 px-4 font-sans animate-in fade-in zoom-in-95 duration-500">
+        {paletteStyle}
         <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-3xl p-8 sm:p-10 rounded-[36px] shadow-xl border border-white/60 dark:border-slate-800/80 w-full text-center">
           <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 mb-6 ring-8 ring-amber-50 dark:ring-amber-950/30">
             <Clock className="h-10 w-10" />
@@ -367,15 +401,21 @@ export default function BookPage() {
 
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300 mb-2">
             <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-            {lang === "tr" ? "İşletme Onayı Bekleniyor" : "Awaiting Business Approval"}
+            {lang === "tr"
+              ? "İşletme Onayı Bekleniyor"
+              : "Awaiting Business Approval"}
           </span>
 
           <h2 className="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white mb-2">
-            {lang === "tr" ? "Randevu Talebiniz Alındı!" : "Appointment Request Received!"}
+            {lang === "tr"
+              ? "Randevu Talebiniz Alındı!"
+              : "Appointment Request Received!"}
           </h2>
 
           <p className="text-sm text-gray-500 dark:text-slate-400 mb-6">
-            <strong className="text-gray-900 dark:text-slate-200">{tenant.name}</strong>{" "}
+            <strong className="text-gray-900 dark:text-slate-200">
+              {tenant.name}
+            </strong>{" "}
             {lang === "tr"
               ? "randevu talebinizi inceleyip onaylayacaktır. Durumu 'Randevularım' sayfasından takip edebilirsiniz."
               : "will review and approve your appointment request. You can track status in My Appointments."}
@@ -392,7 +432,7 @@ export default function BookPage() {
               </div>
               <div className="flex justify-between text-gray-500 dark:text-slate-400">
                 <span>{lang === "tr" ? "Tarih ve Saat" : "Date & Time"}:</span>
-                <span className="font-bold text-indigo-600 dark:text-indigo-400">
+                <span className="font-bold text-[var(--brand-text)]">
                   {format(selectedDate, "dd MMMM yyyy", {
                     locale: lang === "tr" ? tr : enUS,
                   })}{" "}
@@ -424,16 +464,18 @@ export default function BookPage() {
               onClick={downloadIcs}
               className="flex items-center justify-center gap-2 py-3 px-3 rounded-2xl bg-white dark:bg-slate-800 border border-gray-200/80 dark:border-slate-700 text-xs font-bold text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 transition-all shadow-xs"
             >
-              <Download size={16} className="text-indigo-500" />
+              <Download size={16} className="text-[var(--brand-text)]" />
               <span>Apple / .ics İndir</span>
             </button>
           </div>
 
           <button
             onClick={() => router.push("/my-appointments")}
-            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-2xl shadow-lg shadow-indigo-500/20 hover:-translate-y-0.5 transition-all text-sm"
+            className="w-full bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white font-bold py-4 rounded-2xl shadow-lg shadow-[color:var(--brand-shadow)] hover:-translate-y-0.5 transition-all text-sm"
           >
-            {lang === "tr" ? "Randevularımı Görüntüle" : "Go to My Appointments"}
+            {lang === "tr"
+              ? "Randevularımı Görüntüle"
+              : "Go to My Appointments"}
           </button>
         </div>
       </div>
@@ -441,10 +483,11 @@ export default function BookPage() {
   }
 
   return (
-    <div className="w-full max-w-3xl mx-auto space-y-6 pb-28 sm:pb-12 font-sans px-2">
+    <div className="brand-scope w-full max-w-3xl mx-auto space-y-6 pb-12 font-sans px-2">
+      {paletteStyle}
       {/* Mini Business Banner */}
       <div className="flex items-center gap-3 sm:gap-4 p-3 sm:p-4 rounded-2xl sm:rounded-3xl bg-white/70 dark:bg-slate-900/60 backdrop-blur-2xl border border-white/60 dark:border-slate-800/80 shadow-sm">
-        <div className="flex h-12 w-12 sm:h-14 sm:w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-indigo-50 text-indigo-600 dark:bg-slate-800 dark:text-indigo-400 font-black text-lg sm:text-xl shadow-inner">
+        <div className="flex h-12 w-12 sm:h-14 sm:w-14 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-white dark:border-slate-800 shadow-sm bg-[var(--brand-soft)] text-[var(--brand-text)] font-black text-lg sm:text-xl">
           {tenant.profile_image_url ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -474,9 +517,27 @@ export default function BookPage() {
       {/* Stepper Wizard Bar */}
       <div className="grid grid-cols-3 gap-1.5 sm:gap-3 p-1 sm:p-1.5 rounded-2xl bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl border border-white/60 dark:border-slate-800/60 shadow-xs">
         {[
-          { num: 1, labelTr: "1. Hizmet", labelTrFull: "1. Hizmet Seçimi", labelEn: "1. Service", labelEnFull: "1. Service" },
-          { num: 2, labelTr: "2. Tarih", labelTrFull: "2. Tarih & Saat", labelEn: "2. Date", labelEnFull: "2. Date & Time" },
-          { num: 3, labelTr: "3. Onay", labelTrFull: "3. Onay & Not", labelEn: "3. Confirm", labelEnFull: "3. Confirm" },
+          {
+            num: 1,
+            labelTr: "1. Hizmet",
+            labelTrFull: "1. Hizmet Seçimi",
+            labelEn: "1. Service",
+            labelEnFull: "1. Service",
+          },
+          {
+            num: 2,
+            labelTr: "2. Tarih",
+            labelTrFull: "2. Tarih & Saat",
+            labelEn: "2. Date",
+            labelEnFull: "2. Date & Time",
+          },
+          {
+            num: 3,
+            labelTr: "3. Onay",
+            labelTrFull: "3. Onay & Not",
+            labelEn: "3. Confirm",
+            labelEnFull: "3. Confirm",
+          },
         ].map((s) => {
           const isActive = step === s.num;
           const isDone = step > s.num;
@@ -486,19 +547,31 @@ export default function BookPage() {
               onClick={() => {
                 if (s.num === 1) setStep(1);
                 if (s.num === 2 && selectedService) setStep(2);
-                if (s.num === 3 && selectedService && selectedDate && selectedTime) setStep(3);
+                if (
+                  s.num === 3 &&
+                  selectedService &&
+                  selectedDate &&
+                  selectedTime
+                )
+                  setStep(3);
               }}
               className={`flex items-center justify-center gap-1 sm:gap-1.5 py-2 sm:py-2.5 px-1 sm:px-2 rounded-xl text-[11px] sm:text-xs font-bold transition-all whitespace-nowrap ${
                 isActive
-                  ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/20"
+                  ? "bg-[var(--brand)] text-white shadow-md shadow-[color:var(--brand-shadow)]"
                   : isDone
-                  ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
-                  : "text-gray-400 dark:text-slate-500 hover:text-gray-600"
+                    ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                    : "text-gray-400 dark:text-slate-500 hover:text-gray-600"
               }`}
             >
-              {isDone ? <Check size={13} className="shrink-0" strokeWidth={2.5} /> : null}
-              <span className="sm:hidden">{lang === "tr" ? s.labelTr : s.labelEn}</span>
-              <span className="hidden sm:inline">{lang === "tr" ? s.labelTrFull : s.labelEnFull}</span>
+              {isDone ? (
+                <Check size={13} className="shrink-0" strokeWidth={2.5} />
+              ) : null}
+              <span className="sm:hidden">
+                {lang === "tr" ? s.labelTr : s.labelEn}
+              </span>
+              <span className="hidden sm:inline">
+                {lang === "tr" ? s.labelTrFull : s.labelEnFull}
+              </span>
             </button>
           );
         })}
@@ -529,8 +602,10 @@ export default function BookPage() {
                 type="text"
                 value={serviceSearch}
                 onChange={(e) => setServiceSearch(e.target.value)}
-                placeholder={lang === "tr" ? "Hizmet ara..." : "Search services..."}
-                className="w-full pl-9 pr-4 py-2 rounded-xl border border-gray-200 dark:border-slate-700 bg-white/80 dark:bg-slate-800/80 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-800 dark:text-white"
+                placeholder={
+                  lang === "tr" ? "Hizmet ara..." : "Search services..."
+                }
+                className="w-full pl-9 pr-4 py-2 rounded-xl border border-gray-200 dark:border-slate-700 bg-white/80 dark:bg-slate-800/80 text-xs focus:outline-none focus:ring-2 focus:ring-[var(--brand)] text-gray-800 dark:text-white"
               />
             </div>
           </div>
@@ -549,12 +624,12 @@ export default function BookPage() {
                   }}
                   className={`group relative flex items-center justify-between p-5 rounded-3xl border transition-all text-left ${
                     isSelected
-                      ? "bg-indigo-50/90 dark:bg-indigo-950/40 border-indigo-400 dark:border-indigo-600 shadow-md ring-2 ring-indigo-500/20"
-                      : "bg-white/80 dark:bg-slate-900/60 border-white/60 dark:border-slate-800/80 hover:border-indigo-200 dark:hover:border-indigo-800/60 hover:shadow-md hover:-translate-y-0.5"
+                      ? "bg-[var(--brand-soft)] border-[var(--brand)] shadow-md ring-2 ring-[var(--brand)]/20"
+                      : "bg-white/80 dark:bg-slate-900/60 border-white/60 dark:border-slate-800/80 hover:border-[var(--brand-border)] hover:shadow-md hover:-translate-y-0.5"
                   }`}
                 >
                   <div>
-                    <h3 className="font-bold text-gray-900 dark:text-white text-base group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                    <h3 className="font-bold text-gray-900 dark:text-white text-base group-hover:text-[var(--brand-text)] transition-colors">
                       {svc.name}
                     </h3>
                     {svc.description && (
@@ -571,14 +646,14 @@ export default function BookPage() {
                   </div>
 
                   <div className="flex items-center gap-4 shrink-0 ml-4">
-                    <span className="font-black text-xl text-indigo-600 dark:text-indigo-400">
+                    <span className="font-black text-xl text-[var(--brand-text)]">
                       ₺{svc.price}
                     </span>
                     <div
                       className={`flex h-8 w-8 items-center justify-center rounded-full transition-all ${
                         isSelected
-                          ? "bg-indigo-600 text-white"
-                          : "bg-gray-100 dark:bg-slate-800 text-gray-400 group-hover:bg-indigo-600 group-hover:text-white"
+                          ? "bg-[var(--brand)] text-white"
+                          : "bg-gray-100 dark:bg-slate-800 text-gray-400 group-hover:bg-[var(--brand)] group-hover:text-white"
                       }`}
                     >
                       <ChevronRight size={18} />
@@ -590,7 +665,9 @@ export default function BookPage() {
 
             {filteredServices.length === 0 && (
               <div className="p-12 text-center rounded-3xl bg-white/50 dark:bg-slate-900/50 border border-gray-100 dark:border-slate-800 text-gray-400 text-sm">
-                {lang === "tr" ? "Eşleşen hizmet bulunamadı." : "No services found."}
+                {lang === "tr"
+                  ? "Eşleşen hizmet bulunamadı."
+                  : "No services found."}
               </div>
             )}
           </div>
@@ -607,12 +684,13 @@ export default function BookPage() {
               </h2>
               <p className="text-xs text-gray-500 dark:text-slate-400">
                 {selectedService.name} • ₺{selectedService.price} (
-                {getServiceDuration(selectedService)} {lang === "tr" ? "dk" : "min"})
+                {getServiceDuration(selectedService)}{" "}
+                {lang === "tr" ? "dk" : "min"})
               </p>
             </div>
             <button
               onClick={() => setStep(1)}
-              className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
+              className="text-xs font-bold text-[var(--brand-text)] hover:underline"
             >
               {lang === "tr" ? "Hizmeti Değiştir" : "Change Service"}
             </button>
@@ -624,9 +702,10 @@ export default function BookPage() {
               {lang === "tr" ? "1. Gün Seçin" : "1. Select Day"}
             </h3>
 
-            <div className="flex gap-2.5 overflow-x-auto pb-2 scrollbar-thin">
+            <div className="flex gap-2.5 overflow-x-auto pt-1.5 pb-3.5 px-1 -mx-1 scrollbar-none">
               {availableDates.map((date, i) => {
-                const isSelected = selectedDate && isSameDay(date, selectedDate);
+                const isSelected =
+                  selectedDate && isSameDay(date, selectedDate);
                 const locale = lang === "tr" ? tr : enUS;
                 const isToday = isSameDay(date, new Date());
                 const isTomorrow = isSameDay(date, addDays(new Date(), 1));
@@ -640,13 +719,15 @@ export default function BookPage() {
                     }}
                     className={`flex flex-col items-center min-w-[74px] p-3 rounded-2xl border transition-all shrink-0 ${
                       isSelected
-                        ? "bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-500/30 scale-[1.03]"
-                        : "bg-white/80 dark:bg-slate-800/70 border-gray-200/70 dark:border-slate-700/60 text-gray-700 dark:text-slate-300 hover:border-indigo-300 dark:hover:border-indigo-600 hover:-translate-y-0.5"
+                        ? "bg-[var(--brand)] border-[var(--brand)] text-white shadow-md shadow-[color:var(--brand-shadow)] scale-[1.02]"
+                        : "bg-white/80 dark:bg-slate-800/70 border-gray-200/70 dark:border-slate-700/60 text-gray-700 dark:text-slate-300 hover:border-[var(--brand-border)] hover:-translate-y-0.5"
                     }`}
                   >
                     <span
                       className={`text-[11px] font-bold uppercase tracking-wider ${
-                        isSelected ? "text-indigo-100" : "text-gray-400 dark:text-slate-400"
+                        isSelected
+                          ? "text-white/80"
+                          : "text-gray-400 dark:text-slate-400"
                       }`}
                     >
                       {isToday
@@ -654,17 +735,17 @@ export default function BookPage() {
                           ? "Bugün"
                           : "Today"
                         : isTomorrow
-                        ? lang === "tr"
-                          ? "Yarın"
-                          : "Tmrw"
-                        : format(date, "EEE", { locale })}
+                          ? lang === "tr"
+                            ? "Yarın"
+                            : "Tmrw"
+                          : format(date, "EEE", { locale })}
                     </span>
                     <span className="text-2xl font-black mt-1 leading-tight">
                       {format(date, "d")}
                     </span>
                     <span
                       className={`text-[10px] font-medium mt-0.5 ${
-                        isSelected ? "text-indigo-100" : "text-gray-400"
+                        isSelected ? "text-white/80" : "text-gray-400"
                       }`}
                     >
                       {format(date, "MMM", { locale })}
@@ -682,7 +763,7 @@ export default function BookPage() {
                 </h3>
 
                 {/* Time filter pills */}
-                <div className="flex items-center gap-1.5 p-1 rounded-xl bg-gray-100 dark:bg-slate-800 text-[11px] font-bold">
+                <div className="flex items-center justify-between gap-1 p-1 rounded-xl bg-gray-100 dark:bg-slate-800 text-[11px] font-bold w-full sm:w-auto">
                   {(
                     [
                       { id: "all", tr: "Tümü", en: "All" },
@@ -693,11 +774,12 @@ export default function BookPage() {
                   ).map((f) => (
                     <button
                       key={f.id}
+                      type="button"
                       onClick={() => setTimeFilter(f.id)}
-                      className={`px-2.5 py-1 rounded-lg transition-colors ${
+                      className={`flex-1 sm:flex-none text-center px-2.5 py-1.5 sm:py-1 rounded-lg transition-all ${
                         timeFilter === f.id
-                          ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-xs"
-                          : "text-gray-500 dark:text-slate-400 hover:text-gray-800"
+                          ? "bg-white dark:bg-slate-700 text-[var(--brand-text)] shadow-xs font-black"
+                          : "text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-200"
                       }`}
                     >
                       {lang === "tr" ? f.tr : f.en}
@@ -725,10 +807,10 @@ export default function BookPage() {
                         }}
                         className={`py-3 rounded-2xl text-xs sm:text-sm font-black border transition-all ${
                           isSelected
-                            ? "bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-500/30 scale-[1.04]"
+                            ? "bg-[var(--brand)] border-[var(--brand)] text-white shadow-md shadow-[color:var(--brand-shadow)] scale-[1.04]"
                             : isBooked
-                            ? "bg-gray-100 dark:bg-slate-800/40 border-transparent text-gray-300 dark:text-slate-600 cursor-not-allowed line-through"
-                            : "bg-white/80 dark:bg-slate-800/80 border-gray-200/70 dark:border-slate-700 text-gray-800 dark:text-slate-200 hover:border-indigo-400 hover:bg-indigo-50/50 dark:hover:bg-indigo-950/30 active:scale-95"
+                              ? "bg-gray-100 dark:bg-slate-800/40 border-transparent text-gray-300 dark:text-slate-600 cursor-not-allowed line-through"
+                              : "bg-white/80 dark:bg-slate-800/80 border-gray-200/70 dark:border-slate-700 text-gray-800 dark:text-slate-200 hover:border-[var(--brand)] hover:bg-[var(--brand-soft)] active:scale-95"
                         }`}
                       >
                         {time}
@@ -752,14 +834,16 @@ export default function BookPage() {
                   className="flex items-center gap-1.5 px-4 py-2.5 rounded-2xl border border-gray-200 dark:border-slate-700 text-xs font-bold text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors w-fit"
                 >
                   <ChevronLeft size={16} />
-                  <span>{lang === "tr" ? "Hizmet Seçimine Dön" : "Back to Services"}</span>
+                  <span>
+                    {lang === "tr" ? "Hizmet Seçimine Dön" : "Back to Services"}
+                  </span>
                 </button>
 
                 <button
                   type="button"
                   disabled={!selectedTime}
                   onClick={() => setStep(3)}
-                  className="flex items-center justify-center gap-2 px-6 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs sm:text-sm shadow-md shadow-indigo-500/25 active:scale-95 disabled:opacity-40 disabled:pointer-events-none transition-all"
+                  className="flex items-center justify-center gap-2 px-6 py-3 rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white font-black text-xs sm:text-sm shadow-md shadow-[color:var(--brand-shadow)] active:scale-95 disabled:opacity-40 disabled:pointer-events-none transition-all"
                 >
                   <span>
                     {selectedTime
@@ -767,8 +851,8 @@ export default function BookPage() {
                         ? `Onay ve Not Adımına Geç (${selectedTime})`
                         : `Proceed to Confirm (${selectedTime})`
                       : lang === "tr"
-                      ? "Lütfen Bir Saat Seçin"
-                      : "Please Select a Time"}
+                        ? "Lütfen Bir Saat Seçin"
+                        : "Please Select a Time"}
                   </span>
                   <ArrowRight size={16} />
                 </button>
@@ -796,15 +880,26 @@ export default function BookPage() {
           <div className="relative overflow-hidden rounded-[32px] bg-white/80 dark:bg-slate-900/80 backdrop-blur-3xl border border-white/60 dark:border-slate-800/80 p-6 sm:p-8 shadow-lg">
             <div className="flex items-center justify-between pb-6 border-b border-dashed border-gray-200 dark:border-slate-800">
               <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400 font-bold">
-                  <Sparkles size={22} />
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-white dark:border-slate-800 shadow-sm bg-[var(--brand-soft)] text-[var(--brand-text)] font-black text-lg">
+                  {tenant.profile_image_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={tenant.profile_image_url}
+                      alt={tenant.name}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    tenant.name.charAt(0).toUpperCase()
+                  )}
                 </div>
                 <div>
                   <h3 className="font-bold text-gray-900 dark:text-white text-base">
                     {tenant.name}
                   </h3>
                   <p className="text-xs text-gray-400">
-                    {lang === "tr" ? "Doğrulanmış İşletme" : "Verified Business"}
+                    {lang === "tr"
+                      ? "Doğrulanmış İşletme"
+                      : "Verified Business"}
                   </p>
                 </div>
               </div>
@@ -827,8 +922,9 @@ export default function BookPage() {
                 <p className="font-bold text-gray-800 dark:text-slate-200">
                   {selectedService.name}
                 </p>
-                <span className="text-xs text-indigo-600 dark:text-indigo-400 font-semibold">
-                  {getServiceDuration(selectedService)} {lang === "tr" ? "dakika" : "minutes"}
+                <span className="text-xs text-[var(--brand-text)] font-semibold">
+                  {getServiceDuration(selectedService)}{" "}
+                  {lang === "tr" ? "dakika" : "minutes"}
                 </span>
               </div>
 
@@ -841,7 +937,7 @@ export default function BookPage() {
                     locale: lang === "tr" ? tr : enUS,
                   })}
                 </p>
-                <span className="text-xs text-indigo-600 dark:text-indigo-400 font-bold">
+                <span className="text-xs text-[var(--brand-text)] font-bold">
                   {selectedTime}
                 </span>
               </div>
@@ -863,7 +959,7 @@ export default function BookPage() {
                     : "Any special requests or instructions..."
                 }
                 rows={3}
-                className="w-full rounded-2xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3.5 text-xs sm:text-sm text-gray-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                className="w-full rounded-2xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3.5 text-xs sm:text-sm text-gray-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-none"
               />
             </div>
 
@@ -872,9 +968,12 @@ export default function BookPage() {
               <button
                 type="button"
                 onClick={() => setStep(2)}
-                className="flex items-center gap-1 px-4 py-3.5 rounded-2xl border border-gray-200 dark:border-slate-700 text-xs font-bold text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
+                className="inline-flex items-center justify-center gap-2 pl-4 pr-5 py-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-700 bg-white/60 dark:bg-slate-800/60 backdrop-blur-md text-sm font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700/80 shadow-xs hover:shadow-sm active:scale-95 transition-all cursor-pointer select-none shrink-0"
               >
-                <ChevronLeft size={16} />
+                <ChevronLeft
+                  size={18}
+                  className="-ml-0.5 text-slate-500 dark:text-slate-400"
+                />
                 <span>{lang === "tr" ? "Geri" : "Back"}</span>
               </button>
 
@@ -882,7 +981,7 @@ export default function BookPage() {
                 type="button"
                 disabled={bookingLoading}
                 onClick={handleBook}
-                className="flex-1 flex items-center justify-center gap-2 py-3.5 px-6 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-black shadow-lg shadow-indigo-500/25 hover:-translate-y-0.5 active:scale-95 transition-all disabled:opacity-50"
+                className="flex-1 flex items-center justify-center gap-2 py-3.5 px-6 rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white text-sm font-black shadow-lg shadow-[color:var(--brand-shadow)] hover:-translate-y-0.5 active:scale-95 transition-all disabled:opacity-50"
               >
                 {bookingLoading ? (
                   <Loader2 className="animate-spin" size={18} />
@@ -895,51 +994,12 @@ export default function BookPage() {
                       ? "Randevu Oluşturuluyor..."
                       : "Booking..."
                     : lang === "tr"
-                    ? "Randevuyu Onayla"
-                    : "Confirm Appointment"}
+                      ? "Randevuyu Onayla"
+                      : "Confirm Appointment"}
                 </span>
               </button>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* MOBILE STICKY BOTTOM BAR */}
-      {selectedService && step < 3 && (
-        <div className="fixed bottom-0 inset-x-0 z-30 p-4 bg-white/90 dark:bg-slate-900/90 backdrop-blur-3xl border-t border-gray-200/60 dark:border-slate-800/80 shadow-2xl sm:hidden flex items-center justify-between">
-          <div>
-            <p className="text-xs text-gray-400 truncate max-w-[150px]">
-              {selectedService.name}
-            </p>
-            <p className="text-lg font-black text-indigo-600 dark:text-indigo-400">
-              ₺{selectedService.price}
-              {selectedTime && (
-                <span className="text-xs font-semibold text-gray-600 dark:text-slate-300 ml-2">
-                  • {selectedTime}
-                </span>
-              )}
-            </p>
-          </div>
-
-          <button
-            onClick={() => {
-              if (step === 1) setStep(2);
-              else if (step === 2 && selectedTime) setStep(3);
-            }}
-            disabled={step === 2 && !selectedTime}
-            className="flex items-center gap-1.5 px-5 py-3 rounded-2xl bg-indigo-600 text-white font-black text-xs shadow-md active:scale-95 disabled:opacity-50 transition-all"
-          >
-            <span>
-              {step === 1
-                ? lang === "tr"
-                  ? "Tarih Seç"
-                  : "Pick Date"
-                : lang === "tr"
-                ? "Onaya Geç"
-                : "Proceed"}
-            </span>
-            <ChevronRight size={16} />
-          </button>
         </div>
       )}
 
@@ -956,4 +1016,3 @@ export default function BookPage() {
     </div>
   );
 }
-

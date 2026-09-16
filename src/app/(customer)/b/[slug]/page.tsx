@@ -18,15 +18,21 @@ import {
   Wrench,
   Clock,
   Edit3,
+  Navigation,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { tr, enUS } from "date-fns/locale";
 import type { Tenant, Post, Service } from "@/types";
 import { BusinessPageSkeleton, Spinner } from "@/components/Skeleton";
+import MapPoint from "@/components/MapPoint";
+import { formatFullAddress } from "@/lib/address";
+import { getPalette, paletteCss } from "@/lib/palettes";
 import { PostGrid } from "@/components/PostGrid";
 import { PostModal } from "@/components/PostModal";
 import ReviewModal from "@/components/ReviewModal";
-import ManageReviewsModal, { UserReviewItem } from "@/components/ManageReviewsModal";
+import ManageReviewsModal, {
+  UserReviewItem,
+} from "@/components/ManageReviewsModal";
 
 interface PostWithTenant extends Post {
   tenant?: Pick<Tenant, "id" | "name" | "profile_image_url">;
@@ -49,7 +55,11 @@ interface ReviewsResponse {
   average_rating: number | null;
   distribution: Record<number, number>;
   eligible_appointment_id: string | null;
-  eligible_appointments?: Array<{ id: string; service_name?: string; start_time: string }>;
+  eligible_appointments?: Array<{
+    id: string;
+    service_name?: string;
+    start_time: string;
+  }>;
   can_review?: boolean;
   user_reviews?: UserReviewItem[];
   user_has_reviewed: boolean;
@@ -71,8 +81,13 @@ export default function BusinessPage() {
   const [selectedPost, setSelectedPost] = useState<PostWithTenant | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
 
-  // Tab State: Hizmetler • Değerlendirmeler • Paylaşımlar
-  const [activeTab, setActiveTab] = useState<"services" | "reviews" | "posts">("services");
+  // Tab State: Hizmetler • Değerlendirmeler • Paylaşımlar • Konum
+  const [activeTab, setActiveTab] = useState<
+    "services" | "reviews" | "posts" | "location"
+  >("posts");
+
+  // Haritada işaretlenmiş konum var mı?
+  const hasLocation = tenant?.latitude != null && tenant?.longitude != null;
 
   // Reviews state
   const [reviewsData, setReviewsData] = useState<ReviewsResponse>({
@@ -95,24 +110,33 @@ export default function BusinessPage() {
   const [showStickyBar, setShowStickyBar] = useState(false);
   const mainButtonRef = useRef<HTMLDivElement>(null);
 
-  const minPrice = services.length > 0 ? Math.min(...services.map((s) => s.price)) : null;
+  const minPrice =
+    services.length > 0 ? Math.min(...services.map((s) => s.price)) : null;
 
-  useEffect(() => {
-    fetchTenantData();
-  }, [slug]);
-
-  // Observer to trigger sticky mobile booking bar when user scrolls past main button
+  // Ana randevu butonu yukarı kayıp ekrandan çıktığında üst yapışkan barı tetikle
   useEffect(() => {
     if (!mainButtonRef.current) return;
     const target = mainButtonRef.current;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        setShowStickyBar(!entry.isIntersecting && entry.boundingClientRect.top < 0);
-      },
-      { threshold: 0 }
-    );
-    observer.observe(target);
-    return () => observer.disconnect();
+    const scrollContainer = document.querySelector("main");
+
+    const checkVisibility = () => {
+      if (!target) return;
+      const targetRect = target.getBoundingClientRect();
+      const containerRect = scrollContainer
+        ? scrollContainer.getBoundingClientRect()
+        : { top: 0 };
+      // Ana buton kaydırma alanının üstünden yukarı çıktığında barı göster
+      setShowStickyBar(targetRect.bottom < containerRect.top);
+    };
+
+    if (scrollContainer) {
+      scrollContainer.addEventListener("scroll", checkVisibility, {
+        passive: true,
+      });
+      checkVisibility();
+      return () =>
+        scrollContainer.removeEventListener("scroll", checkVisibility);
+    }
   }, [loading]);
 
   const fetchTenantData = async () => {
@@ -159,7 +183,11 @@ export default function BusinessPage() {
     if (Array.isArray(postsData)) {
       const postsWithTenant = postsData.map((post: Post) => ({
         ...post,
-        tenant: { id: tenantData.id, name: tenantData.name, profile_image_url: tenantData.profile_image_url },
+        tenant: {
+          id: tenantData.id,
+          name: tenantData.name,
+          profile_image_url: tenantData.profile_image_url,
+        },
       }));
       setPosts(postsWithTenant);
     }
@@ -177,6 +205,11 @@ export default function BusinessPage() {
 
     setLoading(false);
   };
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- veri çekme efekti; yükleme durumu burada yönetilir
+    fetchTenantData();
+  }, [slug]);
 
   const toggleFavorite = () => {
     if (!tenant) return;
@@ -208,14 +241,14 @@ export default function BusinessPage() {
       prevPosts.map((p) =>
         p.id === postId
           ? { ...p, user_has_liked: data.liked, like_count: data.likeCount }
-          : p
-      )
+          : p,
+      ),
     );
 
     setSelectedPost((prev) =>
       prev && prev.id === postId
         ? { ...prev, user_has_liked: data.liked, like_count: data.likeCount }
-        : prev
+        : prev,
     );
 
     return data;
@@ -236,15 +269,21 @@ export default function BusinessPage() {
     setPosts((prevPosts) =>
       prevPosts.map((p) =>
         p.id === postId
-          ? { ...p, comment_count: data.commentCount ?? ((p.comment_count || 0) + 1) }
-          : p
-      )
+          ? {
+              ...p,
+              comment_count: data.commentCount ?? (p.comment_count || 0) + 1,
+            }
+          : p,
+      ),
     );
 
     setSelectedPost((prev) =>
       prev && prev.id === postId
-        ? { ...prev, comment_count: data.commentCount ?? ((prev.comment_count || 0) + 1) }
-        : prev
+        ? {
+            ...prev,
+            comment_count: data.commentCount ?? (prev.comment_count || 0) + 1,
+          }
+        : prev,
     );
 
     return data;
@@ -272,7 +311,11 @@ export default function BusinessPage() {
     return (
       <div className="w-full max-w-4xl mx-auto h-64 flex items-center justify-center">
         <div className="text-center">
-          <Spinner size="h-12 w-12" className="mx-auto mb-4" color="text-red-500" />
+          <Spinner
+            size="h-12 w-12"
+            className="mx-auto mb-4"
+            color="text-red-500"
+          />
           <p className="text-red-500 dark:text-red-400 font-medium">{error}</p>
         </div>
       </div>
@@ -280,7 +323,10 @@ export default function BusinessPage() {
   }
 
   return (
-    <div className="w-full max-w-4xl mx-auto space-y-8 pb-16 font-sans select-none">
+    <div className="brand-scope w-full max-w-4xl mx-auto space-y-8 pb-16 font-sans select-none relative">
+      {/* İşletmenin seçtiği palet (açık/koyu varyant müşterinin temasına göre) */}
+      <style>{paletteCss(getPalette(tenant.theme_palette))}</style>
+
       {/* Banner & Profile Container */}
       <div className="relative">
         {/* Cover Image Banner */}
@@ -313,19 +359,26 @@ export default function BusinessPage() {
         </div>
 
         {/* Profile Section */}
-        <div className="px-4 md:px-6 relative z-10">
-          <div className="-mt-12 md:-mt-16 mb-4 ml-2 md:ml-4 flex items-end justify-between">
+        <div className="relative z-10">
+          <div className="-mt-12 md:-mt-16 mb-4 ml-6 md:ml-8 flex items-end justify-between">
             {/* Profile Image / Avatar */}
             <div className="h-24 w-24 md:h-28 md:w-28 shrink-0 rounded-full border-[5px] border-white dark:border-slate-900 shadow-xl overflow-hidden bg-white dark:bg-slate-800 flex items-center justify-center">
               {tenant.profile_image_url ? (
-                <img src={tenant.profile_image_url} alt={tenant.name} className="h-full w-full object-cover" />
+                <img
+                  src={tenant.profile_image_url}
+                  alt={tenant.name}
+                  className="h-full w-full object-cover"
+                />
               ) : (
-                <Building2 size={40} className="text-indigo-600 dark:text-indigo-400" />
+                <Building2
+                  size={40}
+                  className="text-[var(--brand-text)] text-[var(--brand-text)]"
+                />
               )}
             </div>
           </div>
 
-          <div className="pb-2 ml-2 md:ml-4">
+          <div className="pb-2">
             <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
               {tenant.name}
             </h1>
@@ -333,26 +386,50 @@ export default function BusinessPage() {
             {/* Gerçek Puan & Sektör & Konum Barı */}
             <div className="flex flex-wrap items-center gap-3 text-slate-500 dark:text-slate-400 mt-3 text-xs sm:text-sm font-medium">
               {/* Gerçek Puan Rozeti */}
-              <a
-                href="#reviews"
-                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 font-extrabold border border-amber-200/80 dark:border-amber-500/25 hover:scale-105 transition-transform"
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab("reviews");
+                  const el = document.getElementById("business-tabs");
+                  const mainEl = document.querySelector("main");
+                  if (el && mainEl) {
+                    const targetOffset =
+                      el.getBoundingClientRect().top -
+                      mainEl.getBoundingClientRect().top +
+                      mainEl.scrollTop -
+                      20;
+                    mainEl.scrollTo({
+                      top: Math.max(0, targetOffset),
+                      behavior: "smooth",
+                    });
+                  }
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 font-extrabold border border-amber-200/80 dark:border-amber-500/25 hover:scale-105 transition-transform cursor-pointer text-left"
               >
                 <Star size={14} className="fill-amber-400 text-amber-400" />
                 {reviewsData.average_rating ? (
                   <span>
                     {reviewsData.average_rating}{" "}
                     <span className="font-normal opacity-80">
-                      ({reviewsData.total_reviews} {lang === "tr" ? "değerlendirme" : "reviews"})
+                      ({reviewsData.total_reviews}{" "}
+                      {lang === "tr" ? "değerlendirme" : "reviews"})
                     </span>
                   </span>
                 ) : (
-                  <span>{lang === "tr" ? "Yeni (Henüz puanlanmadı)" : "New (No reviews yet)"}</span>
+                  <span>
+                    {lang === "tr"
+                      ? "Yeni (Henüz puanlanmadı)"
+                      : "New (No reviews yet)"}
+                  </span>
                 )}
-              </a>
+              </button>
 
               {tenant.sector && (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-indigo-50/90 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-500/25 shadow-xs capitalize">
-                  <Tag size={12} className="text-indigo-500 dark:text-indigo-400 shrink-0" />
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-[var(--brand-soft)] bg-[var(--brand-soft)] text-[var(--brand-text)] text-[var(--brand-text)] border border-[var(--brand-border)] border-[var(--brand-border)] shadow-xs capitalize">
+                  <Tag
+                    size={12}
+                    className="text-[var(--brand-text)] text-[var(--brand-text)] shrink-0"
+                  />
                   <span>{tenant.sector}</span>
                 </span>
               )}
@@ -360,19 +437,25 @@ export default function BusinessPage() {
               {(tenant.address || tenant.province || tenant.district) && (
                 <span className="flex items-center gap-1.5">
                   <MapPin size={15} className="text-slate-400 shrink-0" />
-                  {[tenant.address, tenant.district, tenant.province].filter(Boolean).join(", ")}
+                  {formatFullAddress(tenant) ||
+                    [tenant.address, tenant.district, tenant.province]
+                      .filter(Boolean)
+                      .join(", ")}
                 </span>
               )}
             </div>
 
             {/* Randevu Al & Yorum Butonları */}
-            <div ref={mainButtonRef} className="mt-5 flex items-center gap-3 flex-wrap">
+            <div
+              ref={mainButtonRef}
+              className="mt-5 flex items-center gap-2.5 sm:gap-3 flex-wrap"
+            >
               <button
                 type="button"
                 onClick={() => router.push(`/b/${slug}/randevu`)}
-                className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-full bg-indigo-600 hover:bg-indigo-700 px-8 py-3.5 text-sm sm:text-base font-extrabold text-white shadow-lg shadow-indigo-600/25 active:scale-95 transition-all cursor-pointer"
+                className="inline-flex items-center justify-center gap-2 rounded-full bg-[var(--brand)] hover:bg-[var(--brand-strong)] px-5 sm:px-8 py-3 sm:py-3.5 text-xs sm:text-base font-extrabold text-white shadow-lg shadow-[color:var(--brand-shadow)] active:scale-95 transition-all cursor-pointer whitespace-nowrap"
               >
-                <CalendarIcon size={18} />
+                <CalendarIcon size={17} />
                 <span>{lang === "tr" ? "Randevu Al" : "Book Appointment"}</span>
               </button>
 
@@ -381,10 +464,12 @@ export default function BusinessPage() {
                 <button
                   type="button"
                   onClick={() => setReviewModalOpen(true)}
-                  className="inline-flex items-center gap-2 rounded-full bg-amber-50 hover:bg-amber-100 dark:bg-amber-500/10 dark:hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-500/30 px-6 py-3.5 text-xs sm:text-sm font-bold active:scale-95 transition-all cursor-pointer"
+                  className="inline-flex items-center justify-center gap-2 rounded-full bg-amber-50 hover:bg-amber-100 dark:bg-amber-500/10 dark:hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-500/30 px-4 sm:px-6 py-3 sm:py-3.5 text-xs sm:text-sm font-bold active:scale-95 transition-all cursor-pointer whitespace-nowrap"
                 >
-                  <Star size={16} className="fill-amber-400 text-amber-400" />
-                  <span>{lang === "tr" ? "Yeni Yorum Yap" : "Write a Review"}</span>
+                  <Star size={15} className="fill-amber-400 text-amber-400" />
+                  <span>
+                    {lang === "tr" ? "Yeni Yorum Yap" : "Write a Review"}
+                  </span>
                 </button>
               )}
 
@@ -393,10 +478,12 @@ export default function BusinessPage() {
                 <button
                   type="button"
                   onClick={() => setManageModalOpen(true)}
-                  className="inline-flex items-center gap-2 rounded-full bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800/60 px-5 py-3.5 text-xs sm:text-sm font-bold active:scale-95 transition-all cursor-pointer"
+                  className="inline-flex items-center justify-center gap-2 rounded-full bg-[var(--brand-soft)] hover:bg-[var(--brand-soft-hover)] bg-[var(--brand-soft)] hover:bg-[var(--brand-soft-hover)] text-[var(--brand-text)] text-[var(--brand-text)] border border-[var(--brand-border)] border-[var(--brand-border)] px-4 sm:px-5 py-3 sm:py-3.5 text-xs sm:text-sm font-bold active:scale-95 transition-all cursor-pointer whitespace-nowrap"
                 >
                   <Edit3 size={15} />
-                  <span>{lang === "tr" ? "Yorumlarımı Düzenle" : "Edit My Reviews"}</span>
+                  <span>
+                    {lang === "tr" ? "Yorumlarımı Düzenle" : "Edit My Reviews"}
+                  </span>
                 </button>
               )}
             </div>
@@ -405,12 +492,15 @@ export default function BusinessPage() {
       </div>
 
       {/* APPLE / AIRBNB TARZI YATAY SEKME (SEGMENTED CONTROL) ÇUBUĞU */}
-      <div className="flex items-center justify-center sm:justify-start pt-2 border-b border-slate-200/60 dark:border-slate-800/60 pb-4">
-        <div className="flex items-center p-1 sm:p-1.5 rounded-2xl bg-slate-100/90 dark:bg-slate-800/70 border border-slate-200/60 dark:border-slate-700/60 w-full sm:w-auto backdrop-blur-md gap-1 select-none">
+      <div
+        id="business-tabs"
+        className="sticky top-0 z-30 -mx-3 sm:-mx-6 md:-mx-8 px-3 sm:px-6 md:px-8 py-2.5 bg-white/80 dark:bg-slate-900/80 backdrop-blur-2xl border-b border-slate-200/60 dark:border-slate-800/60 transition-all scroll-mt-4 flex items-center justify-between gap-3 select-none"
+      >
+        <div className="flex items-center p-1 sm:p-1.5 rounded-2xl bg-slate-100/90 dark:bg-slate-800/70 border border-slate-200/60 dark:border-slate-700/60 w-auto backdrop-blur-md gap-1 overflow-x-auto scrollbar-none snap-x shrink-0">
           <button
             type="button"
             onClick={() => setActiveTab("services")}
-            className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 sm:px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+            className={`flex-1 sm:flex-none shrink-0 snap-start flex items-center justify-center gap-1.5 px-3 sm:px-5 py-2 rounded-xl text-[11px] min-[400px]:text-xs sm:text-sm font-bold whitespace-nowrap transition-all cursor-pointer ${
               activeTab === "services"
                 ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm"
                 : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
@@ -418,27 +508,31 @@ export default function BusinessPage() {
           >
             <span>{lang === "tr" ? "Hizmetler" : "Services"}</span>
             {services.length > 0 && (
-              <span className="text-[11px] opacity-70 font-normal">({services.length})</span>
+              <span className="hidden min-[400px]:inline text-[11px] opacity-70 font-normal">
+                ({services.length})
+              </span>
             )}
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab("reviews")}
-            className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 sm:px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+            className={`flex-1 sm:flex-none shrink-0 snap-start flex items-center justify-center gap-1.5 px-3 sm:px-5 py-2 rounded-xl text-[11px] min-[400px]:text-xs sm:text-sm font-bold whitespace-nowrap transition-all cursor-pointer ${
               activeTab === "reviews"
                 ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm"
                 : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
             }`}
           >
             <span>{lang === "tr" ? "Değerlendirmeler" : "Reviews"}</span>
-            <span className="text-[11px] opacity-70 font-normal">({reviewsData.total_reviews})</span>
+            <span className="hidden min-[400px]:inline text-[11px] opacity-70 font-normal">
+              ({reviewsData.total_reviews})
+            </span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab("posts")}
-            className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 sm:px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+            className={`flex-1 sm:flex-none shrink-0 snap-start flex items-center justify-center gap-1.5 px-3 sm:px-5 py-2 rounded-xl text-[11px] min-[400px]:text-xs sm:text-sm font-bold whitespace-nowrap transition-all cursor-pointer ${
               activeTab === "posts"
                 ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm"
                 : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
@@ -446,10 +540,50 @@ export default function BusinessPage() {
           >
             <span>{lang === "tr" ? "Paylaşımlar" : "Posts"}</span>
             {posts.length > 0 && (
-              <span className="text-[11px] opacity-70 font-normal">({posts.length})</span>
+              <span className="hidden min-[400px]:inline text-[11px] opacity-70 font-normal">
+                ({posts.length})
+              </span>
             )}
           </button>
+
+          {hasLocation && (
+            <button
+              type="button"
+              onClick={() => setActiveTab("location")}
+              className={`flex-1 sm:flex-none shrink-0 snap-start flex items-center justify-center gap-1.5 px-3 sm:px-5 py-2 rounded-xl text-[11px] min-[400px]:text-xs sm:text-sm font-bold whitespace-nowrap transition-all cursor-pointer ${
+                activeTab === "location"
+                  ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm"
+                  : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
+              }`}
+            >
+              <span>{lang === "tr" ? "Konum" : "Location"}</span>
+            </button>
+          )}
         </div>
+
+        {/* Sağ: Değerlendirmeler, Paylaşımlar ve Konum'da ana buton kaybolunca beliren Randevu Al butonu */}
+        {showStickyBar && activeTab !== "services" && (
+          <div className="flex items-center gap-3 shrink-0 ml-auto animate-in fade-in slide-in-from-right-3 duration-200">
+            {minPrice !== null && (
+              <div className="hidden md:flex flex-col items-end text-right leading-tight">
+                <span className="text-[10px] text-slate-400 font-medium">
+                  {lang === "tr" ? "Başlangıç Fiyatı" : "Starting from"}
+                </span>
+                <span className="text-xs font-black text-[var(--brand-text)]">
+                  ₺{minPrice}
+                </span>
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => router.push(`/b/${slug}/randevu`)}
+              className="inline-flex items-center gap-1.5 rounded-full bg-[var(--brand)] hover:bg-[var(--brand-strong)] px-4 sm:px-5 py-2 text-xs sm:text-sm font-bold text-white shadow-md shadow-[color:var(--brand-shadow)] active:scale-95 transition-all cursor-pointer whitespace-nowrap"
+            >
+              <CalendarIcon size={14} strokeWidth={2.4} />
+              <span>{lang === "tr" ? "Randevu Al" : "Book"}</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* 1. SEKME: HİZMETLER MENÜSÜ */}
@@ -472,24 +606,26 @@ export default function BusinessPage() {
             <div className="p-8 sm:p-12 text-center rounded-3xl bg-white/60 dark:bg-slate-900/60 backdrop-blur-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-2">
               <Wrench size={32} className="text-slate-400 mx-auto" />
               <p className="text-sm font-semibold text-slate-600 dark:text-slate-300">
-                {lang === "tr" ? "Henüz listelenmiş hizmet bulunmuyor." : "No services listed yet."}
+                {lang === "tr"
+                  ? "Henüz listelenmiş hizmet bulunmuyor."
+                  : "No services listed yet."}
               </p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 sm:gap-4">
               {services.map((s) => {
-                const duration = (s as any).duration || s.duration_minutes || 30;
+                const duration = s.duration || s.duration_minutes || 30;
                 return (
                   <div
                     key={s.id}
-                    className="p-5 sm:p-6 rounded-3xl bg-white/80 dark:bg-slate-900/70 backdrop-blur-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs hover:border-indigo-300 dark:hover:border-indigo-700/60 transition-all flex flex-col justify-between gap-4 group"
+                    className="p-5 sm:p-6 rounded-3xl bg-white/80 dark:bg-slate-900/70 backdrop-blur-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs hover:border-[var(--brand-border)] hover:border-[var(--brand-border)] transition-all flex flex-col justify-between gap-4 group"
                   >
                     <div className="space-y-1.5">
                       <div className="flex items-start justify-between gap-2">
-                        <h3 className="font-bold text-base sm:text-lg text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                        <h3 className="font-bold text-base sm:text-lg text-slate-900 dark:text-white group-hover:text-[var(--brand-text)] group-hover:text-[var(--brand-text)] transition-colors">
                           {s.name}
                         </h3>
-                        <span className="shrink-0 text-base sm:text-lg font-black text-indigo-600 dark:text-indigo-400">
+                        <span className="shrink-0 text-base sm:text-lg font-black text-[var(--brand-text)] text-[var(--brand-text)]">
                           ₺{s.price}
                         </span>
                       </div>
@@ -510,7 +646,7 @@ export default function BusinessPage() {
                       <button
                         type="button"
                         onClick={() => router.push(`/b/${slug}/randevu`)}
-                        className="inline-flex items-center gap-1 px-4 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 text-indigo-600 dark:text-indigo-400 font-bold transition-all active:scale-95 cursor-pointer"
+                        className="inline-flex items-center gap-1 px-4 py-2 rounded-xl bg-[var(--brand-soft)] hover:bg-[var(--brand-soft-hover)] bg-[var(--brand-soft)] hover:bg-[var(--brand-soft-hover)] text-[var(--brand-text)] text-[var(--brand-text)] font-bold transition-all active:scale-95 cursor-pointer"
                       >
                         <span>{lang === "tr" ? "Randevu Al" : "Book"}</span>
                         <ChevronRight size={14} />
@@ -533,7 +669,8 @@ export default function BusinessPage() {
                 <span>{lang === "tr" ? "Değerlendirmeler" : "Reviews"}</span>
                 {reviewsData.average_rating && (
                   <span className="text-base font-bold text-slate-500 dark:text-slate-400">
-                    • ★ {reviewsData.average_rating} ({reviewsData.total_reviews})
+                    • ★ {reviewsData.average_rating} (
+                    {reviewsData.total_reviews})
                   </span>
                 )}
               </h2>
@@ -560,10 +697,12 @@ export default function BusinessPage() {
                 <button
                   type="button"
                   onClick={() => setManageModalOpen(true)}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-2xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 text-xs font-bold hover:bg-indigo-100 transition-colors shrink-0"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-2xl bg-[var(--brand-soft)] bg-[var(--brand-soft)] text-[var(--brand-text)] text-[var(--brand-text)] text-xs font-bold hover:bg-[var(--brand-soft-hover)] transition-colors shrink-0"
                 >
                   <Edit3 size={14} />
-                  <span>{lang === "tr" ? "Yorumlarımı Düzenle" : "Edit Reviews"}</span>
+                  <span>
+                    {lang === "tr" ? "Yorumlarımı Düzenle" : "Edit Reviews"}
+                  </span>
                 </button>
               )}
             </div>
@@ -575,7 +714,9 @@ export default function BusinessPage() {
                 <Star size={24} />
               </div>
               <h3 className="text-base font-bold text-slate-800 dark:text-slate-200">
-                {lang === "tr" ? "Henüz değerlendirme yapılmamış" : "No reviews yet"}
+                {lang === "tr"
+                  ? "Henüz değerlendirme yapılmamış"
+                  : "No reviews yet"}
               </h3>
               <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
                 {lang === "tr"
@@ -598,7 +739,8 @@ export default function BusinessPage() {
                         key={s}
                         size={18}
                         className={`${
-                          reviewsData.average_rating && s <= Math.round(reviewsData.average_rating)
+                          reviewsData.average_rating &&
+                          s <= Math.round(reviewsData.average_rating)
                             ? "fill-amber-400 text-amber-400"
                             : "text-slate-300 dark:text-slate-700"
                         }`}
@@ -606,7 +748,10 @@ export default function BusinessPage() {
                     ))}
                   </div>
                   <p className="text-xs font-bold text-slate-500 dark:text-slate-400">
-                    {reviewsData.total_reviews} {lang === "tr" ? "doğrulanmış değerlendirme" : "verified reviews"}
+                    {reviewsData.total_reviews}{" "}
+                    {lang === "tr"
+                      ? "doğrulanmış değerlendirme"
+                      : "verified reviews"}
                   </p>
                 </div>
 
@@ -614,11 +759,19 @@ export default function BusinessPage() {
                 <div className="md:col-span-8 space-y-1.5">
                   {[5, 4, 3, 2, 1].map((starCount) => {
                     const count = reviewsData.distribution[starCount] || 0;
-                    const percent = reviewsData.total_reviews > 0 ? (count / reviewsData.total_reviews) * 100 : 0;
+                    const percent =
+                      reviewsData.total_reviews > 0
+                        ? (count / reviewsData.total_reviews) * 100
+                        : 0;
 
                     return (
-                      <div key={starCount} className="flex items-center gap-3 text-xs font-semibold text-slate-600 dark:text-slate-300">
-                        <span className="w-12 text-right shrink-0">{starCount} yıldız</span>
+                      <div
+                        key={starCount}
+                        className="flex items-center gap-3 text-xs font-semibold text-slate-600 dark:text-slate-300"
+                      >
+                        <span className="w-12 text-right shrink-0">
+                          {starCount} yıldız
+                        </span>
                         <div className="flex-1 h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
                           <div
                             className="h-full rounded-full bg-amber-400 transition-all duration-500"
@@ -645,9 +798,13 @@ export default function BusinessPage() {
                       {/* Yazar Bilgisi */}
                       <div className="flex items-center justify-between gap-3 mb-2">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full overflow-hidden bg-gradient-to-br from-indigo-400 to-purple-500 text-white font-bold flex items-center justify-center text-sm shadow-xs shrink-0">
+                          <div className="w-10 h-10 rounded-full overflow-hidden bg-gradient-to-br from-[var(--brand)] to-purple-500 text-white font-bold flex items-center justify-center text-sm shadow-xs shrink-0">
                             {rev.avatar_url ? (
-                              <img src={rev.avatar_url} alt={rev.customer_name} className="w-full h-full object-cover" />
+                              <img
+                                src={rev.avatar_url}
+                                alt={rev.customer_name}
+                                className="w-full h-full object-cover"
+                              />
                             ) : (
                               rev.customer_name.charAt(0).toUpperCase()
                             )}
@@ -657,7 +814,9 @@ export default function BusinessPage() {
                               {rev.customer_name}
                             </h4>
                             <p className="text-[11px] text-slate-400 mt-0.5">
-                              {format(parseISO(rev.created_at), "d MMMM yyyy", { locale })}
+                              {format(parseISO(rev.created_at), "d MMMM yyyy", {
+                                locale,
+                              })}
                             </p>
                           </div>
                         </div>
@@ -668,7 +827,11 @@ export default function BusinessPage() {
                             <Star
                               key={s}
                               size={13}
-                              className={s <= rev.rating ? "fill-amber-400 text-amber-400" : "text-slate-200 dark:text-slate-700"}
+                              className={
+                                s <= rev.rating
+                                  ? "fill-amber-400 text-amber-400"
+                                  : "text-slate-200 dark:text-slate-700"
+                              }
                             />
                           ))}
                         </div>
@@ -677,11 +840,19 @@ export default function BusinessPage() {
                       {/* Alınan Hizmet & Doğrulanmış Rozet */}
                       <div className="flex items-center gap-2 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 mb-2">
                         <ShieldCheck size={13} />
-                        <span>{lang === "tr" ? "Doğrulanmış Randevu" : "Verified Booking"}</span>
+                        <span>
+                          {lang === "tr"
+                            ? "Doğrulanmış Randevu"
+                            : "Verified Booking"}
+                        </span>
                         {rev.service_name && (
                           <>
-                            <span className="text-slate-300 dark:text-slate-700">•</span>
-                            <span className="text-slate-500 dark:text-slate-400 font-normal">{rev.service_name}</span>
+                            <span className="text-slate-300 dark:text-slate-700">
+                              •
+                            </span>
+                            <span className="text-slate-500 dark:text-slate-400 font-normal">
+                              {rev.service_name}
+                            </span>
                           </>
                         )}
                       </div>
@@ -729,6 +900,50 @@ export default function BusinessPage() {
         </div>
       )}
 
+      {/* 4. SEKME: KONUM */}
+      {activeTab === "location" && hasLocation && (
+        <div className="space-y-5 animate-in fade-in duration-200">
+          <div className="flex items-center justify-between px-2">
+            <div>
+              <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+                {lang === "tr" ? "Konum" : "Location"}
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+                {formatFullAddress(tenant) || tenant.address}
+              </p>
+            </div>
+          </div>
+
+          <div className="rounded-3xl overflow-hidden border border-slate-200/80 dark:border-slate-800 bg-white/70 dark:bg-slate-900/60 shadow-xs">
+            <MapPoint
+              lat={tenant.latitude ?? null}
+              lng={tenant.longitude ?? null}
+              zoom={16}
+              heightClass="h-80 sm:h-96"
+              pinLabel={tenant.name}
+              className="rounded-none border-0"
+            />
+          </div>
+
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-2">
+            <p className="text-sm font-medium text-slate-600 dark:text-slate-300">
+              {[formatFullAddress(tenant), tenant.address]
+                .filter(Boolean)
+                .join(" • ")}
+            </p>
+            <a
+              href={`https://www.google.com/maps/dir/?api=1&destination=${tenant.latitude},${tenant.longitude}`}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-[var(--brand)] hover:bg-[var(--brand-strong)] px-5 py-3 text-xs sm:text-sm font-extrabold text-white shadow-lg shadow-[color:var(--brand-shadow)] active:scale-95 transition-all whitespace-nowrap"
+            >
+              <Navigation size={15} />
+              <span>{lang === "tr" ? "Yol Tarifi Al" : "Get Directions"}</span>
+            </a>
+          </div>
+        </div>
+      )}
+
       {/* Post Modal */}
       <PostModal
         post={selectedPost}
@@ -757,36 +972,6 @@ export default function BusinessPage() {
         reviews={reviewsData.user_reviews || []}
         onSuccess={handleReviewSuccess}
       />
-
-      {/* YAPIŞKAN (STICKY) MOBİL RANDEVU BARI */}
-      {showStickyBar && (
-        <div className="fixed bottom-[calc(3.85rem+env(safe-area-inset-bottom,0px))] inset-x-0 z-30 lg:hidden px-4 py-3 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-t border-slate-200/80 dark:border-slate-800/80 shadow-[0_-8px_30px_rgba(0,0,0,0.12)] transition-all animate-in fade-in slide-in-from-bottom-3 duration-300 select-none">
-          <div className="max-w-md mx-auto flex items-center justify-between gap-3">
-            <div className="flex flex-col min-w-0">
-              <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium truncate">
-                {lang === "tr" ? "Başlangıç Fiyatı" : "Starting from"}
-              </span>
-              <span className="text-base font-black text-slate-900 dark:text-white truncate">
-                {minPrice !== null ? `₺${minPrice}` : (lang === "tr" ? "Hizmetleri İnceleyin" : "View Services")}
-                {minPrice !== null && (
-                  <span className="text-xs font-normal text-slate-400 ml-1">
-                    {lang === "tr" ? "'den başlayan" : "min"}
-                  </span>
-                )}
-              </span>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => router.push(`/b/${slug}/randevu`)}
-              className="shrink-0 inline-flex items-center gap-2 rounded-full bg-indigo-600 hover:bg-indigo-700 px-6 py-2.5 text-xs sm:text-sm font-extrabold text-white shadow-lg shadow-indigo-600/30 active:scale-95 transition-all cursor-pointer"
-            >
-              <CalendarIcon size={15} />
-              <span>{lang === "tr" ? "Randevu Al" : "Book"}</span>
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

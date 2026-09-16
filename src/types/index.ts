@@ -9,6 +9,15 @@ export interface Tenant {
   description: string | null;
   province: string | null;
   district: string | null;
+  neighborhood?: string | null;
+  street?: string | null;
+  building_no?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  theme_palette?: string | null;
+  membership_status?: string | null;
+  trial_ends_at?: string | null;
+  membership_ends_at?: string | null;
   created_at: string;
   updated_at: string;
 }

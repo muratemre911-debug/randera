@@ -925,6 +925,7 @@ function BoardingPassCard({
                 {bookingSlug && (
                   <Link
                     href={`/b/${bookingSlug}`}
+                    scroll={false}
                     className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-0.5"
                   >
                     {lang === "tr" ? "Profili Gör" : "Profile"}
@@ -1140,6 +1141,7 @@ function BoardingPassCard({
               {bookingSlug && (
                 <Link
                   href={`/b/${bookingSlug}/randevu`}
+                  scroll={false}
                   className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300"
                 >
                   <RotateCcw size={13} />

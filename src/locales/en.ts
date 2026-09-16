@@ -8,6 +8,16 @@ export const en = {
   "nav.customers": "Customers",
   "nav.settings": "Settings",
   "nav.business_account": "Business Account",
+  "nav.customer_account": "Customer Account",
+  "nav.business_panel": "Business Panel",
+  "nav.business_panel_short": "Business",
+  "nav.customer_area": "Customer Area",
+  "nav.go_to_business_panel": "Go to Business Panel",
+  "nav.return_to_business": "Return to Business Panel",
+  "nav.switch_to_customer": "Switch to Customer Account",
+  "nav.upgrade_to_business": "Upgrade to Business",
+  "nav.browse_businesses": "Discover",
+  "nav.my_appointments": "My Appointments",
   "nav.logout": "Logout",
 
   // Header & Notifications
@@ -46,7 +56,7 @@ export const en = {
   "dashboard.completed_revenue": "Realized Revenue",
   "dashboard.projected_revenue": "Projected Revenue",
   "dashboard.occupancy_rate": "Daily Occupancy",
-  
+
   // Buttons & Common
   "btn.save": "Save",
   "btn.cancel": "Cancel",
@@ -132,4 +142,135 @@ export const en = {
   "posts.caption_placeholder": "Write a description for this post...",
   "posts.choose_photo": "Choose a photo",
   "posts.login_to_comment": "Log in to comment",
+
+  // Landing (marketing page)
+  "landing.nav_features": "Features",
+  "landing.nav_how": "How it works",
+  "landing.nav_faq": "FAQ",
+  "landing.login": "Log in",
+  "landing.start": "Get started",
+  "landing.badge": "The next generation of booking",
+  "landing.hero_a": "Smart",
+  "landing.hero_hl": "booking",
+  "landing.hero_b": "software for your business",
+  "landing.hero_sub":
+    "Randera brings your calendar, services and customers together in one panel — for barbers, clinics, consultants and studios alike. Your customers just tap a link and book in seconds.",
+  "landing.hero_cta": "Try it free",
+  "landing.hero_cta2": "Explore businesses",
+  "landing.hero_note": "14-day free trial • Set up in minutes",
+  "landing.stat1_value": "14 days",
+  "landing.stat1_label": "Free trial",
+  "landing.stat2_value": "24/7",
+  "landing.stat2_label": "Online booking",
+  "landing.stat3_value": "TR · EN",
+  "landing.stat3_label": "Language and dark mode",
+  "landing.sectors_title": "Built for every time-based business",
+  "landing.sectors_sub":
+    "Whatever your sector, the same smart foundation: calendar, services, customers and notifications.",
+  "landing.sector.barber": "Barber & Salon",
+  "landing.sector.clinic": "Clinic & Dental",
+  "landing.sector.consultant": "Consulting",
+  "landing.sector.education": "Courses & Tutoring",
+  "landing.sector.fitness": "Fitness & Sports",
+  "landing.sector.studio": "Beauty Studio",
+  "landing.sector.photo": "Photographer",
+  "landing.sector.vet": "Veterinary",
+  "landing.features_title": "From booking to revenue, all in one panel",
+  "landing.features_sub":
+    "No setup, integrations or training needed: open your account and start using the panel.",
+  "landing.f1_title": "Your booking link and QR code",
+  "landing.f1_desc":
+    "Share your own booking page; customers scan your QR code and create an appointment in one tap.",
+  "landing.f2_title": "Calendar and daily flow",
+  "landing.f2_desc":
+    "See today's appointments hour by hour and mark visits complete with a single tap.",
+  "landing.f3_title": "Service, duration and price",
+  "landing.f3_desc":
+    "Define duration and price per service — available slots are calculated automatically.",
+  "landing.f4_title": "Customer management",
+  "landing.f4_desc":
+    "Customer records, contact details and full booking history in one list.",
+  "landing.f5_title": "Instant notifications",
+  "landing.f5_desc":
+    "New bookings, cancellations and reminders arrive in the panel and as browser notifications.",
+  "landing.f6_title": "Discover: map and filters",
+  "landing.f6_desc":
+    "Customers find businesses on the map and filter by city, district, sector and availability.",
+  "landing.f7_title": "Reviews and posts",
+  "landing.f7_desc":
+    "Ratings, reviews, likes and posts keep your business page alive.",
+  "landing.f8_title": "Revenue and occupancy",
+  "landing.f8_desc":
+    "Track completed and projected revenue plus daily occupancy at a glance.",
+  "landing.how_title": "Ready in three steps",
+  "landing.how_sub":
+    "No technical skills needed; open your account and share your booking link.",
+  "landing.s1_title": "Create your account",
+  "landing.s1_desc":
+    "Start with a 14-day free trial and enter your business details.",
+  "landing.s2_title": "Set your services and hours",
+  "landing.s2_desc":
+    "Define your services, their durations and your working hours.",
+  "landing.s3_title": "Share your link",
+  "landing.s3_desc":
+    "Share your booking link or QR code and watch appointments land in your calendar.",
+  "landing.roles_title": "Who is it for?",
+  "landing.roles_sub":
+    "Two sides, one experience: you manage, your customers book in seconds.",
+  "landing.biz_title": "Businesses",
+  "landing.biz_desc":
+    "Manage your appointment calendar, list your services, and set your working hours.",
+  "landing.biz_b1": "Manage your services, durations and prices in one place",
+  "landing.biz_b2": "Decide your own working hours and availability",
+  "landing.biz_b3":
+    "See revenue, occupancy and upcoming appointments on one screen",
+  "landing.biz_b4": "Grow your reputation with customer ratings and reviews",
+  "landing.biz_cta": "Set up my business",
+  "landing.cust_title": "Customers",
+  "landing.cust_desc":
+    "Book appointments in seconds. Track your upcoming and past bookings.",
+  "landing.cust_b1": "Find the right business with the map and filters",
+  "landing.cust_b2": "Save favourites and rebook with a single tap",
+  "landing.cust_b3": "Follow upcoming and past appointments in one place",
+  "landing.cust_b4": "Rate your experience and share a review",
+  "landing.cust_cta": "Explore businesses",
+  "landing.faq_title": "Frequently asked questions",
+  "landing.faq_sub": "The things people ask most.",
+  "landing.q1": "Is there a free trial?",
+  "landing.a1":
+    "Yes. Business accounts start with a 14-day free trial and every feature is available during that period.",
+  "landing.q2": "How long does setup take?",
+  "landing.a2":
+    "Once your account is open, add your services and working hours, then share your booking link. Minutes, not days.",
+  "landing.q3": "How do my customers book?",
+  "landing.a3":
+    "You share your booking link or QR code. Your customer picks a service and a free slot, and the appointment lands in your calendar instantly.",
+  "landing.q4": "Does it fit my sector?",
+  "landing.a4":
+    "Randera is built for every time-based business: barbers and salons, clinics, consultants, courses, studios and more.",
+  "landing.q5": "Do I need to install an app?",
+  "landing.a5":
+    "No. Randera runs in the browser on phone, tablet and desktop with the same account.",
+  "landing.band_title": "Time to close the appointment book",
+  "landing.band_sub":
+    "Manage every appointment from one panel and give your customers a modern experience.",
+  "landing.band_note": "14 days free • Set up in minutes",
+  "landing.footer_tagline":
+    "Smart business management for appointment-based businesses.",
+  "landing.footer_product": "Product",
+  "landing.footer_legal": "Legal",
+  "landing.footer_discover": "Explore businesses",
+  "landing.footer_register": "Create business account",
+  "landing.footer_privacy": "Privacy Policy",
+  "landing.footer_terms": "Terms of Service",
+  "landing.footer_rights": "All rights reserved.",
+  "landing.mock_open": "Open",
+  "landing.mock_today": "Today",
+  "landing.mock_service1": "Haircut · 30 min",
+  "landing.mock_service2": "Beard · 15 min",
+  "landing.mock_service3": "Treatment · 45 min",
+  "landing.mock_slots": "Available slots",
+  "landing.mock_confirm": "Confirm booking",
+  "landing.mock_new_title": "New booking received",
+  "landing.mock_new_sub": "2:30 PM · Haircut",
 };

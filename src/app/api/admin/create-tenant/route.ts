@@ -3,16 +3,22 @@ import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { createClient as createServerClient } from "@/utils/supabase/server";
 import { createTenantSchema, validateRequest } from "@/lib/validations";
 import { generateBaseSlug, generateUniqueSlug } from "@/lib/slug";
-import { isSuperAdmin } from "@/lib/admin";
+import { isSuperAdmin, SUPER_ADMIN_EMAILS } from "@/lib/admin";
+import { TRIAL_DAYS, shiftEndDate } from "@/lib/membership";
 
 export async function POST(req: Request) {
   try {
     // GÜVENLİK KONTROLÜ
     const supabaseUser = await createServerClient();
-    const { data: { user } } = await supabaseUser.auth.getUser();
-    
+    const {
+      data: { user },
+    } = await supabaseUser.auth.getUser();
+
     if (!user || !isSuperAdmin(user.email)) {
-      return NextResponse.json({ error: "Yetkisiz işlem. Süper Admin girişi yapılmadı." }, { status: 403 });
+      return NextResponse.json(
+        { error: "Yetkisiz işlem. Süper Admin girişi yapılmadı." },
+        { status: 403 },
+      );
     }
 
     const body = await req.json();
@@ -25,7 +31,13 @@ export async function POST(req: Request) {
 
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (!serviceRoleKey) {
-      return NextResponse.json({ error: "Sunucu ayarları eksik. Lütfen .env.local dosyasına SUPABASE_SERVICE_ROLE_KEY eklediğinizden emin olun." }, { status: 500 });
+      return NextResponse.json(
+        {
+          error:
+            "Sunucu ayarları eksik. Lütfen .env.local dosyasına SUPABASE_SERVICE_ROLE_KEY eklediğinizden emin olun.",
+        },
+        { status: 500 },
+      );
     }
 
     // RLS'yi atlayan Supabase Admin bağlantısı
@@ -37,16 +49,17 @@ export async function POST(req: Request) {
           autoRefreshToken: false,
           persistSession: false,
         },
-      }
+      },
     );
 
     // 1. Auth (Kimlik Doğrulama) kısmında kullanıcıyı oluştur
-    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: { full_name: fullName }
-    });
+    const { data: authData, error: authError } =
+      await supabaseAdmin.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: { full_name: fullName },
+      });
 
     if (authError) {
       return NextResponse.json({ error: authError.message }, { status: 400 });
@@ -66,48 +79,91 @@ export async function POST(req: Request) {
 
     const baseSlug = generateBaseSlug(tenantName);
     const slug = await generateUniqueSlug(supabaseAdmin, baseSlug);
+    const trialEndsAt = shiftEndDate(null, TRIAL_DAYS);
+    // Süper admin kendi hesabını açıyorsa sınırsız üyelik verilir
+    const membershipPatch = SUPER_ADMIN_EMAILS.includes(
+      email.trim().toLowerCase(),
+    )
+      ? {
+          membership_status: "unlimited",
+          trial_ends_at: null,
+          membership_ends_at: null,
+        }
+      : { membership_status: "trial", trial_ends_at: trialEndsAt };
 
     if (existingProfile) {
       const tenantId = existingProfile.tenant_id;
-      
-      await supabaseAdmin.from("tenants").update({
-        name: tenantName,
-        sector: sector,
-        slug: slug
-      }).eq("id", tenantId);
 
-      await supabaseAdmin.from("profiles").update({
-        full_name: fullName,
-      }).eq("id", userId);
+      await supabaseAdmin
+        .from("tenants")
+        .update({
+          name: tenantName,
+          sector: sector,
+          slug: slug,
+          ...membershipPatch,
+        })
+        .eq("id", tenantId);
 
-      return NextResponse.json({ success: true, message: "İşletme başarıyla oluşturuldu ve ayarlandı!" });
+      await supabaseAdmin
+        .from("profiles")
+        .update({
+          full_name: fullName,
+        })
+        .eq("id", userId);
+
+      return NextResponse.json({
+        success: true,
+        message: "İşletme başarıyla oluşturuldu ve ayarlandı!",
+      });
     } else {
-      const { data: tenantData, error: tenantError } = await supabaseAdmin.from("tenants").insert({
-        name: tenantName,
-        slug: slug,
-        sector: sector
-      }).select("id").single();
+      const { data: tenantData, error: tenantError } = await supabaseAdmin
+        .from("tenants")
+        .insert({
+          name: tenantName,
+          slug: slug,
+          sector: sector,
+          ...membershipPatch,
+        })
+        .select("id")
+        .single();
 
       if (tenantError) {
         await supabaseAdmin.auth.admin.deleteUser(userId);
-        return NextResponse.json({ error: "İşletme oluşturulurken hata: " + tenantError.message }, { status: 400 });
+        return NextResponse.json(
+          { error: "İşletme oluşturulurken hata: " + tenantError.message },
+          { status: 400 },
+        );
       }
 
-      const { error: profileError } = await supabaseAdmin.from("profiles").insert({
-        id: userId,
-        tenant_id: tenantData.id,
-        full_name: fullName,
-        role: "owner"
-      });
+      const { error: profileError } = await supabaseAdmin
+        .from("profiles")
+        .insert({
+          id: userId,
+          tenant_id: tenantData.id,
+          full_name: fullName,
+          role: "owner",
+        });
 
       if (profileError) {
-        return NextResponse.json({ error: "Profil oluşturulurken hata: " + profileError.message }, { status: 400 });
+        return NextResponse.json(
+          { error: "Profil oluşturulurken hata: " + profileError.message },
+          { status: 400 },
+        );
       }
 
-      return NextResponse.json({ success: true, message: "İşletme sıfırdan başarıyla oluşturuldu!" });
+      return NextResponse.json({
+        success: true,
+        message: "İşletme sıfırdan başarıyla oluşturuldu!",
+      });
     }
-
-  } catch (err: any) {
-    return NextResponse.json({ error: "Beklenmeyen sunucu hatası: " + err.message }, { status: 500 });
+  } catch (err) {
+    return NextResponse.json(
+      {
+        error:
+          "Beklenmeyen sunucu hatası: " +
+          (err instanceof Error ? err.message : "bilinmeyen"),
+      },
+      { status: 500 },
+    );
   }
 }

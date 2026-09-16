@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
-import { Camera, LogOut, Zap } from "lucide-react";
+import { Camera, LogOut, LayoutDashboard } from "lucide-react";
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -13,6 +13,7 @@ export default function ProfilePage() {
   const [avatarUrl, setAvatarUrl] = useState("");
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState("");
+  const [role, setRole] = useState<string | null>(null);
   const [fetching, setFetching] = useState(true);
   const [saving, setSaving] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -28,11 +29,13 @@ export default function ProfilePage() {
 
   useEffect(() => {
     const getProfile = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (user) {
         const { data: profile } = await supabase
           .from("profiles")
-          .select("full_name, phone, avatar_url")
+          .select("full_name, phone, avatar_url, role")
           .eq("id", user.id)
           .single();
 
@@ -40,6 +43,7 @@ export default function ProfilePage() {
           setFullName(profile.full_name || "");
           setPhone(profile.phone || "");
           setAvatarUrl(profile.avatar_url || "");
+          setRole(profile.role || null);
         }
       }
       setFetching(false);
@@ -61,10 +65,15 @@ export default function ProfilePage() {
     setSaving(true);
     setMessage({ type: "", text: "" });
 
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
     if (!user) {
-      setMessage({ type: "error", text: "Kullanıcı bulunamadı. Lütfen tekrar giriş yapın." });
+      setMessage({
+        type: "error",
+        text: "Kullanıcı bulunamadı. Lütfen tekrar giriş yapın.",
+      });
       setSaving(false);
       return;
     }
@@ -77,11 +86,17 @@ export default function ProfilePage() {
 
       const { error: uploadError } = await supabase.storage
         .from("avatars")
-        .upload(filePath, avatarFile, { upsert: true, contentType: avatarFile.type });
+        .upload(filePath, avatarFile, {
+          upsert: true,
+          contentType: avatarFile.type,
+        });
 
       if (uploadError) {
         console.error("Avatar upload error:", uploadError);
-        setMessage({ type: "error", text: "Fotoğraf yüklenirken bir hata oluştu." });
+        setMessage({
+          type: "error",
+          text: "Fotoğraf yüklenirken bir hata oluştu.",
+        });
         setSaving(false);
         return;
       }
@@ -97,12 +112,25 @@ export default function ProfilePage() {
 
     if (error) {
       console.error("Profile update error:", error);
-      setMessage({ type: "error", text: "Profil güncellenirken bir hata oluştu." });
+      setMessage({
+        type: "error",
+        text: "Profil güncellenirken bir hata oluştu.",
+      });
     } else {
       setAvatarUrl(finalAvatarUrl);
       setAvatarFile(null);
       setAvatarPreview("");
-      setMessage({ type: "success", text: "Profiliniz başarıyla güncellendi." });
+      setMessage({
+        type: "success",
+        text: "Profiliniz başarıyla güncellendi.",
+      });
+
+      // Sidebar'daki isim + profil fotoğrafı anında güncellensin
+      window.dispatchEvent(
+        new CustomEvent("randera:profile-updated", {
+          detail: { full_name: fullName, avatar_url: finalAvatarUrl },
+        }),
+      );
     }
 
     setSaving(false);
@@ -110,7 +138,9 @@ export default function ProfilePage() {
 
   return (
     <div className="max-w-2xl mx-auto py-10 px-4 md:px-0">
-      <h1 className="text-3xl font-bold mb-6 text-gray-900 dark:text-white">Profilim</h1>
+      <h1 className="text-3xl font-bold mb-6 text-gray-900 dark:text-white">
+        Profilim
+      </h1>
 
       <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 shadow-sm">
         {fetching ? (
@@ -166,7 +196,10 @@ export default function ProfilePage() {
             </div>
 
             <div>
-              <label htmlFor="fullName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label
+                htmlFor="fullName"
+                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+              >
                 Ad Soyad
               </label>
               <input
@@ -181,7 +214,10 @@ export default function ProfilePage() {
             </div>
 
             <div>
-              <label htmlFor="phone" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label
+                htmlFor="phone"
+                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+              >
                 Telefon Numarası
               </label>
               <input
@@ -214,13 +250,15 @@ export default function ProfilePage() {
 
       {/* Ekstra İşlemler & Çıkış Yap */}
       <div className="mt-6 flex flex-col gap-3">
-        <Link
-          href="/upgrade"
-          className="flex w-full items-center justify-center gap-2 rounded-2xl border border-indigo-200 bg-indigo-50/60 hover:bg-indigo-100/70 py-3.5 px-4 text-sm font-bold text-indigo-600 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:hover:bg-indigo-500/20 dark:text-indigo-400 transition-all active:scale-[0.98] shadow-xs"
-        >
-          <Zap size={18} strokeWidth={2.2} />
-          <span>İşletme Hesabına Geç</span>
-        </Link>
+        {(role === "owner" || role === "staff") && (
+          <Link
+            href="/dashboard"
+            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-md shadow-indigo-200 hover:from-indigo-600 hover:to-purple-700 dark:shadow-indigo-950/40 py-3.5 px-4 text-sm font-bold transition-all active:scale-[0.98]"
+          >
+            <LayoutDashboard size={18} strokeWidth={2.2} />
+            <span>İşletme Paneline Dön</span>
+          </Link>
+        )}
 
         <button
           type="button"

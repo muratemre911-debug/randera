@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import { useEffect, useState, useMemo } from 'react';
-import { createClient } from '@/utils/supabase/client';
-import { useRouter } from 'next/navigation';
-import { useLanguage } from '@/context/LanguageContext';
+import { useEffect, useState, useMemo } from "react";
+import { createClient } from "@/utils/supabase/client";
+import { useRouter } from "next/navigation";
+import { useLanguage } from "@/context/LanguageContext";
 import {
   Heart,
   MapPin,
@@ -12,7 +12,8 @@ import {
   Compass,
   Loader2,
   Calendar,
-} from 'lucide-react';
+  Building2,
+} from "lucide-react";
 
 interface Tenant {
   id: string;
@@ -26,13 +27,18 @@ interface Tenant {
 }
 
 const SECTOR_IMAGES: Record<string, string> = {
-  berber: 'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&w=800&q=80',
-  kuafor: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=800&q=80',
-  guzellik: 'https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?auto=format&fit=crop&w=800&q=80',
-  spa: 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=800&q=80',
-  klinik: 'https://images.unsplash.com/photo-1629909613654-28e377c37b09?auto=format&fit=crop&w=800&q=80',
-  dis: 'https://images.unsplash.com/photo-1629909613654-28e377c37b09?auto=format&fit=crop&w=800&q=80',
-  default: 'https://images.unsplash.com/photo-1521590832167-7bcbfaa6381f?auto=format&fit=crop&w=800&q=80',
+  berber:
+    "https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&w=800&q=80",
+  kuafor:
+    "https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=800&q=80",
+  guzellik:
+    "https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?auto=format&fit=crop&w=800&q=80",
+  spa: "https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=800&q=80",
+  klinik:
+    "https://images.unsplash.com/photo-1629909613654-28e377c37b09?auto=format&fit=crop&w=800&q=80",
+  dis: "https://images.unsplash.com/photo-1629909613654-28e377c37b09?auto=format&fit=crop&w=800&q=80",
+  default:
+    "https://images.unsplash.com/photo-1521590832167-7bcbfaa6381f?auto=format&fit=crop&w=800&q=80",
 };
 
 export default function FavoritesPage() {
@@ -40,23 +46,22 @@ export default function FavoritesPage() {
   const router = useRouter();
   const { lang } = useLanguage();
 
-  const [favorites, setFavorites] = useState<string[]>([]);
+  // Favoriler tarayıcıda saklanır; ilk render'da okunur
+  const [favorites, setFavorites] = useState<string[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const saved = localStorage.getItem("randera_favorites");
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [tenantPrices, setTenantPrices] = useState<Record<string, number>>({});
-  const [ratingSummary, setRatingSummary] = useState<Record<string, { average_rating: number | null; total_reviews: number }>>({});
+  const [ratingSummary, setRatingSummary] = useState<
+    Record<string, { average_rating: number | null; total_reviews: number }>
+  >({});
   const [loading, setLoading] = useState(true);
-
-  // Load favorites from localStorage
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem('randera_favorites');
-      if (saved) {
-        setFavorites(JSON.parse(saved));
-      }
-    } catch {
-      // ignore
-    }
-  }, []);
 
   // Fetch favorited businesses and their real ratings
   useEffect(() => {
@@ -65,9 +70,11 @@ export default function FavoritesPage() {
       try {
         // Fetch all active tenants
         const { data: tenantData } = await supabase
-          .from('tenants')
-          .select('id, name, sector, province, district, slug, profile_image_url, cover_image_url')
-          .eq('is_active', true);
+          .from("tenants")
+          .select(
+            "id, name, sector, province, district, slug, profile_image_url, cover_image_url",
+          )
+          .eq("is_active", true);
 
         if (tenantData) {
           setTenants(tenantData as Tenant[]);
@@ -75,9 +82,9 @@ export default function FavoritesPage() {
 
         // Fetch prices
         const { data: servicesData } = await supabase
-          .from('services')
-          .select('tenant_id, price')
-          .eq('is_active', true);
+          .from("services")
+          .select("tenant_id, price")
+          .eq("is_active", true);
 
         if (servicesData) {
           const priceMap: Record<string, number> = {};
@@ -90,13 +97,13 @@ export default function FavoritesPage() {
         }
 
         // Fetch real ratings
-        const revRes = await fetch('/api/reviews?summary=true');
+        const revRes = await fetch("/api/reviews?summary=true");
         const revData = await revRes.json();
         if (revData && !revData.error) {
           setRatingSummary(revData);
         }
       } catch (err) {
-        console.error('Failed to load favorites data:', err);
+        console.error("Failed to load favorites data:", err);
       } finally {
         setLoading(false);
       }
@@ -109,7 +116,7 @@ export default function FavoritesPage() {
     const updated = favorites.filter((id) => id !== tenantId);
     setFavorites(updated);
     try {
-      localStorage.setItem('randera_favorites', JSON.stringify(updated));
+      localStorage.setItem("randera_favorites", JSON.stringify(updated));
     } catch {
       // ignore
     }
@@ -122,17 +129,17 @@ export default function FavoritesPage() {
   const getCoverImage = (tenant: Tenant) => {
     if (tenant.cover_image_url) return tenant.cover_image_url;
     if (tenant.profile_image_url) return tenant.profile_image_url;
-    const sectorKey = tenant.sector?.toLowerCase() || '';
+    const sectorKey = tenant.sector?.toLowerCase() || "";
     for (const [key, img] of Object.entries(SECTOR_IMAGES)) {
       if (sectorKey.includes(key)) return img;
     }
     return SECTOR_IMAGES.default;
   };
 
-  const getTenantPrice = (tenant: Tenant) => {
-    if (tenantPrices[tenant.id]) return tenantPrices[tenant.id];
-    const hash = tenant.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    return 250 + (hash % 6) * 50;
+  // Fiyat: yalnızca gerçek hizmet fiyatı varsa gösterilir (uydurma fiyat yok)
+  const getTenantPrice = (tenant: Tenant): number | null => {
+    const price = tenantPrices[tenant.id];
+    return price != null ? price : null;
   };
 
   return (
@@ -140,27 +147,23 @@ export default function FavoritesPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
         <div>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 text-xs font-bold mb-2">
-            <Heart size={13} className="fill-rose-500 text-rose-500" />
-            <span>{lang === 'tr' ? 'Kayıtlı İşletmelerim' : 'Saved Businesses'}</span>
-          </div>
           <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white tracking-normal">
-            {lang === 'tr' ? 'Favori İşletmelerim' : 'My Favorites'}
+            {lang === "tr" ? "Favori İşletmelerim" : "My Favorites"}
           </h1>
           <p className="text-sm sm:text-base text-slate-500 dark:text-slate-400 mt-1">
-            {lang === 'tr'
-              ? 'Beğendiğiniz işletmeleri buradan takip edin ve anında randevu alın.'
-              : 'Keep track of your favorite places and book with a single tap.'}
+            {lang === "tr"
+              ? "Beğendiğiniz işletmeleri buradan takip edin ve anında randevu alın."
+              : "Keep track of your favorite places and book with a single tap."}
           </p>
         </div>
 
         <button
           type="button"
-          onClick={() => router.push('/discover')}
+          onClick={() => router.push("/discover")}
           className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs sm:text-sm shadow-md shadow-indigo-600/20 active:scale-95 transition-all self-start sm:self-auto cursor-pointer"
         >
           <Compass size={16} />
-          <span>{lang === 'tr' ? 'Daha Fazla Keşfet' : 'Explore More'}</span>
+          <span>{lang === "tr" ? "Daha Fazla Keşfet" : "Explore More"}</span>
         </button>
       </div>
 
@@ -175,20 +178,22 @@ export default function FavoritesPage() {
             <Heart size={32} className="stroke-[2.2]" />
           </div>
           <h3 className="text-lg sm:text-xl font-extrabold text-slate-900 dark:text-white">
-            {lang === 'tr' ? 'Henüz favori işletmeniz yok' : 'No favorites yet'}
+            {lang === "tr" ? "Henüz favori işletmeniz yok" : "No favorites yet"}
           </h3>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 leading-relaxed max-w-sm mx-auto">
-            {lang === 'tr'
-              ? 'Keşfet ekranında gördüğünüz işletmelerin sağ üstündeki kalp butonuna dokunarak favorilerinize ekleyebilirsiniz.'
-              : 'Tap the heart icon on any business card in Discover to save your favorite businesses here.'}
+            {lang === "tr"
+              ? "Keşfet ekranında gördüğünüz işletmelerin sağ üstündeki kalp butonuna dokunarak favorilerinize ekleyebilirsiniz."
+              : "Tap the heart icon on any business card in Discover to save your favorite businesses here."}
           </p>
           <button
             type="button"
-            onClick={() => router.push('/discover')}
+            onClick={() => router.push("/discover")}
             className="mt-2 inline-flex items-center gap-2 px-6 py-3 rounded-full bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 font-extrabold text-xs sm:text-sm shadow-md active:scale-95 transition-all cursor-pointer"
           >
             <Compass size={16} />
-            <span>{lang === 'tr' ? 'İşletmeleri Keşfet' : 'Discover Places'}</span>
+            <span>
+              {lang === "tr" ? "İşletmeleri Keşfet" : "Discover Places"}
+            </span>
           </button>
         </div>
       ) : (
@@ -196,7 +201,8 @@ export default function FavoritesPage() {
         <div>
           <div className="flex items-center justify-between mb-4 px-1">
             <p className="text-xs sm:text-sm font-bold text-slate-500 dark:text-slate-400">
-              {favoriteTenants.length} {lang === 'tr' ? 'favori işletme' : 'saved places'}
+              {favoriteTenants.length}{" "}
+              {lang === "tr" ? "favori işletme" : "saved places"}
             </p>
           </div>
 
@@ -217,7 +223,9 @@ export default function FavoritesPage() {
                     {/* 'Bugün Müsait' Rozeti */}
                     <div className="absolute top-3 left-3 z-10 flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/45 dark:bg-black/60 backdrop-blur-md text-white text-[11px] font-bold border border-white/20 shadow-xs">
                       <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                      <span>{lang === 'tr' ? 'Bugün Müsait' : 'Available Today'}</span>
+                      <span>
+                        {lang === "tr" ? "Bugün Müsait" : "Available Today"}
+                      </span>
                     </div>
 
                     {/* Favoriden Kaldır Butonu (Kırmızı Kalp) */}
@@ -230,12 +238,15 @@ export default function FavoritesPage() {
                       className="absolute top-3 right-3 z-10 p-2.5 rounded-full bg-black/40 hover:bg-black/60 backdrop-blur-md text-white border border-white/20 hover:scale-110 active:scale-90 transition-all cursor-pointer shadow-md"
                       title="Favorilerden Kaldır"
                     >
-                      <Heart size={18} className="fill-rose-500 text-rose-500 stroke-rose-500" />
+                      <Heart
+                        size={18}
+                        className="fill-rose-500 text-rose-500 stroke-rose-500"
+                      />
                     </button>
 
-                    {/* Sektör Çipi */}
+                    {/* Sektör Çipi (sol alt profil fotoğrafına ayrıldı) */}
                     {tenant.sector && (
-                      <div className="absolute bottom-3 left-3 z-10 px-2.5 py-0.5 rounded-full bg-white/90 dark:bg-slate-900/90 backdrop-blur-md text-slate-800 dark:text-slate-100 text-[11px] font-bold shadow-xs capitalize">
+                      <div className="absolute bottom-3 right-3 z-10 px-2.5 py-0.5 rounded-full bg-white/90 dark:bg-slate-900/90 backdrop-blur-md text-slate-800 dark:text-slate-100 text-[11px] font-bold shadow-xs capitalize">
                         {tenant.sector}
                       </div>
                     )}
@@ -248,24 +259,46 @@ export default function FavoritesPage() {
                   </div>
 
                   {/* Body */}
-                  <div className="p-5 flex flex-col flex-1">
+                  <div className="p-5 pt-0 flex flex-col flex-1">
+                    {/* Profil Fotoğrafı: kapak görselinden taşan avatar */}
+                    <div className="relative z-20 -mt-8 mb-3 flex items-end">
+                      <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border-4 border-white bg-white shadow-md dark:border-slate-900 dark:bg-slate-800">
+                        {tenant.profile_image_url ? (
+                          <img
+                            src={tenant.profile_image_url}
+                            alt={tenant.name}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <Building2
+                            size={26}
+                            className="text-indigo-600 dark:text-indigo-400"
+                          />
+                        )}
+                      </div>
+                    </div>
+
                     <h3 className="font-bold text-slate-900 dark:text-white text-lg sm:text-xl leading-snug group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors line-clamp-1">
                       {tenant.name}
                     </h3>
 
                     {/* Gerçek Puan */}
                     <div className="flex items-center gap-1.5 text-xs text-amber-500 font-bold mt-1.5">
-                      <Star size={14} className="fill-amber-400 text-amber-400" />
+                      <Star
+                        size={14}
+                        className="fill-amber-400 text-amber-400"
+                      />
                       {ratingInfo?.average_rating ? (
                         <span>
-                          {ratingInfo.average_rating}{' '}
+                          {ratingInfo.average_rating}{" "}
                           <span className="text-slate-400 font-normal">
-                            ({ratingInfo.total_reviews} {lang === 'tr' ? 'değerlendirme' : 'reviews'})
+                            ({ratingInfo.total_reviews}{" "}
+                            {lang === "tr" ? "değerlendirme" : "reviews"})
                           </span>
                         </span>
                       ) : (
                         <span className="text-slate-500 dark:text-slate-400 font-semibold">
-                          {lang === 'tr' ? 'Yeni İşletme' : 'New'}
+                          {lang === "tr" ? "Yeni İşletme" : "New"}
                         </span>
                       )}
                     </div>
@@ -274,8 +307,12 @@ export default function FavoritesPage() {
                     <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 text-xs sm:text-sm font-medium mt-2">
                       <MapPin size={15} className="text-slate-400 shrink-0" />
                       <span className="line-clamp-1">
-                        {[tenant.district, tenant.province].filter(Boolean).join(', ') ||
-                          (lang === 'tr' ? 'Konum belirtilmedi' : 'No location')}
+                        {[tenant.district, tenant.province]
+                          .filter(Boolean)
+                          .join(", ") ||
+                          (lang === "tr"
+                            ? "Konum belirtilmedi"
+                            : "No location")}
                       </span>
                     </div>
 
@@ -283,10 +320,18 @@ export default function FavoritesPage() {
                     <div className="mt-auto pt-4 border-t border-slate-200/60 dark:border-slate-800/60 flex items-center justify-between">
                       <div>
                         <p className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-                          {lang === 'tr' ? 'Başlangıç' : 'Starts at'}
+                          {lang === "tr" ? "Başlangıç" : "Starts at"}
                         </p>
                         <p className="text-base font-black text-slate-900 dark:text-white">
-                          ₺{price}
+                          {price != null ? (
+                            <>₺{price}</>
+                          ) : (
+                            <span className="text-xs font-bold text-slate-400 dark:text-slate-500">
+                              {lang === "tr"
+                                ? "Fiyat bilgisi yok"
+                                : "Price not available"}
+                            </span>
+                          )}
                         </p>
                       </div>
 
@@ -299,7 +344,7 @@ export default function FavoritesPage() {
                         className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs shadow-md shadow-indigo-600/20 active:scale-95 transition-all cursor-pointer"
                       >
                         <Calendar size={13} />
-                        <span>{lang === 'tr' ? 'Randevu Al' : 'Book'}</span>
+                        <span>{lang === "tr" ? "Randevu Al" : "Book"}</span>
                         <ChevronRight size={13} />
                       </button>
                     </div>

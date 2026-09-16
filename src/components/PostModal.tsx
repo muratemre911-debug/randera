@@ -3,18 +3,36 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { X, Heart, MessageCircle, Send, Loader2, MoreVertical, User, AtSign } from "lucide-react";
+import {
+  X,
+  Heart,
+  MessageCircle,
+  Send,
+  Loader2,
+  MoreVertical,
+  User,
+  AtSign,
+} from "lucide-react";
 import { Post, PostComment } from "@/types";
 import { createClient } from "@/utils/supabase/client";
-import { renderTextWithMentions, formatRelativeTime, formatNumber } from "@/lib/utils";
+import {
+  renderTextWithMentions,
+  formatRelativeTime,
+  formatNumber,
+} from "@/lib/utils";
 import { useLanguage } from "@/context/LanguageContext";
 
 interface PostModalProps {
   post: Post | null;
   isOpen: boolean;
   onClose: () => void;
-  onLikeToggle: (postId: string) => Promise<{ liked?: boolean; likeCount?: number } | void>;
-  onAddComment: (postId: string, text: string) => Promise<{ comment?: any; commentCount?: number } | void>;
+  onLikeToggle: (
+    postId: string,
+  ) => Promise<{ liked?: boolean; likeCount?: number } | void>;
+  onAddComment: (
+    postId: string,
+    text: string,
+  ) => Promise<{ comment?: PostComment; commentCount?: number } | void>;
 }
 
 export function PostModal({
@@ -34,37 +52,22 @@ export function PostModal({
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
   const [commentCount, setCommentCount] = useState(0);
-  const [user, setUser] = useState<{ id: string; username: string; avatar_url?: string; full_name?: string } | null>(null);
+  const [user, setUser] = useState<{
+    id: string;
+    username: string;
+    avatar_url?: string;
+    full_name?: string;
+  } | null>(null);
   const [loadingUser, setLoadingUser] = useState(true);
   const [requireAuth, setRequireAuth] = useState(false);
   const commentsEndRef = useRef<HTMLDivElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (isOpen && post) {
-      setLiked(post.user_has_liked || false);
-      setLikeCount(post.like_count || 0);
-      setCommentCount(post.comment_count || 0);
-      fetchComments(post.id);
-      fetchCurrentUser();
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "unset";
-      setComments([]);
-      setNewComment("");
-      setUser(null);
-      setLoadingUser(true);
-      setRequireAuth(false);
-    }
-
-    return () => {
-      document.body.style.overflow = "unset";
-    };
-  }, [isOpen, post?.id, post?.user_has_liked, post?.like_count, post?.comment_count]);
-
   const fetchCurrentUser = async () => {
     setLoadingUser(true);
-    const { data: { user: authUser } } = await supabase.auth.getUser();
+    const {
+      data: { user: authUser },
+    } = await supabase.auth.getUser();
     if (authUser) {
       const { data: profile } = await supabase
         .from("profiles")
@@ -82,7 +85,10 @@ export function PostModal({
         const metadata = authUser.user_metadata;
         setUser({
           id: authUser.id,
-          username: (metadata?.nickname as string) || (metadata?.full_name as string) || "Kullanıcı",
+          username:
+            (metadata?.nickname as string) ||
+            (metadata?.full_name as string) ||
+            "Kullanıcı",
         });
       }
       setRequireAuth(false);
@@ -108,6 +114,36 @@ export function PostModal({
       setLoadingComments(false);
     }
   };
+
+  useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect -- modal açılış/kapanışında durum sıfırlanır */
+    if (isOpen && post) {
+      setLiked(post.user_has_liked || false);
+      setLikeCount(post.like_count || 0);
+      setCommentCount(post.comment_count || 0);
+      fetchComments(post.id);
+      fetchCurrentUser();
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "unset";
+      setComments([]);
+      setNewComment("");
+      setUser(null);
+      setLoadingUser(true);
+      setRequireAuth(false);
+    }
+    /* eslint-enable react-hooks/set-state-in-effect */
+
+    return () => {
+      document.body.style.overflow = "unset";
+    };
+  }, [
+    isOpen,
+    post?.id,
+    post?.user_has_liked,
+    post?.like_count,
+    post?.comment_count,
+  ]);
 
   const scrollToBottom = useCallback(() => {
     commentsEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -159,7 +195,15 @@ export function PostModal({
 
   const handleSubmitComment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!post || !newComment.trim() || submittingComment || requireAuth || loadingUser || !user) return;
+    if (
+      !post ||
+      !newComment.trim() ||
+      submittingComment ||
+      requireAuth ||
+      loadingUser ||
+      !user
+    )
+      return;
 
     const text = newComment.trim();
     setSubmittingComment(true);
@@ -219,7 +263,7 @@ export function PostModal({
 
           <div className="flex-1 flex flex-col w-full md:w-[380px] md:max-w-[380px] border-l border-gray-100 dark:border-slate-800 overflow-hidden">
             <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 dark:border-slate-800">
-              <div className="h-10 w-10 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center shrink-0 overflow-hidden">
+              <div className="h-10 w-10 rounded-full bg-[var(--brand-soft-hover)] bg-[var(--brand-soft-hover)] flex items-center justify-center shrink-0 overflow-hidden">
                 {post.tenant?.profile_image_url ? (
                   <img
                     src={post.tenant.profile_image_url}
@@ -227,12 +271,16 @@ export function PostModal({
                     className="h-10 w-10 rounded-full object-cover"
                   />
                 ) : (
-                  <User className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                  <User className="h-5 w-5 text-[var(--brand-text)] text-[var(--brand-text)]" />
                 )}
               </div>
               <div className="min-w-0 flex-1 flex flex-col justify-center leading-none">
-                <p className="font-semibold text-gray-900 dark:text-white truncate text-sm leading-snug">{post.tenant?.name || "İşletme"}</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 truncate leading-tight mt-0.5">{formatRelativeTime(post.created_at)}</p>
+                <p className="font-semibold text-gray-900 dark:text-white truncate text-sm leading-snug">
+                  {post.tenant?.name || "İşletme"}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 truncate leading-tight mt-0.5">
+                  {formatRelativeTime(post.created_at)}
+                </p>
               </div>
               <button
                 onClick={onClose}
@@ -246,7 +294,9 @@ export function PostModal({
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
               {post.description && (
                 <div className="prose prose-sm dark:prose-invert max-w-none">
-                  <p className="text-gray-900 dark:text-white whitespace-pre-wrap">{renderTextWithMentions(post.description)}</p>
+                  <p className="text-gray-900 dark:text-white whitespace-pre-wrap">
+                    {renderTextWithMentions(post.description)}
+                  </p>
                 </div>
               )}
 
@@ -254,7 +304,9 @@ export function PostModal({
                 <h3 className="font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
                   <MessageCircle className="h-5 w-5 text-gray-500" />
                   <span>{t("posts.comments") || "Yorumlar"}</span>
-                  <span className="text-sm font-normal text-gray-500 dark:text-gray-400">({formatNumber(commentCount)})</span>
+                  <span className="text-sm font-normal text-gray-500 dark:text-gray-400">
+                    ({formatNumber(commentCount)})
+                  </span>
                 </h3>
 
                 {loadingComments ? (
@@ -272,12 +324,19 @@ export function PostModal({
                 ) : comments.length === 0 ? (
                   <div className="py-8 text-center text-gray-500 dark:text-gray-400">
                     <MessageCircle className="h-10 w-10 mx-auto mb-2 opacity-30" />
-                    <p>{t("posts.no_comments") || "Henüz yorum yok. İlk yorumu siz yapın!"}</p>
+                    <p>
+                      {t("posts.no_comments") ||
+                        "Henüz yorum yok. İlk yorumu siz yapın!"}
+                    </p>
                   </div>
                 ) : (
                   <div className="space-y-3 max-h-[40vh] overflow-y-auto pr-2 custom-scrollbar">
                     {comments.map((comment) => (
-                      <CommentItem key={comment.id} comment={comment} currentUserId={user?.id} />
+                      <CommentItem
+                        key={comment.id}
+                        comment={comment}
+                        currentUserId={user?.id}
+                      />
                     ))}
                     <div ref={commentsEndRef} />
                   </div>
@@ -288,15 +347,24 @@ export function PostModal({
             <div className="border-t border-gray-100 dark:border-slate-800 px-4 py-3 space-y-2">
               {requireAuth || loadingUser ? (
                 <div className="flex items-center gap-2 text-center py-3 text-sm text-gray-500 dark:text-gray-400">
-                  <span>{t("posts.login_to_comment") || "Giriş yaparak yorum yapın"}</span>
+                  <span>
+                    {t("posts.login_to_comment") || "Giriş yaparak yorum yapın"}
+                  </span>
                 </div>
               ) : (
-                <form onSubmit={handleSubmitComment} className="flex items-center gap-2">
+                <form
+                  onSubmit={handleSubmitComment}
+                  className="flex items-center gap-2"
+                >
                   {user?.avatar_url ? (
-                    <img src={user.avatar_url} alt="" className="h-8 w-8 rounded-full object-cover shrink-0" />
+                    <img
+                      src={user.avatar_url}
+                      alt=""
+                      className="h-8 w-8 rounded-full object-cover shrink-0"
+                    />
                   ) : (
-                    <div className="h-8 w-8 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center shrink-0">
-                      <User className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                    <div className="h-8 w-8 rounded-full bg-[var(--brand-soft-hover)] bg-[var(--brand-soft-hover)] flex items-center justify-center shrink-0">
+                      <User className="h-4 w-4 text-[var(--brand-text)] text-[var(--brand-text)]" />
                     </div>
                   )}
                   <div className="flex-1 flex items-center gap-2 min-h-9">
@@ -312,8 +380,13 @@ export function PostModal({
                     />
                     <button
                       type="submit"
-                      disabled={!newComment.trim() || submittingComment || requireAuth || loadingUser}
-                      className="shrink-0 p-1.5 rounded-full text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      disabled={
+                        !newComment.trim() ||
+                        submittingComment ||
+                        requireAuth ||
+                        loadingUser
+                      }
+                      className="shrink-0 p-1.5 rounded-full text-[var(--brand-text)] text-[var(--brand-text)] hover:bg-[var(--brand-soft)] hover:bg-[var(--brand-soft-hover)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                       aria-label={t("posts.send") || "Gönder"}
                     >
                       <Send className="h-5 w-5" />
@@ -327,19 +400,40 @@ export function PostModal({
                   <button
                     onClick={handleLikeClick}
                     className="flex items-center gap-1 text-gray-500 hover:text-red-500 transition-colors"
-                    aria-label={liked ? (t("posts.unlike") || "Beğeniyi geri al") : (t("posts.like") || "Beğen")}
+                    aria-label={
+                      liked
+                        ? t("posts.unlike") || "Beğeniyi geri al"
+                        : t("posts.like") || "Beğen"
+                    }
                     aria-pressed={liked}
-                    title={requireAuth ? (t("posts.login_to_like") || "Beğenmek için giriş yapın") : undefined}
+                    title={
+                      requireAuth
+                        ? t("posts.login_to_like") ||
+                          "Beğenmek için giriş yapın"
+                        : undefined
+                    }
                   >
-                    <Heart className={`h-5 w-5 ${liked ? "fill-current text-red-500" : "stroke-current"}`} />
-                    <span className="text-sm font-medium leading-none">{formatNumber(likeCount)}</span>
+                    <Heart
+                      className={`h-5 w-5 ${liked ? "fill-current text-red-500" : "stroke-current"}`}
+                    />
+                    <span className="text-sm font-medium leading-none">
+                      {formatNumber(likeCount)}
+                    </span>
                   </button>
-                  <button className="flex items-center gap-1 text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors" aria-label={t("posts.comment") || "Yorum yap"}>
+                  <button
+                    className="flex items-center gap-1 text-gray-500 hover:text-[var(--brand-text)] hover:text-[var(--brand-text)] transition-colors"
+                    aria-label={t("posts.comment") || "Yorum yap"}
+                  >
                     <MessageCircle className="h-5 w-5 stroke-current" />
-                    <span className="text-sm font-medium leading-none">{formatNumber(commentCount)}</span>
+                    <span className="text-sm font-medium leading-none">
+                      {formatNumber(commentCount)}
+                    </span>
                   </button>
                 </div>
-                <button className="flex items-center text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors" aria-label={t("posts.more") || "Daha fazla"}>
+                <button
+                  className="flex items-center text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+                  aria-label={t("posts.more") || "Daha fazla"}
+                >
                   <MoreVertical className="h-5 w-5" />
                 </button>
               </div>
@@ -348,7 +442,7 @@ export function PostModal({
         </div>
       </div>
     </div>,
-    document.body
+    document.body,
   );
 }
 
@@ -369,16 +463,20 @@ function CommentItem({ comment, currentUserId }: CommentItemProps) {
           className="h-8 w-8 rounded-full object-cover shrink-0"
         />
       ) : (
-        <div className="h-8 w-8 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center shrink-0">
-          <User className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+        <div className="h-8 w-8 rounded-full bg-[var(--brand-soft-hover)] bg-[var(--brand-soft-hover)] flex items-center justify-center shrink-0">
+          <User className="h-4 w-4 text-[var(--brand-text)] text-[var(--brand-text)]" />
         </div>
       )}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <span className="font-semibold text-gray-900 dark:text-white text-sm">{comment.username}</span>
-          <span className="text-xs text-gray-500 dark:text-gray-400">{formatRelativeTime(comment.created_at)}</span>
+          <span className="font-semibold text-gray-900 dark:text-white text-sm">
+            {comment.username}
+          </span>
+          <span className="text-xs text-gray-500 dark:text-gray-400">
+            {formatRelativeTime(comment.created_at)}
+          </span>
           {isOwn && (
-            <span className="text-xs text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-1.5 py-0.5 rounded-full">
+            <span className="text-xs text-[var(--brand-text)] text-[var(--brand-text)] bg-[var(--brand-soft)] bg-[var(--brand-soft-hover)] px-1.5 py-0.5 rounded-full">
               {t("posts.you") || "Sen"}
             </span>
           )}

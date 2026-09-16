@@ -99,11 +99,11 @@ export default function NotificationBell() {
     <div className="relative">
       <button 
         onClick={() => { setOpen(!open); if (!open) fetchNotifications(); }}
-        className="relative rounded-full p-2.5 text-gray-500 transition-all hover:bg-black/5 active:scale-90 dark:text-slate-400 dark:hover:bg-white/10"
+        className="relative rounded-full p-2 sm:p-2.5 text-gray-500 transition-all hover:bg-black/5 active:scale-90 dark:text-slate-400 dark:hover:bg-white/10"
       >
-        <Bell size={20} strokeWidth={2.5} />
+        <Bell size={18} strokeWidth={2.5} />
         {unreadCount > 0 && (
-          <span className="absolute right-2 top-2 flex h-3 w-3 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white ring-2 ring-white dark:ring-slate-900 animate-pulse">
+          <span className="absolute right-1.5 top-1.5 flex h-3 w-3 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white ring-2 ring-white dark:ring-slate-900 animate-pulse">
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}

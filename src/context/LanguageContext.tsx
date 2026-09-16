@@ -36,7 +36,12 @@ export const LanguageProvider = ({ children }: { children: React.ReactNode }) =>
   };
 
   const t = (key: string): string => {
-    return dictionaries[lang][key] || key;
+    const value = dictionaries[lang][key];
+    // Eksik anahtar sessizce ham "nav.xxx" olarak görünmesin: geliştirmede uyar
+    if (value === undefined && process.env.NODE_ENV !== "production") {
+      console.warn(`[i18n] Eksik çeviri anahtarı (${lang}): ${key}`);
+    }
+    return value || key;
   };
 
   return (

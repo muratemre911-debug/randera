@@ -1,10 +1,19 @@
-'use client';
+"use client";
 
-import React, { useState } from 'react';
-import { Star, X, CheckCircle2, Loader2, Edit3, Calendar, ShieldCheck, ArrowLeft } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
-import { tr, enUS } from 'date-fns/locale';
-import { useLanguage } from '@/context/LanguageContext';
+import React, { useState } from "react";
+import {
+  Star,
+  X,
+  CheckCircle2,
+  Loader2,
+  Edit3,
+  Calendar,
+  ShieldCheck,
+  ArrowLeft,
+} from "lucide-react";
+import { format, parseISO } from "date-fns";
+import { tr, enUS } from "date-fns/locale";
+import { useLanguage } from "@/context/LanguageContext";
 
 export interface UserReviewItem {
   appointment_id: string;
@@ -24,11 +33,11 @@ interface ManageReviewsModalProps {
 }
 
 const RATING_LABELS: Record<number, { tr: string; en: string }> = {
-  5: { tr: 'Olağanüstü! 🌟', en: 'Outstanding! 🌟' },
-  4: { tr: 'Çok İyi 👍', en: 'Very Good 👍' },
-  3: { tr: 'İyi 🙂', en: 'Good 🙂' },
-  2: { tr: 'İdare Eder 😐', en: 'Fair 😐' },
-  1: { tr: 'Memnun Kalmadım 👎', en: 'Poor 👎' },
+  5: { tr: "Olağanüstü! 🌟", en: "Outstanding! 🌟" },
+  4: { tr: "Çok İyi 👍", en: "Very Good 👍" },
+  3: { tr: "İyi 🙂", en: "Good 🙂" },
+  2: { tr: "İdare Eder 😐", en: "Fair 😐" },
+  1: { tr: "Memnun Kalmadım 👎", en: "Poor 👎" },
 };
 
 export default function ManageReviewsModal({
@@ -39,46 +48,52 @@ export default function ManageReviewsModal({
   onSuccess,
 }: ManageReviewsModalProps) {
   const { lang } = useLanguage();
-  const locale = lang === 'tr' ? tr : enUS;
+  const locale = lang === "tr" ? tr : enUS;
 
-  const [editingReview, setEditingReview] = useState<UserReviewItem | null>(null);
+  const [editingReview, setEditingReview] = useState<UserReviewItem | null>(
+    null,
+  );
   const [rating, setRating] = useState<number>(5);
   const [hoverRating, setHoverRating] = useState<number>(0);
-  const [comment, setComment] = useState<string>('');
+  const [comment, setComment] = useState<string>("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [successMessage, setSuccessMessage] = useState('');
+  const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
 
   if (!isOpen) return null;
 
   const startEdit = (rev: UserReviewItem) => {
     setEditingReview(rev);
     setRating(rev.rating);
-    setComment(rev.comment || '');
-    setError('');
-    setSuccessMessage('');
+    setComment(rev.comment || "");
+    setError("");
+    setSuccessMessage("");
   };
 
   const cancelEdit = () => {
     setEditingReview(null);
-    setError('');
+    setError("");
   };
 
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingReview) return;
     if (rating < 1) {
-      setError(lang === 'tr' ? 'Lütfen en az 1 yıldız seçin.' : 'Please select at least 1 star.');
+      setError(
+        lang === "tr"
+          ? "Lütfen en az 1 yıldız seçin."
+          : "Please select at least 1 star.",
+      );
       return;
     }
 
     setLoading(true);
-    setError('');
+    setError("");
 
     try {
-      const res = await fetch('/api/reviews', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           appointment_id: editingReview.appointment_id,
           rating,
@@ -88,17 +103,32 @@ export default function ManageReviewsModal({
 
       const data = await res.json();
       if (!res.ok || data.error) {
-        throw new Error(data.error || (lang === 'tr' ? 'Değerlendirme güncellenemedi.' : 'Failed to update review.'));
+        throw new Error(
+          data.error ||
+            (lang === "tr"
+              ? "Değerlendirme güncellenemedi."
+              : "Failed to update review."),
+        );
       }
 
-      setSuccessMessage(lang === 'tr' ? 'Değerlendirmeniz başarıyla güncellendi!' : 'Review updated successfully!');
+      setSuccessMessage(
+        lang === "tr"
+          ? "Değerlendirmeniz başarıyla güncellendi!"
+          : "Review updated successfully!",
+      );
       onSuccess();
       setTimeout(() => {
         setEditingReview(null);
-        setSuccessMessage('');
+        setSuccessMessage("");
       }, 1200);
-    } catch (err: any) {
-      setError(err.message || (lang === 'tr' ? 'Bir hata oluştu.' : 'An error occurred.'));
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : lang === "tr"
+            ? "Bir hata oluştu."
+            : "An error occurred.",
+      );
     } finally {
       setLoading(false);
     }
@@ -120,7 +150,7 @@ export default function ManageReviewsModal({
                 onClick={cancelEdit}
                 disabled={loading}
                 className="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer"
-                title={lang === 'tr' ? 'Geri Dön' : 'Back'}
+                title={lang === "tr" ? "Geri Dön" : "Back"}
               >
                 <ArrowLeft size={18} />
               </button>
@@ -128,8 +158,12 @@ export default function ManageReviewsModal({
             <div>
               <h3 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white">
                 {editingReview
-                  ? (lang === 'tr' ? 'Yorumu Düzenle' : 'Edit Review')
-                  : (lang === 'tr' ? 'Değerlendirmelerim' : 'My Reviews')}
+                  ? lang === "tr"
+                    ? "Yorumu Düzenle"
+                    : "Edit Review"
+                  : lang === "tr"
+                    ? "Değerlendirmelerim"
+                    : "My Reviews"}
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 {businessName}
@@ -164,27 +198,37 @@ export default function ManageReviewsModal({
 
           {/* EDIT FORM VIEW */}
           {editingReview ? (
-            <form onSubmit={handleSaveEdit} className="space-y-5 animate-in fade-in slide-in-from-right-2 duration-200">
+            <form
+              onSubmit={handleSaveEdit}
+              className="space-y-5 animate-in fade-in slide-in-from-right-2 duration-200"
+            >
               {/* Selected Appointment Info */}
               <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60 flex items-center justify-between text-xs">
                 <div>
                   <span className="font-bold text-slate-900 dark:text-white">
-                    {editingReview.service_name || (lang === 'tr' ? 'Hizmet' : 'Service')}
+                    {editingReview.service_name ||
+                      (lang === "tr" ? "Hizmet" : "Service")}
                   </span>
                   <p className="text-slate-400 text-[11px] mt-0.5 flex items-center gap-1">
                     <Calendar size={12} />
-                    {format(parseISO(editingReview.start_time), 'd MMMM yyyy, HH:mm', { locale })}
+                    {format(
+                      parseISO(editingReview.start_time),
+                      "d MMMM yyyy, HH:mm",
+                      { locale },
+                    )}
                   </p>
                 </div>
                 <span className="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 text-[10px] font-extrabold">
-                  {lang === 'tr' ? 'Tamamlandı' : 'Completed'}
+                  {lang === "tr" ? "Tamamlandı" : "Completed"}
                 </span>
               </div>
 
               {/* Star Rating Picker */}
               <div className="text-center space-y-2">
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  {lang === 'tr' ? 'Puanınızı Değiştirin' : 'Change Your Rating'}
+                  {lang === "tr"
+                    ? "Puanınızı Değiştirin"
+                    : "Change Your Rating"}
                 </label>
                 <div className="flex items-center justify-center gap-1.5 py-1">
                   {[1, 2, 3, 4, 5].map((star) => {
@@ -202,8 +246,8 @@ export default function ManageReviewsModal({
                           size={28}
                           className={`transition-colors ${
                             isFilled
-                              ? 'fill-amber-400 text-amber-400 drop-shadow-sm'
-                              : 'text-slate-200 dark:text-slate-700'
+                              ? "fill-amber-400 text-amber-400 drop-shadow-sm"
+                              : "text-slate-200 dark:text-slate-700"
                           }`}
                         />
                       </button>
@@ -211,7 +255,9 @@ export default function ManageReviewsModal({
                   })}
                 </div>
                 <p className="text-xs font-semibold text-amber-600 dark:text-amber-400 h-5">
-                  {RATING_LABELS[currentDisplayRating]?.[lang === 'tr' ? 'tr' : 'en'] || ''}
+                  {RATING_LABELS[currentDisplayRating]?.[
+                    lang === "tr" ? "tr" : "en"
+                  ] || ""}
                 </p>
               </div>
 
@@ -219,20 +265,22 @@ export default function ManageReviewsModal({
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between text-xs">
                   <label className="font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    {lang === 'tr' ? 'Yorumunuz' : 'Your Comment'}
+                    {lang === "tr" ? "Yorumunuz" : "Your Comment"}
                   </label>
-                  <span className="text-[11px] text-slate-400">{comment.length}/500</span>
+                  <span className="text-[11px] text-slate-400">
+                    {comment.length}/500
+                  </span>
                 </div>
                 <textarea
                   value={comment}
                   onChange={(e) => setComment(e.target.value.slice(0, 500))}
                   rows={4}
                   placeholder={
-                    lang === 'tr'
-                      ? 'Deneyiminiz hakkında eklemek veya güncellemek istediğiniz detayları yazın...'
-                      : 'Write any details about your experience...'
+                    lang === "tr"
+                      ? "Deneyiminiz hakkında eklemek veya güncellemek istediğiniz detayları yazın..."
+                      : "Write any details about your experience..."
                   }
-                  className="w-full rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 p-3.5 text-sm text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all resize-none"
+                  className="w-full rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 p-3.5 text-sm text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/20 focus:border-[var(--brand)] transition-all resize-none"
                 />
               </div>
 
@@ -244,20 +292,24 @@ export default function ManageReviewsModal({
                   disabled={loading}
                   className="flex-1 py-3 px-4 rounded-full border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold text-xs sm:text-sm hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                 >
-                  {lang === 'tr' ? 'Vazgeç' : 'Cancel'}
+                  {lang === "tr" ? "Vazgeç" : "Cancel"}
                 </button>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="flex-1 py-3 px-4 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs sm:text-sm shadow-md shadow-indigo-600/25 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                  className="flex-1 py-3 px-4 rounded-full bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white font-extrabold text-xs sm:text-sm shadow-md shadow-[color:var(--brand-shadow)] active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                 >
                   {loading ? (
                     <>
                       <Loader2 size={16} className="animate-spin" />
-                      <span>{lang === 'tr' ? 'Kaydediliyor...' : 'Saving...'}</span>
+                      <span>
+                        {lang === "tr" ? "Kaydediliyor..." : "Saving..."}
+                      </span>
                     </>
                   ) : (
-                    <span>{lang === 'tr' ? 'Değişiklikleri Kaydet' : 'Save Changes'}</span>
+                    <span>
+                      {lang === "tr" ? "Değişiklikleri Kaydet" : "Save Changes"}
+                    </span>
                   )}
                 </button>
               </div>
@@ -267,7 +319,9 @@ export default function ManageReviewsModal({
             <div className="space-y-3">
               {reviews.length === 0 ? (
                 <div className="py-8 text-center text-slate-400 dark:text-slate-500 text-sm">
-                  {lang === 'tr' ? 'Henüz bu işletmeye yaptığınız bir değerlendirme bulunmuyor.' : 'You have not written any reviews for this business yet.'}
+                  {lang === "tr"
+                    ? "Henüz bu işletmeye yaptığınız bir değerlendirme bulunmuyor."
+                    : "You have not written any reviews for this business yet."}
                 </div>
               ) : (
                 reviews.map((rev) => (
@@ -279,15 +333,18 @@ export default function ManageReviewsModal({
                       <div>
                         <div className="flex items-center gap-2">
                           <span className="font-bold text-sm text-slate-900 dark:text-white">
-                            {rev.service_name || (lang === 'tr' ? 'Hizmet' : 'Service')}
+                            {rev.service_name ||
+                              (lang === "tr" ? "Hizmet" : "Service")}
                           </span>
                           <span className="flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
                             <ShieldCheck size={12} />
-                            {lang === 'tr' ? 'Doğrulanmış' : 'Verified'}
+                            {lang === "tr" ? "Doğrulanmış" : "Verified"}
                           </span>
                         </div>
                         <p className="text-[11px] text-slate-400 mt-0.5">
-                          {format(parseISO(rev.created_at), 'd MMMM yyyy', { locale })}
+                          {format(parseISO(rev.created_at), "d MMMM yyyy", {
+                            locale,
+                          })}
                         </p>
                       </div>
 
@@ -298,17 +355,21 @@ export default function ManageReviewsModal({
                             <Star
                               key={s}
                               size={12}
-                              className={s <= rev.rating ? 'fill-amber-400 text-amber-400' : 'text-slate-200 dark:text-slate-700'}
+                              className={
+                                s <= rev.rating
+                                  ? "fill-amber-400 text-amber-400"
+                                  : "text-slate-200 dark:text-slate-700"
+                              }
                             />
                           ))}
                         </div>
                         <button
                           type="button"
                           onClick={() => startEdit(rev)}
-                          className="inline-flex items-center gap-1 px-3 py-1 rounded-xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 text-indigo-600 dark:text-indigo-400 text-xs font-bold transition-colors cursor-pointer"
+                          className="inline-flex items-center gap-1 px-3 py-1 rounded-xl bg-[var(--brand-soft)] hover:bg-[var(--brand-soft-hover)] bg-[var(--brand-soft)] hover:bg-[var(--brand-soft-hover)] text-[var(--brand-text)] text-[var(--brand-text)] text-xs font-bold transition-colors cursor-pointer"
                         >
                           <Edit3 size={12} />
-                          <span>{lang === 'tr' ? 'Düzenle' : 'Edit'}</span>
+                          <span>{lang === "tr" ? "Düzenle" : "Edit"}</span>
                         </button>
                       </div>
                     </div>
@@ -320,7 +381,9 @@ export default function ManageReviewsModal({
                       </p>
                     ) : (
                       <p className="text-xs text-slate-400 italic">
-                        {lang === 'tr' ? '(Yorum metni yazılmamış, sadece puan verildi)' : '(No text comment, rating only)'}
+                        {lang === "tr"
+                          ? "(Yorum metni yazılmamış, sadece puan verildi)"
+                          : "(No text comment, rating only)"}
                       </p>
                     )}
                   </div>

@@ -34,6 +34,19 @@
   --animate-modal-in: modalIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   --animate-backdrop-in: backdropIn 0.25s ease-out forwards;
 
+  /* Landing: yüzen kart animasyonu */
+  --animate-float: float 6s ease-in-out infinite;
+
+  @keyframes float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-10px);
+    }
+  }
+
   @keyframes modalIn {
     0% {
       opacity: 0;
@@ -52,7 +65,10 @@
 }
 
 html, body {
-  overscroll-behavior-y: none;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -104,6 +120,18 @@ html, body {
   background-color: rgba(148, 163, 184, 0.4);
 }
 
+/* Görünmez (scrollbar'sız) yatay kaydırma alanı: mobil sekme/filtre çubukları */
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
 /* ==========================================================================
    Modern SaaS User-Select Standards
    ========================================================================== */
@@ -137,3 +165,60 @@ pre,
   user-select: text;
 }
 
+
+/* ==========================================================================
+   Landing (tanıtım sayfası)
+   Gövde `overflow: hidden` olduğu için bu sayfa kendi kaydırma kabını kullanır;
+   kaydırma ile ortaya çıkan bölümler `data-reveal` + `.reveal` ile canlanır.
+   Animasyon bitince sınıflar JS tarafından kaldırılır; böylece kartların kendi
+   hover geçişleri (Tailwind `transition-*`) animasyon süresinden etkilenmez.
+   ========================================================================== */
+
+.reveal {
+  opacity: 0;
+  transform: translateY(22px);
+  transition:
+    opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
+}
+
+.reveal.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  .reveal *,
+  .reveal::before,
+  .reveal::after {
+    animation: none;
+  }
+}
+
+/* Varsayılan marka paleti (indigo). İşletme sayfaları `.brand-scope` ile kendi paletini
+   tanımlar; scope dışındaki bileşenler (ör. dashboard'daki gönderi modalı) bu değerleri kullanır. */
+:root {
+  --brand: oklch(51.1% 0.262 276.966);
+  --brand-strong: oklch(45.7% 0.24 277.023);
+  --brand-soft: oklch(96.2% 0.018 272.314);
+  --brand-soft-hover: oklch(93% 0.034 272.788);
+  --brand-text: oklch(45.7% 0.24 277.023);
+  --brand-border: oklch(87% 0.065 274.039);
+  --brand-shadow: color-mix(in srgb, var(--brand) 30%, transparent);
+}
+
+.dark {
+  --brand: oklch(58.5% 0.233 277.117);
+  --brand-strong: oklch(67.3% 0.182 276.935);
+  --brand-soft: oklch(25.7% 0.09 281.288);
+  --brand-soft-hover: oklch(35.9% 0.144 278.697);
+  --brand-text: oklch(78.5% 0.115 274.713);
+  --brand-border: oklch(39.8% 0.195 277.366);
+}

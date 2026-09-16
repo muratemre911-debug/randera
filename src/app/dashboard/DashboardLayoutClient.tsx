@@ -20,17 +20,33 @@ import {
   Image as ImageIcon,
   Search,
   Command,
+  Compass,
+  Lock,
+  Mail,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import NotificationBell from "@/components/NotificationBell";
+import { SUPER_ADMIN_EMAILS } from "@/lib/admin";
+import {
+  getMembership,
+  formatRemaining,
+  type MembershipInfo,
+} from "@/lib/membership";
 
 import { useLanguage } from "@/context/LanguageContext";
+import { useTheme } from "@/context/ThemeContext";
 import DynamicLogoLink from "@/components/DynamicLogoLink";
+import { SHELL } from "@/components/layout/shell";
+import UserAvatar, { getDisplayName } from "@/components/layout/UserAvatar";
 
 const navItems = [
   { i18nKey: "nav.overview", href: "/dashboard", icon: LayoutDashboard },
   { i18nKey: "nav.calendar", href: "/dashboard/takvim", icon: Calendar },
-  { i18nKey: "nav.past_appointments", href: "/dashboard/gecmis-randevular", icon: History },
+  {
+    i18nKey: "nav.past_appointments",
+    href: "/dashboard/gecmis-randevular",
+    icon: History,
+  },
   { i18nKey: "nav.services", href: "/dashboard/hizmetler", icon: Wrench },
   { i18nKey: "nav.posts", href: "/dashboard/icerikler", icon: ImageIcon },
   { i18nKey: "nav.customers", href: "/dashboard/musteriler", icon: Users },
@@ -46,17 +62,36 @@ export default function DashboardLayoutClient({
   const router = useRouter();
   const supabase = createClient();
   const { t, lang, toggleLanguage } = useLanguage();
+  const { theme, toggleTheme } = useTheme();
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [theme, setTheme] = useState<"light" | "dark">("light");
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [userFullName, setUserFullName] = useState<string | null>(null);
+  const [userAvatarUrl, setUserAvatarUrl] = useState<string | null>(null);
+  // İşletme üyeliği (deneme/ücretli süre) — süper admin kapattıysa panel bloke edilir
+  const [membership, setMembership] = useState<MembershipInfo | null>(null);
   const [cmdOpen, setCmdOpen] = useState(false);
   const [cmdQuery, setCmdQuery] = useState("");
-  const isFirstRender = useRef(true);
+  const mainRef = useRef<HTMLElement>(null);
 
-  // Close mobile bottom sheet when route changes
+  // Kalan gün rozetinin renkleri
+  const membershipBadgeClass = (kind: MembershipInfo["kind"]) =>
+    kind === "unlimited"
+      ? "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-500/25 dark:bg-violet-500/10 dark:text-violet-300"
+      : kind === "active"
+        ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/25 dark:bg-emerald-500/10 dark:text-emerald-400"
+        : kind === "trial"
+          ? "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/25 dark:bg-amber-500/10 dark:text-amber-400"
+          : "border-red-200 bg-red-50 text-red-700 dark:border-red-500/25 dark:bg-red-500/10 dark:text-red-400";
+
+  // Close mobile bottom sheet and reset scroll when route changes
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- rota değişince mobil menüyü kapat
     setMobileMenuOpen(false);
+    if (mainRef.current) {
+      mainRef.current.scrollTop = 0;
+    }
+    window.scrollTo(0, 0);
   }, [pathname]);
 
   // Keyboard shortcut Cmd+K / Ctrl+K listener
@@ -74,55 +109,132 @@ export default function DashboardLayoutClient({
   }, [cmdOpen]);
 
   useEffect(() => {
-    const saved = localStorage.getItem("theme") as "light" | "dark" | null;
-    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    const initial = saved || (prefersDark ? "dark" : "light");
-
-    setTheme(initial);
-    document.documentElement.classList.toggle("dark", initial === "dark");
-    isFirstRender.current = false;
-
     // Fetch user
     const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (user) {
         setUserEmail(user.email || null);
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("full_name, avatar_url, tenant_id")
+          .eq("id", user.id)
+          .single();
+        setUserFullName(profile?.full_name ?? null);
+        setUserAvatarUrl(profile?.avatar_url ?? null);
+
+        // Üyelik durumu (kolonlar yoksa sessizce atlanır)
+        if (profile?.tenant_id) {
+          const { data: tenant } = await supabase
+            .from("tenants")
+            .select("membership_status, trial_ends_at, membership_ends_at")
+            .eq("id", profile.tenant_id)
+            .single();
+          if (tenant) setMembership(getMembership(tenant));
+        }
       }
     };
     getUser();
   }, []);
-
-  useEffect(() => {
-    if (isFirstRender.current) return;
-    localStorage.setItem("theme", theme);
-    document.documentElement.classList.toggle("dark", theme === "dark");
-  }, [theme]);
-
-  const toggleTheme = () =>
-    setTheme((t) => (t === "light" ? "dark" : "light"));
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
     router.push("/login");
   };
 
+  const isSuperAdminUser = Boolean(
+    userEmail && SUPER_ADMIN_EMAILS.includes(userEmail.toLowerCase()),
+  );
+  const membershipClosed =
+    membership !== null &&
+    (membership.kind === "suspended" || membership.kind === "expired");
+
+  // Üyelik kapatıldıysa / süresi dolduysa panel bloke edilir (süper admin hariç)
+  if (membershipClosed && membership && !isSuperAdminUser) {
+    const suspended = membership.kind === "suspended";
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4 dark:bg-[#0B0D14]">
+        <div className="w-full max-w-lg rounded-[28px] border border-slate-200/80 bg-white/80 p-8 text-center shadow-xl backdrop-blur-2xl dark:border-slate-800 dark:bg-slate-900/70">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-3xl bg-red-50 dark:bg-red-500/10">
+            <Lock size={28} className="text-red-500" />
+          </div>
+          <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">
+            {suspended
+              ? lang === "tr"
+                ? "İşletme üyeliğiniz kapatıldı"
+                : "Your business membership is closed"
+              : lang === "tr"
+                ? "Üyelik süreniz doldu"
+                : "Your membership expired"}
+          </h1>
+          <p className="mt-3 text-sm font-medium text-slate-500 dark:text-slate-400">
+            {lang === "tr"
+              ? suspended
+                ? "Panele erişim yönetici tarafından kapatıldı. Yeniden açmak için bizimle iletişime geçin; randevu ve müşteri verileriniz silinmedi."
+                : "Deneme/üyelik süreniz bitti. Devam etmek için size uygun paketi yükleyebiliriz; verileriniz silinmedi."
+              : suspended
+                ? "Access was closed by the administrator. Contact us to reopen; your data is safe."
+                : "Your trial/membership has ended. Contact us to continue; your data is safe."}
+          </p>
+
+          <div className="mt-6 flex flex-col gap-2.5">
+            <a
+              href={`mailto:${SUPER_ADMIN_EMAILS[0]}?subject=${encodeURIComponent(
+                "İşletme üyeliği hakkında",
+              )}`}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-5 py-3 text-sm font-bold text-white shadow-md shadow-indigo-500/25 transition-all hover:bg-indigo-500 active:scale-95"
+            >
+              <Mail size={16} />
+              {lang === "tr" ? "İletişime Geç" : "Contact us"}
+            </a>
+            <Link
+              href="/discover"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 px-5 py-3 text-sm font-bold text-slate-700 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+            >
+              <LayoutDashboard size={16} />
+              {lang === "tr" ? "Keşfet'e dön" : "Back to discover"}
+            </Link>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-bold text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10"
+            >
+              <LogOut size={16} />
+              {lang === "tr" ? "Çıkış Yap" : "Sign out"}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex h-screen relative overflow-hidden bg-slate-50 dark:bg-[#0B0D14]">
+    <div className={SHELL.root}>
       {/* Animated Mesh Gradient Backgrounds */}
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-purple-400/20 mix-blend-multiply filter blur-3xl opacity-70 animate-blob dark:bg-purple-900/20 dark:mix-blend-screen" />
-      <div className="absolute top-[20%] right-[-10%] w-[40%] h-[40%] rounded-full bg-indigo-400/20 mix-blend-multiply filter blur-3xl opacity-70 animate-blob dark:bg-indigo-900/20 dark:mix-blend-screen" style={{ animationDelay: '2s' }} />
+      <div
+        className="absolute top-[20%] right-[-10%] w-[40%] h-[40%] rounded-full bg-indigo-400/20 mix-blend-multiply filter blur-3xl opacity-70 animate-blob dark:bg-indigo-900/20 dark:mix-blend-screen"
+        style={{ animationDelay: "2s" }}
+      />
       <div className="absolute bottom-[-20%] left-[20%] w-[40%] h-[40%] rounded-full bg-pink-400/20 mix-blend-multiply filter blur-3xl opacity-70 animate-blob-slow dark:bg-pink-900/20 dark:mix-blend-screen" />
 
       {/* Desktop Floating Sidebar (hidden on mobile) */}
-      <aside
-        className="hidden lg:flex inset-y-4 left-4 z-50 w-64 flex-col rounded-3xl bg-white/60 backdrop-blur-3xl border border-white/50 shadow-[0_8px_30px_rgb(0,0,0,0.04)] lg:static dark:bg-slate-900/60 dark:border-slate-700/50 dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] select-none m-4"
-      >
+      <aside className={SHELL.sidebar}>
         {/* Logo */}
         <div className="flex h-20 items-center justify-between px-6 pt-2">
           <DynamicLogoLink className="flex items-center gap-3 group">
             <div className="relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl shadow-md transition-transform duration-300 group-hover:scale-105 border border-gray-200/50 dark:border-slate-700/50">
-              <img src="/logo-light.png" alt="Randera Logo" className="h-full w-full object-cover dark:hidden" />
-              <img src="/logo-dark.png" alt="Randera Logo" className="hidden h-full w-full object-cover dark:block" />
+              <img
+                src="/logo-light.png"
+                alt="Randera Logo"
+                className="h-full w-full object-cover dark:hidden"
+              />
+              <img
+                src="/logo-dark.png"
+                alt="Randera Logo"
+                className="hidden h-full w-full object-cover dark:block"
+              />
             </div>
             <span className="text-xl font-bold tracking-tight text-gray-800 dark:text-slate-100">
               Randera
@@ -157,15 +269,31 @@ export default function DashboardLayoutClient({
         {/* Bottom section */}
         <div className="p-4 pb-4">
           <div className="flex flex-col gap-2 rounded-2xl p-3 text-sm transition-colors bg-white/30 dark:bg-slate-800/30">
+            {/* Customer area shortcut */}
+            <Link
+              href="/discover"
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-indigo-300 px-4 py-2 text-[13px] font-bold text-indigo-600 transition-all hover:bg-indigo-50 active:scale-95 dark:border-indigo-500/40 dark:text-indigo-400 dark:hover:bg-indigo-500/10 mb-2"
+            >
+              <Compass size={16} />
+              <span className="truncate">{t("nav.switch_to_customer")}</span>
+            </Link>
+
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 text-sm font-bold text-white shadow-sm">
-                {userEmail ? userEmail.charAt(0).toUpperCase() : "U"}
-              </div>
+              <UserAvatar
+                src={userAvatarUrl}
+                fullName={userFullName}
+                email={userEmail}
+              />
               <div className="flex-1 truncate">
-                <p className="font-semibold tracking-tight text-gray-800 dark:text-slate-200 truncate">
-                  {userEmail || t("header.loading")}
+                <p
+                  title={userEmail || undefined}
+                  className="font-semibold tracking-tight text-gray-800 dark:text-slate-200 truncate"
+                >
+                  {getDisplayName(userFullName, userEmail, t("header.loading"))}
                 </p>
-                <p className="text-[11px] font-medium text-indigo-500 dark:text-indigo-400">{t("nav.business_account")}</p>
+                <p className="text-[11px] font-medium text-indigo-500 dark:text-indigo-400">
+                  {t("nav.business_account")}
+                </p>
               </div>
             </div>
             <button
@@ -180,15 +308,23 @@ export default function DashboardLayoutClient({
       </aside>
 
       {/* Main content area */}
-      <div className="flex flex-1 flex-col overflow-hidden relative z-10">
+      <div className={SHELL.column}>
         {/* Floating Header */}
-        <header className="sticky top-2 sm:top-4 z-40 mx-2 sm:mx-4 lg:mx-8 flex h-14 sm:h-16 items-center justify-between rounded-2xl sm:rounded-3xl border border-white/50 bg-white/60 backdrop-blur-3xl px-3.5 sm:px-5 shadow-[0_4px_20px_rgb(0,0,0,0.03)] dark:bg-slate-900/60 dark:border-slate-700/50 dark:shadow-[0_4px_20px_rgb(0,0,0,0.2)] transition-all select-none">
+        <header className={SHELL.header}>
           {/* Mobile Logo Brand */}
           <div className="flex items-center gap-2 lg:hidden">
             <DynamicLogoLink className="flex items-center gap-2">
               <div className="relative flex h-8 w-8 items-center justify-center overflow-hidden rounded-xl shadow-xs border border-gray-200/50 dark:border-slate-700/50">
-                <img src="/logo-light.png" alt="Randera Logo" className="h-full w-full object-cover dark:hidden" />
-                <img src="/logo-dark.png" alt="Randera Logo" className="hidden h-full w-full object-cover dark:block" />
+                <img
+                  src="/logo-light.png"
+                  alt="Randera Logo"
+                  className="h-full w-full object-cover dark:hidden"
+                />
+                <img
+                  src="/logo-dark.png"
+                  alt="Randera Logo"
+                  className="hidden h-full w-full object-cover dark:block"
+                />
               </div>
               <span className="hidden sm:inline text-base font-black tracking-tight text-gray-800 dark:text-slate-100">
                 Randera
@@ -204,7 +340,9 @@ export default function DashboardLayoutClient({
           >
             <Search size={15} />
             <span>
-              {lang === "tr" ? "Hızlı ara veya komutlar..." : "Quick search or commands..."}
+              {lang === "tr"
+                ? "Hızlı ara veya komutlar..."
+                : "Quick search or commands..."}
             </span>
             <kbd className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-white/90 dark:bg-slate-800 text-[10px] font-mono font-bold text-gray-600 dark:text-slate-300 shadow-xs border border-gray-200 dark:border-slate-700">
               ⌘K
@@ -212,6 +350,28 @@ export default function DashboardLayoutClient({
           </button>
 
           <div className="flex items-center gap-1.5 sm:gap-4">
+            {/* Kalan deneme/üyelik süresi */}
+            {membership && (
+              <span
+                title={formatRemaining(membership, lang === "tr" ? "tr" : "en")}
+                className={`hidden items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold sm:inline-flex ${membershipBadgeClass(
+                  membership.kind,
+                )}`}
+              >
+                <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                {formatRemaining(membership, lang === "tr" ? "tr" : "en")}
+              </span>
+            )}
+
+            {/* Customer area shortcut (business owners can also browse as customers) */}
+            <Link
+              href="/discover"
+              title={t("nav.customer_area")}
+              className="lg:hidden rounded-full p-2 sm:p-2.5 text-gray-500 transition-all hover:bg-black/5 active:scale-90 dark:text-slate-400 dark:hover:bg-white/10"
+            >
+              <Search size={18} strokeWidth={2.5} />
+            </Link>
+
             {/* Language toggle */}
             <button
               onClick={toggleLanguage}
@@ -225,7 +385,11 @@ export default function DashboardLayoutClient({
               onClick={toggleTheme}
               className="rounded-full p-2 sm:p-2.5 text-gray-500 transition-all hover:bg-black/5 active:scale-90 dark:text-slate-400 dark:hover:bg-white/10"
             >
-              {theme === "light" ? <Moon size={18} strokeWidth={2.5} /> : <Sun size={18} strokeWidth={2.5} />}
+              {theme === "light" ? (
+                <Moon size={18} strokeWidth={2.5} />
+              ) : (
+                <Sun size={18} strokeWidth={2.5} />
+              )}
             </button>
 
             {/* Notification bell */}
@@ -234,12 +398,14 @@ export default function DashboardLayoutClient({
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto p-3 sm:p-6 lg:p-8 pt-4 sm:pt-8 pb-28 sm:pb-28 lg:pb-8">{children}</main>
+        <main ref={mainRef} className={SHELL.main}>
+          {children}
+        </main>
       </div>
 
       {/* Mobile Bottom Navigation Bar (Instagram / TikTok / YouTube style) */}
-      <nav className="fixed bottom-0 inset-x-0 z-40 lg:hidden bg-white/85 dark:bg-slate-900/85 backdrop-blur-2xl border-t border-gray-200/80 dark:border-slate-800/80 shadow-[0_-4px_25px_rgba(0,0,0,0.06)] dark:shadow-[0_-4px_25px_rgba(0,0,0,0.4)] pb-[max(env(safe-area-inset-bottom),0.6rem)] pt-1.5 px-2 select-none">
-        <div className="flex items-center justify-around max-w-lg mx-auto">
+      <nav className={SHELL.bottomNav}>
+        <div className={SHELL.bottomNavInner}>
           {/* 1. Özet */}
           <Link
             href="/dashboard"
@@ -249,7 +415,10 @@ export default function DashboardLayoutClient({
                 : "text-gray-400 hover:text-gray-600 dark:text-slate-400 dark:hover:text-slate-200 font-medium"
             }`}
           >
-            <LayoutDashboard size={21} strokeWidth={pathname === "/dashboard" ? 2.5 : 1.8} />
+            <LayoutDashboard
+              size={22}
+              strokeWidth={pathname === "/dashboard" ? 2.5 : 1.8}
+            />
             <span className="text-[10px] mt-1 tracking-tight leading-none">
               {t("nav.overview")}
             </span>
@@ -264,7 +433,10 @@ export default function DashboardLayoutClient({
                 : "text-gray-400 hover:text-gray-600 dark:text-slate-400 dark:hover:text-slate-200 font-medium"
             }`}
           >
-            <Calendar size={21} strokeWidth={pathname.startsWith("/dashboard/takvim") ? 2.5 : 1.8} />
+            <Calendar
+              size={22}
+              strokeWidth={pathname.startsWith("/dashboard/takvim") ? 2.5 : 1.8}
+            />
             <span className="text-[10px] mt-1 tracking-tight leading-none">
               {t("nav.calendar")}
             </span>
@@ -279,7 +451,12 @@ export default function DashboardLayoutClient({
                 : "text-gray-400 hover:text-gray-600 dark:text-slate-400 dark:hover:text-slate-200 font-medium"
             }`}
           >
-            <Users size={21} strokeWidth={pathname.startsWith("/dashboard/musteriler") ? 2.5 : 1.8} />
+            <Users
+              size={22}
+              strokeWidth={
+                pathname.startsWith("/dashboard/musteriler") ? 2.5 : 1.8
+              }
+            />
             <span className="text-[10px] mt-1 tracking-tight leading-none">
               {t("nav.customers")}
             </span>
@@ -294,7 +471,12 @@ export default function DashboardLayoutClient({
                 : "text-gray-400 hover:text-gray-600 dark:text-slate-400 dark:hover:text-slate-200 font-medium"
             }`}
           >
-            <Wrench size={21} strokeWidth={pathname.startsWith("/dashboard/hizmetler") ? 2.5 : 1.8} />
+            <Wrench
+              size={22}
+              strokeWidth={
+                pathname.startsWith("/dashboard/hizmetler") ? 2.5 : 1.8
+              }
+            />
             <span className="text-[10px] mt-1 tracking-tight leading-none">
               {t("nav.services")}
             </span>
@@ -316,7 +498,10 @@ export default function DashboardLayoutClient({
                     : "text-gray-400 hover:text-gray-600 dark:text-slate-400 dark:hover:text-slate-200 font-medium"
                 }`}
               >
-                <Menu size={21} strokeWidth={isMoreActive || mobileMenuOpen ? 2.5 : 1.8} />
+                <Menu
+                  size={22}
+                  strokeWidth={isMoreActive || mobileMenuOpen ? 2.5 : 1.8}
+                />
                 <span className="text-[10px] mt-1 tracking-tight leading-none">
                   {lang === "tr" ? "Menü" : "Menu"}
                 </span>
@@ -343,12 +528,23 @@ export default function DashboardLayoutClient({
             {/* Business info & close */}
             <div className="flex items-center justify-between pb-2 border-b border-gray-100 dark:border-slate-800">
               <div className="flex items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-sm font-bold text-white shadow-sm">
-                  {userEmail ? userEmail.charAt(0).toUpperCase() : "B"}
-                </div>
+                <UserAvatar
+                  src={userAvatarUrl}
+                  fullName={userFullName}
+                  email={userEmail}
+                  shape="rounded"
+                  className="h-11 w-11 text-sm"
+                />
                 <div>
-                  <p className="text-sm font-bold text-gray-900 dark:text-white truncate max-w-[200px]">
-                    {userEmail || "İşletme Hesabı"}
+                  <p
+                    title={userEmail || undefined}
+                    className="text-sm font-bold text-gray-900 dark:text-white truncate max-w-[200px]"
+                  >
+                    {getDisplayName(
+                      userFullName,
+                      userEmail,
+                      lang === "tr" ? "İşletme Hesabı" : "Business Account",
+                    )}
                   </p>
                   <p className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400">
                     {t("nav.business_account")}
@@ -366,9 +562,21 @@ export default function DashboardLayoutClient({
             {/* Navigation links inside drawer */}
             <div className="space-y-1.5">
               {[
-                { href: "/dashboard/icerikler", icon: ImageIcon, label: t("nav.posts") },
-                { href: "/dashboard/gecmis-randevular", icon: History, label: t("nav.past_appointments") },
-                { href: "/dashboard/ayarlar", icon: Settings, label: t("nav.settings") },
+                {
+                  href: "/dashboard/icerikler",
+                  icon: ImageIcon,
+                  label: t("nav.posts"),
+                },
+                {
+                  href: "/dashboard/gecmis-randevular",
+                  icon: History,
+                  label: t("nav.past_appointments"),
+                },
+                {
+                  href: "/dashboard/ayarlar",
+                  icon: Settings,
+                  label: t("nav.settings"),
+                },
               ].map((item) => {
                 const isActive = pathname.startsWith(item.href);
                 return (
@@ -383,7 +591,14 @@ export default function DashboardLayoutClient({
                     }`}
                   >
                     <div className="flex items-center gap-3">
-                      <item.icon size={20} className={isActive ? "text-indigo-600 dark:text-indigo-400" : "text-gray-400"} />
+                      <item.icon
+                        size={20}
+                        className={
+                          isActive
+                            ? "text-indigo-600 dark:text-indigo-400"
+                            : "text-gray-400"
+                        }
+                      />
                       <span>{item.label}</span>
                     </div>
                     {isActive && (
@@ -395,14 +610,17 @@ export default function DashboardLayoutClient({
                 );
               })}
 
-              {/* Müşteri Sayfası Linki */}
+              {/* Müşteri Hesabına Dön Linki */}
               <Link
                 href="/discover"
                 onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-bold text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800/60 transition-all"
+                className="flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-bold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition-all"
               >
-                <Search size={20} className="text-gray-400" />
-                <span>{lang === "tr" ? "Müşteri Keşfet Sayfası" : "Customer Discover"}</span>
+                <Compass
+                  size={20}
+                  className="text-indigo-600 dark:text-indigo-400"
+                />
+                <span>{t("nav.switch_to_customer")}</span>
               </Link>
             </div>
 
@@ -415,7 +633,15 @@ export default function DashboardLayoutClient({
                   className="flex items-center justify-center gap-2 p-3 rounded-2xl bg-gray-100 dark:bg-slate-800/80 text-xs font-bold text-gray-700 dark:text-slate-200 hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors"
                 >
                   {theme === "light" ? <Moon size={16} /> : <Sun size={16} />}
-                  <span>{theme === "light" ? (lang === "tr" ? "Koyu Mod" : "Dark Mode") : (lang === "tr" ? "Açık Mod" : "Light Mode")}</span>
+                  <span>
+                    {theme === "light"
+                      ? lang === "tr"
+                        ? "Koyu Mod"
+                        : "Dark Mode"
+                      : lang === "tr"
+                        ? "Açık Mod"
+                        : "Light Mode"}
+                  </span>
                 </button>
                 <button
                   type="button"
@@ -455,7 +681,11 @@ export default function DashboardLayoutClient({
                 autoFocus
                 value={cmdQuery}
                 onChange={(e) => setCmdQuery(e.target.value)}
-                placeholder={lang === "tr" ? "Sayfa ara, işlem yap veya komut gir..." : "Search pages or run commands..."}
+                placeholder={
+                  lang === "tr"
+                    ? "Sayfa ara, işlem yap veya komut gir..."
+                    : "Search pages or run commands..."
+                }
                 className="w-full bg-transparent text-sm sm:text-base text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none"
               />
               <kbd className="text-[10px] font-mono px-2 py-1 rounded bg-gray-100 dark:bg-slate-800 text-gray-400 dark:text-slate-500">
@@ -473,7 +703,9 @@ export default function DashboardLayoutClient({
                 <div className="mt-1 space-y-0.5">
                   {navItems
                     .filter((item) =>
-                      t(item.i18nKey).toLowerCase().includes(cmdQuery.toLowerCase())
+                      t(item.i18nKey)
+                        .toLowerCase()
+                        .includes(cmdQuery.toLowerCase()),
                     )
                     .map((item) => {
                       const Icon = item.icon;
@@ -488,8 +720,47 @@ export default function DashboardLayoutClient({
                           className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-700 dark:text-slate-200 text-xs sm:text-sm font-medium transition-colors text-left"
                         >
                           <div className="flex items-center gap-2.5">
-                            <Icon size={16} className="text-indigo-600 dark:text-indigo-400" />
+                            <Icon
+                              size={16}
+                              className="text-indigo-600 dark:text-indigo-400"
+                            />
                             <span>{t(item.i18nKey)}</span>
+                          </div>
+                          <span className="text-[10px] text-gray-400 font-mono">
+                            {item.href}
+                          </span>
+                        </button>
+                      );
+                    })}
+
+                  {[
+                    {
+                      href: "/discover",
+                      icon: Compass,
+                      label: t("nav.switch_to_customer"),
+                    },
+                  ]
+                    .filter((item) =>
+                      item.label.toLowerCase().includes(cmdQuery.toLowerCase()),
+                    )
+                    .map((item) => {
+                      const Icon = item.icon;
+                      return (
+                        <button
+                          key={item.href}
+                          onClick={() => {
+                            router.push(item.href);
+                            setCmdOpen(false);
+                            setCmdQuery("");
+                          }}
+                          className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-700 dark:text-slate-200 text-xs sm:text-sm font-medium transition-colors text-left"
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <Icon
+                              size={16}
+                              className="text-emerald-600 dark:text-emerald-400"
+                            />
+                            <span>{item.label}</span>
                           </div>
                           <span className="text-[10px] text-gray-400 font-mono">
                             {item.href}
@@ -514,8 +785,16 @@ export default function DashboardLayoutClient({
                     className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-700 dark:text-slate-200 text-xs sm:text-sm font-medium transition-colors text-left"
                   >
                     <div className="flex items-center gap-2.5">
-                      {theme === "light" ? <Moon size={16} className="text-amber-500" /> : <Sun size={16} className="text-amber-400" />}
-                      <span>{lang === "tr" ? "Temayı Değiştir (Açık / Koyu)" : "Toggle Theme (Light / Dark)"}</span>
+                      {theme === "light" ? (
+                        <Moon size={16} className="text-amber-500" />
+                      ) : (
+                        <Sun size={16} className="text-amber-400" />
+                      )}
+                      <span>
+                        {lang === "tr"
+                          ? "Temayı Değiştir (Açık / Koyu)"
+                          : "Toggle Theme (Light / Dark)"}
+                      </span>
                     </div>
                   </button>
 
@@ -528,7 +807,11 @@ export default function DashboardLayoutClient({
                   >
                     <div className="flex items-center gap-2.5">
                       <Command size={16} className="text-purple-500" />
-                      <span>{lang === "tr" ? "Dili Değiştir (TR / EN)" : "Toggle Language"}</span>
+                      <span>
+                        {lang === "tr"
+                          ? "Dili Değiştir (TR / EN)"
+                          : "Toggle Language"}
+                      </span>
                     </div>
                   </button>
 
@@ -550,7 +833,11 @@ export default function DashboardLayoutClient({
 
             {/* Footer Hint */}
             <div className="px-4 py-2.5 bg-gray-50 dark:bg-slate-800/50 border-t border-gray-100 dark:border-slate-800 flex items-center justify-between text-[11px] text-gray-400 dark:text-slate-500">
-              <span>{lang === "tr" ? "Gitmek için tıklayın veya klavyeden seçin" : "Click or use keyboard to navigate"}</span>
+              <span>
+                {lang === "tr"
+                  ? "Gitmek için tıklayın veya klavyeden seçin"
+                  : "Click or use keyboard to navigate"}
+              </span>
               <span className="font-mono">⌘K</span>
             </div>
           </div>

@@ -1,8 +1,25 @@
-'use client';
+"use client";
 
-import React, { useState, useRef, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
-import { Plus, Minus, Compass, MapPin, Star, X, ChevronRight } from 'lucide-react';
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  Plus,
+  Minus,
+  Compass,
+  MapPin,
+  Star,
+  X,
+  ChevronRight,
+  Building2,
+} from "lucide-react";
+import type { LayerGroup, Map as LeafletMap } from "leaflet";
+import "leaflet/dist/leaflet.css";
+import {
+  tenantCoords,
+  hasExactLocation,
+  TURKEY_CENTER,
+  TURKEY_ZOOM,
+} from "@/lib/provinceCoords";
 
 export interface TenantWithDetails {
   id: string;
@@ -14,62 +31,60 @@ export interface TenantWithDetails {
   profile_image_url: string | null;
   cover_image_url?: string | null;
   address?: string | null;
+  neighborhood?: string | null;
+  street?: string | null;
+  building_no?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 interface DiscoverMapProps {
   tenants: TenantWithDetails[];
   selectedTenant: TenantWithDetails | null;
   onSelectTenant: (tenant: TenantWithDetails | null) => void;
-  getTenantPrice: (tenant: TenantWithDetails) => number;
-  getTenantRating: (tenant: TenantWithDetails) => { score: string; reviews: number; hasReviews?: boolean };
+  getTenantPrice: (tenant: TenantWithDetails) => number | null;
+  getTenantRating: (tenant: TenantWithDetails) => {
+    score: string;
+    reviews: number;
+    hasReviews?: boolean;
+  };
   getSectorLabel: (sector: string | null) => string;
   getCoverImage: (tenant: TenantWithDetails) => string;
   lang: string;
 }
 
-// Approximate geo-coordinates for Turkish provinces
-const CITY_COORDS: Record<string, { lat: number; lng: number }> = {
-  "İstanbul": { lat: 41.0082, lng: 28.9784 },
-  "Ankara": { lat: 39.9334, lng: 32.8597 },
-  "İzmir": { lat: 38.4237, lng: 27.1428 },
-  "Bursa": { lat: 40.1885, lng: 29.0610 },
-  "Antalya": { lat: 36.8969, lng: 30.7133 },
-  "Adana": { lat: 37.0000, lng: 35.3213 },
-  "Konya": { lat: 37.8746, lng: 32.4932 },
-  "Gaziantep": { lat: 37.0662, lng: 37.3833 },
-  "Eskişehir": { lat: 39.7767, lng: 30.5206 },
-  "Trabzon": { lat: 41.0027, lng: 39.7168 },
-  "Muğla": { lat: 37.2153, lng: 28.3636 },
-  "Samsun": { lat: 41.2867, lng: 36.3300 },
-  "Kayseri": { lat: 38.7312, lng: 35.4787 },
-  "Mersin": { lat: 36.8121, lng: 34.6415 },
-  "Diyarbakır": { lat: 37.9144, lng: 40.2306 },
-  "Kocaeli": { lat: 40.7654, lng: 29.9408 },
-  "Aydın": { lat: 37.8444, lng: 27.8458 },
-  "Tekirdağ": { lat: 40.9781, lng: 27.5117 },
-  "Balıkesir": { lat: 39.6484, lng: 27.8826 },
-  "Denizli": { lat: 37.7765, lng: 29.0864 },
-  "Sakarya": { lat: 40.7569, lng: 30.3783 },
-  "Manisa": { lat: 38.6191, lng: 27.4289 },
-  "Hatay": { lat: 36.4018, lng: 36.3498 },
-  "Şanlıurfa": { lat: 37.1674, lng: 38.7955 },
-  "Malatya": { lat: 38.3552, lng: 38.3095 },
-  "Erzurum": { lat: 39.9043, lng: 41.2679 },
-  "Van": { lat: 38.4891, lng: 43.4089 },
-  "Çanakkale": { lat: 40.1553, lng: 26.4142 },
-};
+const OSM_TILES = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
+const OSM_ATTRIBUTION =
+  '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a>';
 
-// Turkey bounding box for projection
-const BOUNDS = {
-  minLat: 35.8,
-  maxLat: 42.2,
-  minLng: 25.8,
-  maxLng: 44.8,
-};
+function pinHtml(price: number | null, isSelected: boolean, name: string) {
+  // Fiyatı olmayan işletmenin pininde isim gösterilir (uydurma fiyat yazılmaz)
+  const label =
+    price != null
+      ? `₺${price}`
+      : `${name.length > 14 ? `${name.slice(0, 14)}…` : name}`;
+
+  return `
+    <div style="transform: translate(-50%, -100%)" class="relative">
+      <button type="button" class="flex items-center gap-1.5 px-3 py-1.5 rounded-full font-bold text-xs shadow-md border whitespace-nowrap transition-all ${
+        isSelected
+          ? "bg-indigo-600 text-white border-indigo-500 ring-4 ring-indigo-500/25"
+          : "bg-white/95 dark:bg-slate-900/95 text-slate-900 dark:text-white border-slate-200/90 dark:border-slate-700 hover:border-indigo-400"
+      }">
+        <span class="text-[11px]">${label}</span>
+        ${isSelected ? '<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0"></span>' : ""}
+      </button>
+      <div class="w-0 h-0 mx-auto border-x-4 border-x-transparent border-t-4 ${
+        isSelected
+          ? "border-t-indigo-600"
+          : "border-t-white/95 dark:border-t-slate-900/95"
+      }"></div>
+    </div>`;
+}
 
 export default function DiscoverMap({
   tenants,
-  selectedTenant,
+  selectedTenant: selectedTenantProp,
   onSelectTenant,
   getTenantPrice,
   getTenantRating,
@@ -78,242 +93,139 @@ export default function DiscoverMap({
   lang,
 }: DiscoverMapProps) {
   const router = useRouter();
-  const [zoom, setZoom] = useState(1);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [isDragging, setIsDragging] = useState(false);
-  const dragStart = useRef({ x: 0, y: 0 });
-  const panStart = useRef({ x: 0, y: 0 });
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<LeafletMap | null>(null);
+  const layerRef = useRef<LayerGroup | null>(null);
+  const leafletRef = useRef<typeof import("leaflet") | null>(null);
+  const selectRef = useRef(onSelectTenant);
+  const [ready, setReady] = useState(false);
 
-  const handleMouseDown = (e: React.MouseEvent) => {
-    setIsDragging(true);
-    dragStart.current = { x: e.clientX, y: e.clientY };
-    panStart.current = { ...pan };
-  };
+  // Filtre değişip listeden çıkan işletmenin pin/kartı gösterilmesin
+  const selectedTenant =
+    tenants.find((t) => t.id === selectedTenantProp?.id) ?? null;
+  const approximateCount = tenants.filter((t) => !hasExactLocation(t)).length;
 
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging) return;
-    const dx = e.clientX - dragStart.current.x;
-    const dy = e.clientY - dragStart.current.y;
-    setPan({
-      x: panStart.current.x + dx,
-      y: panStart.current.y + dy,
+  useEffect(() => {
+    selectRef.current = onSelectTenant;
+  }, [onSelectTenant]);
+
+  // Harita örneğini bir kez kur (leaflet yalnızca tarayıcıda yüklenir)
+  useEffect(() => {
+    let cancelled = false;
+
+    import("leaflet").then((L) => {
+      if (cancelled || mapRef.current || !containerRef.current) return;
+
+      const map = L.map(containerRef.current, {
+        center: TURKEY_CENTER,
+        zoom: TURKEY_ZOOM,
+        zoomControl: false,
+        minZoom: 5,
+        maxZoom: 18,
+      });
+
+      L.tileLayer(OSM_TILES, {
+        maxZoom: 19,
+        attribution: OSM_ATTRIBUTION,
+      }).addTo(map);
+      map.on("click", () => selectRef.current(null));
+
+      leafletRef.current = L;
+      layerRef.current = L.layerGroup().addTo(map);
+      mapRef.current = map;
+      setReady(true);
     });
-  };
 
-  const handleMouseUp = () => {
-    setIsDragging(false);
-  };
+    return () => {
+      cancelled = true;
+      mapRef.current?.remove();
+      mapRef.current = null;
+      layerRef.current = null;
+      setReady(false);
+    };
+  }, []);
 
-  // Touch support for mobile
-  const handleTouchStart = (e: React.TouchEvent) => {
-    if (e.touches.length === 1) {
-      setIsDragging(true);
-      dragStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-      panStart.current = { ...pan };
+  // Pinleri (fiyat balonlarını) bas
+  useEffect(() => {
+    const L = leafletRef.current;
+    const map = mapRef.current;
+    const layer = layerRef.current;
+    if (!L || !map || !layer) return;
+
+    layer.clearLayers();
+
+    tenants.forEach((tenant) => {
+      const isSelected = selectedTenant?.id === tenant.id;
+      const coords = tenantCoords(tenant);
+      const marker = L.marker(coords, {
+        icon: L.divIcon({
+          className: "",
+          html: pinHtml(getTenantPrice(tenant), isSelected, tenant.name),
+          iconSize: [0, 0],
+          iconAnchor: [0, 0],
+        }),
+        zIndexOffset: isSelected ? 1000 : 0,
+        title: tenant.name,
+      });
+
+      marker.on("click", () => {
+        selectRef.current(tenant);
+        map.panTo(coords);
+      });
+
+      marker.addTo(layer);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenants, selectedTenant, ready]);
+
+  // Filtre değişince görünümü sonuçlara sığdır
+  useEffect(() => {
+    const L = leafletRef.current;
+    const map = mapRef.current;
+    if (!L || !map || tenants.length === 0) return;
+
+    map.fitBounds(L.latLngBounds(tenants.map((t) => tenantCoords(t))), {
+      padding: [70, 70],
+      maxZoom: 12,
+    });
+  }, [tenants, ready]);
+
+  const resetView = () => {
+    const map = mapRef.current;
+    const L = leafletRef.current;
+    if (!map || !L) return;
+    if (tenants.length > 0) {
+      map.fitBounds(L.latLngBounds(tenants.map((t) => tenantCoords(t))), {
+        padding: [70, 70],
+        maxZoom: 12,
+      });
+    } else {
+      map.setView(TURKEY_CENTER, TURKEY_ZOOM);
     }
   };
 
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (!isDragging || e.touches.length !== 1) return;
-    const dx = e.touches[0].clientX - dragStart.current.x;
-    const dy = e.touches[0].clientY - dragStart.current.y;
-    setPan({
-      x: panStart.current.x + dx,
-      y: panStart.current.y + dy,
-    });
-  };
-
-  const handleTouchEnd = () => {
-    setIsDragging(false);
-  };
-
-  const resetView = () => {
-    setZoom(1);
-    setPan({ x: 0, y: 0 });
-  };
-
-  // Map pin coordinate projector
-  const projectedTenants = useMemo(() => {
-    return tenants.map((tenant, idx) => {
-      let coords = tenant.province ? CITY_COORDS[tenant.province] : null;
-
-      if (!coords) {
-        // Deterministic hash based coords fallback
-        const hash = tenant.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-        coords = {
-          lat: 38.0 + ((hash % 100) / 100) * 3.5,
-          lng: 28.0 + (((hash * 7) % 100) / 100) * 14.0,
-        };
-      }
-
-      // Add a slight jitter if multiple tenants share city
-      const jitterX = ((idx % 5) - 2) * 1.6;
-      const jitterY = (((idx * 3) % 5) - 2) * 1.6;
-
-      // Project into percentage coordinates [0, 100]
-      const rawX = ((coords.lng - BOUNDS.minLng) / (BOUNDS.maxLng - BOUNDS.minLng)) * 100;
-      // Invert Y because latitude increases northward, but SVG/screen Y increases downward
-      const rawY = (1 - (coords.lat - BOUNDS.minLat) / (BOUNDS.maxLat - BOUNDS.minLat)) * 100;
-
-      return {
-        tenant,
-        x: Math.min(Math.max(rawX + jitterX, 5), 95),
-        y: Math.min(Math.max(rawY + jitterY, 8), 92),
-      };
-    });
-  }, [tenants]);
-
   return (
-    <div
-      className="relative w-full h-[480px] sm:h-[580px] rounded-3xl overflow-hidden select-none cursor-grab active:cursor-grabbing border border-slate-200/80 dark:border-slate-800/80 bg-[#f4f3f0] dark:bg-[#12141c] shadow-sm transition-colors"
-      onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseUp}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-    >
-      {/* Apple Maps Style Vector Canvas */}
-      <div
-        className="absolute inset-0 transition-transform duration-75 origin-center pointer-events-none"
-        style={{
-          transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-        }}
-      >
-        {/* Apple Maps Grid & Terrain Textures */}
-        <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <pattern id="apple-maps-grid" width="40" height="40" patternUnits="userSpaceOnUse">
-              <path
-                d="M 40 0 L 0 0 0 40"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="0.75"
-                className="text-slate-300/40 dark:text-slate-800/40"
-              />
-            </pattern>
-            <linearGradient id="water-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#bae6fd" stopOpacity="0.4" className="dark:stop-color-[#0f172a]" />
-              <stop offset="100%" stopColor="#e0f2fe" stopOpacity="0.6" className="dark:stop-color-[#1e293b]" />
-            </linearGradient>
-          </defs>
-
-          {/* Grid Background */}
-          <rect width="100%" height="100%" fill="url(#apple-maps-grid)" />
-
-          {/* Stylized Coastal Water Curves (Marmara / Aegean / Mediterranean / Black Sea) */}
-          <path
-            d="M 0 0 Q 300 80 600 20 T 1200 40 L 1200 0 Z"
-            fill="url(#water-gradient)"
-          />
-          <path
-            d="M 0 350 Q 80 500 200 600 L 0 600 Z"
-            fill="url(#water-gradient)"
-          />
-          <path
-            d="M 300 600 Q 600 520 900 600 L 900 600 Z"
-            fill="url(#water-gradient)"
-          />
-
-          {/* Major arterial road vector lines */}
-          <path
-            d="M 120 180 Q 320 220 500 260 T 900 320"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeDasharray="4 4"
-            className="text-amber-500/25 dark:text-amber-400/20"
-          />
-          <path
-            d="M 500 260 Q 520 380 560 480"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            className="text-indigo-400/25 dark:text-indigo-500/20"
-          />
-          <path
-            d="M 180 320 Q 300 380 480 440"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            className="text-slate-400/20 dark:text-slate-700/30"
-          />
-        </svg>
-
-        {/* Interactive Price Pill Pins (Airbnb & Apple Maps Style) */}
-        <div className="absolute inset-0 pointer-events-auto">
-          {projectedTenants.map(({ tenant, x, y }) => {
-            const isSelected = selectedTenant?.id === tenant.id;
-            const price = getTenantPrice(tenant);
-
-            return (
-              <div
-                key={tenant.id}
-                style={{
-                  left: `${x}%`,
-                  top: `${y}%`,
-                  transform: 'translate(-50%, -50%)',
-                }}
-                className={`absolute transition-transform duration-200 z-10 ${
-                  isSelected ? 'z-30 scale-110' : 'hover:scale-105'
-                }`}
-              >
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onSelectTenant(tenant);
-                  }}
-                  className={`group flex items-center gap-1.5 px-3 py-1.5 rounded-full font-bold text-xs shadow-md transition-all active:scale-95 cursor-pointer border ${
-                    isSelected
-                      ? 'bg-indigo-600 text-white border-indigo-500 shadow-indigo-500/40 ring-4 ring-indigo-500/25'
-                      : 'bg-white/95 dark:bg-slate-900/95 text-slate-900 dark:text-white border-slate-200/90 dark:border-slate-700 hover:border-indigo-400 dark:hover:border-indigo-500 hover:shadow-lg'
-                  }`}
-                >
-                  <span className="text-[11px]">₺{price}</span>
-                  {isSelected && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-                  )}
-                </button>
-
-                {/* Needle / Pin Tail */}
-                <div
-                  className={`w-0 h-0 mx-auto border-x-4 border-x-transparent border-t-4 transition-colors ${
-                    isSelected
-                      ? 'border-t-indigo-600'
-                      : 'border-t-white/95 dark:border-t-slate-900/95'
-                  }`}
-                />
-              </div>
-            );
-          })}
-        </div>
-      </div>
+    <div className="relative w-full h-[480px] sm:h-[580px] rounded-3xl overflow-hidden border border-slate-200/80 dark:border-slate-800/80 shadow-sm bg-[#f4f3f0] dark:bg-[#12141c]">
+      {/* Gerçek harita (Leaflet + OpenStreetMap) */}
+      <div ref={containerRef} className="absolute inset-0 z-0" />
 
       {/* Map Controls (Apple Maps Style Floating Glass) */}
-      <div className="absolute top-4 right-4 z-20 flex flex-col gap-2 pointer-events-auto">
+      <div className="absolute top-4 right-4 z-20 flex flex-col gap-2">
         <div className="flex flex-col rounded-2xl bg-white/85 dark:bg-slate-900/85 backdrop-blur-2xl border border-slate-200/70 dark:border-slate-800 shadow-lg overflow-hidden">
           <button
             type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              setZoom((z) => Math.min(z + 0.25, 2.2));
-            }}
+            onClick={() => mapRef.current?.zoomIn()}
             className="p-2.5 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors active:scale-90"
-            title="Yakınlaştır"
+            title={lang === "tr" ? "Yakınlaştır" : "Zoom in"}
           >
             <Plus size={18} strokeWidth={2.5} />
           </button>
           <div className="h-px bg-slate-200 dark:bg-slate-800 w-full" />
           <button
             type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              setZoom((z) => Math.max(z - 0.25, 0.75));
-            }}
+            onClick={() => mapRef.current?.zoomOut()}
             className="p-2.5 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors active:scale-90"
-            title="Uzaklaştır"
+            title={lang === "tr" ? "Uzaklaştır" : "Zoom out"}
           >
             <Minus size={18} strokeWidth={2.5} />
           </button>
@@ -321,30 +233,55 @@ export default function DiscoverMap({
 
         <button
           type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            resetView();
-          }}
+          onClick={resetView}
           className="p-2.5 rounded-2xl bg-white/85 dark:bg-slate-900/85 backdrop-blur-2xl border border-slate-200/70 dark:border-slate-800 shadow-lg text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors active:scale-90"
-          title="Merkeze Sıfırla"
+          title={lang === "tr" ? "Sonuçlara Sığdır" : "Fit results"}
         >
           <Compass size={18} strokeWidth={2.2} />
         </button>
       </div>
 
       {/* Map Header Status Badge */}
-      <div className="absolute top-4 left-4 z-20 pointer-events-auto">
+      <div className="absolute top-4 left-4 z-20">
         <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/85 dark:bg-slate-900/85 backdrop-blur-2xl border border-slate-200/70 dark:border-slate-800 shadow-md text-xs font-semibold text-slate-700 dark:text-slate-200">
           <MapPin size={14} className="text-indigo-600 dark:text-indigo-400" />
           <span>
-            {tenants.length} {lang === 'tr' ? 'işletme haritada' : 'businesses on map'}
+            {tenants.length}{" "}
+            {lang === "tr" ? "işletme haritada" : "businesses on map"}
           </span>
         </div>
+        {tenants.length > 0 && approximateCount > 0 && (
+          <p className="mt-1.5 ml-1 text-[10px] font-medium text-slate-500 dark:text-slate-400">
+            {lang === "tr"
+              ? `${approximateCount} işletme konumunu henüz işaretlemedi (il merkezinde gösteriliyor)`
+              : `${approximateCount} business(es) have no pinned location (shown at city center)`}
+          </p>
+        )}
       </div>
+
+      {/* Boş sonuç */}
+      {ready && tenants.length === 0 && (
+        <div className="absolute inset-x-4 top-1/2 -translate-y-1/2 z-20 max-w-xs mx-auto text-center px-5 py-4 rounded-2xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-3xl border border-slate-200/90 dark:border-slate-800 shadow-xl">
+          <Building2
+            size={26}
+            className="mx-auto mb-2 text-slate-300 dark:text-slate-700"
+          />
+          <p className="text-sm font-bold text-slate-700 dark:text-slate-200">
+            {lang === "tr"
+              ? "Haritada gösterilecek işletme yok"
+              : "No businesses to show on map"}
+          </p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            {lang === "tr"
+              ? "Filtreleri değiştirmeyi deneyin."
+              : "Try changing your filters."}
+          </p>
+        </div>
+      )}
 
       {/* Floating Bottom Preview Card (Airbnb / Apple Maps Style) */}
       {selectedTenant && (
-        <div className="absolute bottom-4 inset-x-4 max-w-sm sm:max-w-md mx-auto z-30 pointer-events-auto animate-in fade-in slide-in-from-bottom-4 duration-300">
+        <div className="absolute bottom-4 inset-x-4 max-w-sm sm:max-w-md mx-auto z-30 animate-in fade-in slide-in-from-bottom-4 duration-300">
           <div
             onClick={() => router.push(`/b/${selectedTenant.slug}`)}
             className="group relative bg-white/95 dark:bg-slate-900/95 backdrop-blur-3xl rounded-3xl p-3 sm:p-4 border border-slate-200/90 dark:border-slate-800 shadow-2xl hover:shadow-indigo-500/10 transition-all cursor-pointer flex gap-3.5 items-center"
@@ -358,7 +295,23 @@ export default function DiscoverMap({
               />
               <div className="absolute top-1.5 left-1.5 flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-black/50 backdrop-blur-md text-white text-[9px] font-bold">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                <span>Müsait</span>
+                <span>{lang === "tr" ? "Müsait" : "Open"}</span>
+              </div>
+
+              {/* Profil fotoğrafı */}
+              <div className="absolute bottom-1.5 left-1.5 flex h-7 w-7 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-white shadow-sm dark:border-slate-900 dark:bg-slate-800">
+                {selectedTenant.profile_image_url ? (
+                  <img
+                    src={selectedTenant.profile_image_url}
+                    alt={selectedTenant.name}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <Building2
+                    size={14}
+                    className="text-indigo-600 dark:text-indigo-400"
+                  />
+                )}
               </div>
             </div>
 
@@ -385,20 +338,38 @@ export default function DiscoverMap({
               <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5 flex items-center gap-1">
                 <MapPin size={12} className="shrink-0 text-slate-400" />
                 <span>
-                  {[selectedTenant.district, selectedTenant.province].filter(Boolean).join(', ') || 'Konum belirtilmedi'}
+                  {[
+                    selectedTenant.street,
+                    selectedTenant.building_no,
+                    selectedTenant.district,
+                    selectedTenant.province,
+                  ]
+                    .filter(Boolean)
+                    .join(", ") ||
+                    (lang === "tr" ? "Konum belirtilmedi" : "No location")}
                 </span>
               </p>
 
               <div className="mt-2 flex items-center justify-between">
                 <span className="text-xs font-extrabold text-slate-900 dark:text-white">
-                  ₺{getTenantPrice(selectedTenant)}
-                  <span className="text-[10px] font-normal text-slate-500 dark:text-slate-400 ml-1">
-                    {lang === 'tr' ? '\'den başlayan' : 'starting'}
-                  </span>
+                  {getTenantPrice(selectedTenant) != null ? (
+                    <>
+                      ₺{getTenantPrice(selectedTenant)}
+                      <span className="text-[10px] font-normal text-slate-500 dark:text-slate-400 ml-1">
+                        {lang === "tr" ? "'den başlayan" : "starting"}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500">
+                      {lang === "tr"
+                        ? "Fiyat bilgisi yok"
+                        : "Price not available"}
+                    </span>
+                  )}
                 </span>
 
                 <span className="inline-flex items-center gap-0.5 text-xs font-bold text-indigo-600 dark:text-indigo-400 group-hover:translate-x-0.5 transition-transform">
-                  <span>{lang === 'tr' ? 'Randevu Al' : 'Book'}</span>
+                  <span>{lang === "tr" ? "Randevu Al" : "Book"}</span>
                   <ChevronRight size={14} />
                 </span>
               </div>
@@ -412,7 +383,7 @@ export default function DiscoverMap({
                 onSelectTenant(null);
               }}
               className="absolute top-2.5 right-2.5 p-1.5 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
-              title="Kapat"
+              title={lang === "tr" ? "Kapat" : "Close"}
             >
               <X size={14} />
             </button>

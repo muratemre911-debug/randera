@@ -1,11 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Plus, X, Clock, Scissors, Trash2, Edit2 } from "lucide-react";
+import { useEffect, useState, useMemo } from "react";
+import { Plus, X, Clock, Scissors, Trash2, Edit2, Search } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 
 import { useLanguage } from "@/context/LanguageContext";
-import CustomSelect from "@/components/CustomSelect";
 
 interface Service {
   id: string;
@@ -16,35 +15,12 @@ interface Service {
   is_active: boolean;
 }
 
-const CATEGORIES = ["Tümü", "Saç", "Sakal", "Cilt Bakımı", "Diğer"] as const;
-type Category = typeof CATEGORIES[number];
+const CATEGORY_MARKER = /\[Kategori:\s*[^\]]+\]\s*/gi;
 
-function detectCategory(service: Service): "Saç" | "Sakal" | "Cilt Bakımı" | "Diğer" {
-  const desc = service.description || "";
-  const match = desc.match(/\[Kategori:\s*([^\]]+)\]/i);
-  if (match && match[1]) {
-    const cat = match[1].trim();
-    if (["Saç", "Sakal", "Cilt Bakımı", "Diğer"].includes(cat)) {
-      return cat as "Saç" | "Sakal" | "Cilt Bakımı" | "Diğer";
-    }
-  }
-
-  const text = `${service.name} ${desc}`.toLowerCase();
-  if (/sakal|bıyık|biyik|tıraş|tiras|beard|shave/.test(text)) {
-    return "Sakal";
-  }
-  if (/cilt|maske|bakım|bakim|peeling|masaj|kaş|kas|ağda|agda|facial|skin/.test(text)) {
-    return "Cilt Bakımı";
-  }
-  if (/saç|sac|kesim|boya|fön|fon|balyaj|röfle|rofle|keratin|perma|hair/.test(text)) {
-    return "Saç";
-  }
-  return "Diğer";
-}
-
-function getCleanDescription(desc: string | null): string {
+/** Eski kayıtlarda açıklamaya gömülmüş [Kategori: X] etiketini temizler */
+function cleanServiceDescription(desc: string | null): string {
   if (!desc) return "";
-  return desc.replace(/\[Kategori:\s*[^\]]+\]\s*/i, "").trim();
+  return desc.replace(CATEGORY_MARKER, "").trim();
 }
 
 export default function HizmetlerPage() {
@@ -56,20 +32,44 @@ export default function HizmetlerPage() {
   const [editingService, setEditingService] = useState<Service | null>(null);
   const [saving, setSaving] = useState(false);
   const [tenantId, setTenantId] = useState<string | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<Category>("Tümü");
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat(lang === "tr" ? "tr-TR" : "en-US", {
+      style: "currency",
+      currency: "TRY",
+      minimumFractionDigits: Number.isInteger(price) ? 0 : 2,
+      maximumFractionDigits: 2,
+    }).format(price);
+  };
+
+  const filteredServices = useMemo(() => {
+    if (!searchQuery.trim()) return services;
+    const q = searchQuery.toLowerCase().trim();
+    return services.filter(
+      (s) =>
+        s.name.toLowerCase().includes(q) ||
+        (s.description ?? "").toLowerCase().includes(q),
+    );
+  }, [services, searchQuery]);
 
   const [form, setForm] = useState({
     name: "",
-    category: "Saç",
     description: "",
     duration: "",
     price: "",
   });
 
   const fetchServices = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (user) {
-      const { data: profile, error: profileErr } = await supabase.from("profiles").select("tenant_id").eq("id", user.id).single();
+      const { data: profile, error: profileErr } = await supabase
+        .from("profiles")
+        .select("tenant_id")
+        .eq("id", user.id)
+        .single();
       if (profileErr) {
         alert("Profil çekilirken veritabanı hatası: " + profileErr.message);
       }
@@ -88,32 +88,37 @@ export default function HizmetlerPage() {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- veri çekme; setState çağrıları await sonrasında çalışır
     fetchServices();
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!tenantId) {
-      alert("Hata: İşletme kimliğiniz (Tenant ID) bulunamadı! Lütfen SQL kodunu başarıyla çalıştırdığınızdan emin olun.");
+      alert(
+        "Hata: İşletme kimliğiniz (Tenant ID) bulunamadı! Lütfen SQL kodunu başarıyla çalıştırdığınızdan emin olun.",
+      );
       return;
     }
     setSaving(true);
 
-    const descClean = form.description.trim();
-    const finalDescription = `[Kategori: ${form.category}]${descClean ? ` ${descClean}` : ""}`;
+    const finalDescription = form.description.trim();
 
     if (editingService) {
-      const { error } = await supabase.from("services").update({
-        name: form.name,
-        description: finalDescription,
-        duration: parseInt(form.duration),
-        price: parseFloat(form.price),
-      }).eq("id", editingService.id);
+      const { error } = await supabase
+        .from("services")
+        .update({
+          name: form.name,
+          description: finalDescription,
+          duration: parseInt(form.duration),
+          price: parseFloat(form.price),
+        })
+        .eq("id", editingService.id);
 
       if (!error) {
         setModalOpen(false);
         setEditingService(null);
-        setForm({ name: "", category: "Saç", description: "", duration: "", price: "" });
+        setForm({ name: "", description: "", duration: "", price: "" });
         fetchServices();
       } else {
         alert("Güncelleme hatası: " + error.message);
@@ -129,7 +134,7 @@ export default function HizmetlerPage() {
 
       if (!error) {
         setModalOpen(false);
-        setForm({ name: "", category: "Saç", description: "", duration: "", price: "" });
+        setForm({ name: "", description: "", duration: "", price: "" });
         fetchServices();
       } else {
         alert("Ekleme hatası: " + error.message);
@@ -140,30 +145,33 @@ export default function HizmetlerPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Bu hizmeti silmek istediğinize emin misiniz? (Mevcut randevular bu hizmeti kullanamaz hale gelebilir)")) return;
+    if (
+      !confirm(
+        "Bu hizmeti silmek istediğinize emin misiniz? (Mevcut randevular bu hizmeti kullanamaz hale gelebilir)",
+      )
+    )
+      return;
     await supabase.from("services").delete().eq("id", id);
     fetchServices();
   };
-
-  const filteredServices = services.filter((service) => {
-    if (selectedCategory === "Tümü") return true;
-    return detectCategory(service) === selectedCategory;
-  });
 
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 max-w-4xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-4xl font-extrabold tracking-tight text-gray-900 dark:text-white">{t("services.title")}</h1>
+          <h1 className="text-4xl font-extrabold tracking-tight text-gray-900 dark:text-white">
+            {t("services.title")}
+          </h1>
           <p className="mt-1 text-sm font-medium text-slate-500 dark:text-slate-400">
-            {services.length} {lang === "tr" ? "hizmet tanımlı" : "services defined"}
+            {services.length}{" "}
+            {lang === "tr" ? "hizmet tanımlı" : "services defined"}
           </p>
         </div>
         <button
           onClick={() => {
             setEditingService(null);
-            setForm({ name: "", category: "Saç", description: "", duration: "", price: "" });
+            setForm({ name: "", description: "", duration: "", price: "" });
             setModalOpen(true);
           }}
           className="flex items-center gap-2 rounded-full bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-indigo-500/30 transition-all hover:bg-indigo-500 active:scale-95"
@@ -173,129 +181,127 @@ export default function HizmetlerPage() {
         </button>
       </div>
 
-      {/* Category Tabs */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 custom-scrollbar select-none">
-        {CATEGORIES.map((cat) => {
-          const count = cat === "Tümü" 
-            ? services.length 
-            : services.filter((s) => detectCategory(s) === cat).length;
-          const isActive = selectedCategory === cat;
-          return (
+      {/* Arama Çubuğu (Hizmet varsa) */}
+      {services.length > 0 && (
+        <div className="relative">
+          <Search
+            className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+            size={18}
+          />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder={
+              lang === "tr"
+                ? "Hizmet adı veya açıklamayla ara..."
+                : "Search by service name or description..."
+            }
+            className="w-full pl-11 pr-4 py-3 rounded-2xl bg-white/70 dark:bg-slate-900/60 backdrop-blur-xl border border-slate-200/80 dark:border-slate-800 text-sm font-medium text-slate-800 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-xs transition-all"
+          />
+          {searchQuery && (
             <button
-              key={cat}
-              onClick={() => setSelectedCategory(cat)}
-              className={`flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-bold transition-all shrink-0 ${
-                isActive
-                  ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/20"
-                  : "bg-white/80 text-slate-600 hover:bg-slate-100 hover:text-slate-900 border border-slate-200/80 dark:bg-slate-900/60 dark:text-slate-400 dark:border-slate-700/80 dark:hover:bg-slate-800"
-              }`}
+              onClick={() => setSearchQuery("")}
+              className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
             >
-              <span>{cat}</span>
-              <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${
-                isActive
-                  ? "bg-white/20 text-white"
-                  : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
-              }`}>
-                {count}
-              </span>
+              <X size={16} />
             </button>
-          );
-        })}
-      </div>
+          )}
+        </div>
+      )}
 
-      {/* Compact Services List */}
-      <div className="overflow-hidden rounded-3xl bg-white/80 backdrop-blur-2xl shadow-sm dark:bg-slate-900/70 border border-slate-200 dark:border-slate-700">
-        <div className="divide-y divide-slate-100 dark:divide-slate-800/80">
-          {loading ? (
-            <div className="p-8 text-center text-sm font-medium text-gray-500 dark:text-slate-400">
-              {t("header.loading")}
-            </div>
-          ) : filteredServices.length === 0 ? (
-            <div className="p-12 text-center">
-              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 dark:bg-slate-800 mb-4">
-                <Scissors className="h-8 w-8 text-gray-400" />
-              </div>
-              <p className="text-lg font-medium text-gray-900 dark:text-white">
-                {selectedCategory === "Tümü"
-                  ? t("services.empty")
-                  : (lang === "tr" ? `Bu kategoride henüz hizmet bulunmuyor.` : `No services in this category yet.`)}
-              </p>
-              <button
-                onClick={() => {
-                  setEditingService(null);
-                  setForm({
-                    name: "",
-                    category: selectedCategory === "Tümü" ? "Saç" : selectedCategory,
-                    description: "",
-                    duration: "",
-                    price: "",
-                  });
-                  setModalOpen(true);
-                }}
-                className="mt-4 inline-flex items-center gap-2 rounded-full bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-md shadow-indigo-500/20 hover:bg-indigo-500 transition-all"
+      {/* Services Grid / Cards */}
+      {loading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {[1, 2].map((n) => (
+            <div
+              key={n}
+              className="h-44 rounded-3xl bg-white/40 dark:bg-slate-900/40 backdrop-blur-xl border border-slate-200/50 dark:border-slate-800/50 animate-pulse p-5"
+            />
+          ))}
+        </div>
+      ) : services.length === 0 ? (
+        <div className="rounded-3xl bg-white/80 dark:bg-slate-900/70 backdrop-blur-2xl border border-slate-200/80 dark:border-slate-800 p-12 text-center shadow-xs">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 mb-4 border border-indigo-100 dark:border-indigo-900/50">
+            <Scissors className="h-8 w-8" />
+          </div>
+          <p className="text-lg font-bold text-gray-900 dark:text-white">
+            {t("services.empty")}
+          </p>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-sm mx-auto">
+            {lang === "tr"
+              ? "Müşterilerinizin randevu alabilmesi için ilk hizmetinizi ekleyin."
+              : "Add your first service so customers can start booking."}
+          </p>
+          <button
+            onClick={() => {
+              setEditingService(null);
+              setForm({
+                name: "",
+                description: "",
+                duration: "",
+                price: "",
+              });
+              setModalOpen(true);
+            }}
+            className="mt-5 inline-flex items-center gap-2 rounded-full bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-indigo-500/25 hover:bg-indigo-500 active:scale-95 transition-all cursor-pointer"
+          >
+            <Plus size={18} strokeWidth={2.5} />
+            {t("btn.add")}
+          </button>
+        </div>
+      ) : filteredServices.length === 0 ? (
+        <div className="rounded-3xl bg-white/80 dark:bg-slate-900/70 backdrop-blur-2xl border border-slate-200/80 dark:border-slate-800 p-8 text-center text-slate-500">
+          {lang === "tr"
+            ? "Aramanızla eşleşen hizmet bulunamadı."
+            : "No services found matching your search."}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {filteredServices.map((service) => {
+            const cleanDesc = cleanServiceDescription(service.description);
+
+            return (
+              <div
+                key={service.id}
+                className="group relative flex flex-col justify-between rounded-3xl bg-white/85 dark:bg-slate-900/75 backdrop-blur-2xl border border-slate-200/80 dark:border-slate-800 p-5 shadow-xs hover:shadow-md hover:border-indigo-400/40 dark:hover:border-indigo-500/30 transition-all duration-200"
               >
-                <Plus size={16} />
-                {t("btn.add")}
-              </button>
-            </div>
-          ) : (
-            filteredServices.map((service) => {
-              const cat = detectCategory(service);
-              const cleanDesc = (service.description || "").replace(/\[Kategori:\s*[^\]]+\]/gi, "").trim();
-
-              return (
-                <div
-                  key={service.id}
-                  className="flex items-center justify-between py-2.5 px-4 sm:py-3 sm:px-5 hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors"
-                >
-                  <div className="flex items-center gap-3.5 min-w-0">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400 select-none">
-                      <Scissors size={20} />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-[15px] font-bold text-slate-900 dark:text-white truncate select-text">
+                {/* Üst Kısım: İkon + İsim + Aksiyon Butonları */}
+                <div>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3.5 min-w-0 flex-1">
+                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-indigo-500/10 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400 border border-indigo-500/15 group-hover:scale-105 transition-transform mt-0.5">
+                        <Scissors size={20} strokeWidth={2.2} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white leading-snug break-words">
                           {service.name}
                         </h3>
-                        <span className="shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 select-none">
-                          {cat}
-                        </span>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            {lang === "tr" ? "Aktif Hizmet" : "Active"}
+                          </span>
+                        </div>
                       </div>
-                      {cleanDesc && (
-                        <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-1 mt-0.5 select-text">
-                          {cleanDesc}
-                        </p>
-                      )}
                     </div>
-                  </div>
 
-                  <div className="flex items-center gap-4 sm:gap-6 shrink-0 ml-3">
-                    <div className="flex items-center gap-2 sm:gap-3">
-                      <div className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100/80 px-2.5 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-800/80 dark:text-slate-300 select-none">
-                        <Clock size={13} className="text-slate-400" />
-                        <span>{service.duration} {lang === "tr" ? "dk" : "min"}</span>
-                      </div>
-                      
-                      <span className="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-xs sm:text-sm font-extrabold text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800/50 shadow-xs select-text">
-                        ₺{service.price.toFixed(2)}
-                      </span>
-                    </div>
-                    
-                    <div className="flex items-center gap-1">
+                    {/* Düzenle / Sil Butonları */}
+                    <div className="flex items-center gap-1 shrink-0 bg-slate-100/70 dark:bg-slate-800/70 rounded-2xl p-1 border border-slate-200/50 dark:border-slate-700/50">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           setEditingService(service);
                           setForm({
                             name: service.name,
-                            category: cat,
                             description: cleanDesc,
                             duration: service.duration.toString(),
                             price: service.price.toString(),
                           });
                           setModalOpen(true);
                         }}
-                        className="rounded-full p-2 text-slate-400 hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-indigo-500/10 dark:hover:text-indigo-400 transition-colors"
+                        title={lang === "tr" ? "Düzenle" : "Edit"}
+                        className="rounded-xl p-2 text-slate-500 hover:bg-white hover:text-indigo-600 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-indigo-400 transition-all shadow-xs cursor-pointer"
                       >
                         <Edit2 size={16} />
                       </button>
@@ -304,18 +310,40 @@ export default function HizmetlerPage() {
                           e.stopPropagation();
                           handleDelete(service.id);
                         }}
-                        className="rounded-full p-2 text-slate-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10 dark:hover:text-red-400 transition-colors"
+                        title={lang === "tr" ? "Sil" : "Delete"}
+                        className="rounded-xl p-2 text-slate-500 hover:bg-white hover:text-red-600 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-red-400 transition-all shadow-xs cursor-pointer"
                       >
                         <Trash2 size={16} />
                       </button>
                     </div>
                   </div>
+
+                  {/* Açıklama */}
+                  {cleanDesc && (
+                    <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-3 line-clamp-2 leading-relaxed">
+                      {cleanDesc}
+                    </p>
+                  )}
                 </div>
-              );
-            })
-          )}
+
+                {/* Alt Kısım: Süre + Fiyat */}
+                <div className="mt-5 pt-4 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between gap-3">
+                  <div className="inline-flex items-center gap-1.5 rounded-xl bg-slate-100/80 dark:bg-slate-800/80 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    <Clock size={14} className="text-indigo-500" />
+                    <span>
+                      {service.duration} {lang === "tr" ? "dakika" : "minutes"}
+                    </span>
+                  </div>
+
+                  <div className="inline-flex items-center rounded-xl bg-emerald-50 dark:bg-emerald-950/40 px-3 py-1.5 text-sm sm:text-base font-black text-emerald-700 dark:text-emerald-400 border border-emerald-200/80 dark:border-emerald-800/50 shadow-xs">
+                    {formatPrice(service.price)}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
-      </div>
+      )}
 
       {/* Modal */}
       {modalOpen && (
@@ -349,18 +377,6 @@ export default function HizmetlerPage() {
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
                   className="block w-full rounded-2xl border-0 bg-white/50 px-4 py-2.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300/50 backdrop-blur-xl focus:ring-2 focus:ring-inset focus:ring-indigo-600 dark:bg-slate-800/50 dark:text-white dark:ring-slate-700/50 dark:focus:ring-indigo-500 transition-all text-sm"
                   placeholder="Örn: Saç Kesimi & Yıkama"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-1.5">
-                  {lang === "tr" ? "Kategori" : "Category"}
-                </label>
-                <CustomSelect
-                  value={form.category}
-                  onChange={(val) => setForm({ ...form, category: val })}
-                  options={["Saç", "Sakal", "Cilt Bakımı", "Diğer"]}
-                  buttonClassName="w-full flex items-center justify-between rounded-2xl border-0 bg-white/60 px-4 py-2.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300/50 backdrop-blur-xl focus:ring-2 focus:ring-inset focus:ring-indigo-600 dark:bg-slate-800/60 dark:text-white dark:ring-slate-700/50 dark:focus:ring-indigo-500 transition-all text-sm cursor-pointer"
                 />
               </div>
 

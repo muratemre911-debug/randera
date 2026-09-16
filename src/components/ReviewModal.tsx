@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect } from 'react';
-import { Star, X, CheckCircle2, Loader2, Sparkles } from 'lucide-react';
+import React, { useState, useEffect } from "react";
+import { Star, X, CheckCircle2, Loader2, Sparkles } from "lucide-react";
 
 interface ReviewModalProps {
   isOpen: boolean;
@@ -15,11 +15,11 @@ interface ReviewModalProps {
 }
 
 const RATING_LABELS: Record<number, { tr: string; en: string }> = {
-  5: { tr: 'Olağanüstü! 🌟', en: 'Outstanding! 🌟' },
-  4: { tr: 'Çok İyi 👍', en: 'Very Good 👍' },
-  3: { tr: 'İyi 🙂', en: 'Good 🙂' },
-  2: { tr: 'İdare Eder 😐', en: 'Fair 😐' },
-  1: { tr: 'Memnun Kalmadım 👎', en: 'Poor 👎' },
+  5: { tr: "Olağanüstü! 🌟", en: "Outstanding! 🌟" },
+  4: { tr: "Çok İyi 👍", en: "Very Good 👍" },
+  3: { tr: "İyi 🙂", en: "Good 🙂" },
+  2: { tr: "İdare Eder 😐", en: "Fair 😐" },
+  1: { tr: "Memnun Kalmadım 👎", en: "Poor 👎" },
 };
 
 export default function ReviewModal({
@@ -29,23 +29,25 @@ export default function ReviewModal({
   businessName,
   serviceName,
   initialRating = 5,
-  initialComment = '',
+  initialComment = "",
   onSuccess,
 }: ReviewModalProps) {
   const [rating, setRating] = useState(initialRating);
   const [hoverRating, setHoverRating] = useState(0);
   const [comment, setComment] = useState(initialComment);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [submitted, setSubmitted] = useState(false);
 
   useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect -- modal her açılışta başlangıç değerlerine sıfırlanır */
     if (isOpen) {
       setRating(initialRating || 5);
-      setComment(initialComment || '');
-      setError('');
+      setComment(initialComment || "");
+      setError("");
       setSubmitted(false);
     }
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, [isOpen, initialRating, initialComment]);
 
   if (!isOpen) return null;
@@ -53,17 +55,17 @@ export default function ReviewModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (rating < 1) {
-      setError('Lütfen en az 1 yıldız seçin.');
+      setError("Lütfen en az 1 yıldız seçin.");
       return;
     }
 
     setLoading(true);
-    setError('');
+    setError("");
 
     try {
-      const res = await fetch('/api/reviews', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           appointment_id: appointmentId,
           rating,
@@ -73,7 +75,7 @@ export default function ReviewModal({
 
       const data = await res.json();
       if (!res.ok || data.error) {
-        throw new Error(data.error || 'Değerlendirme kaydedilemedi.');
+        throw new Error(data.error || "Değerlendirme kaydedilemedi.");
       }
 
       setSubmitted(true);
@@ -81,8 +83,8 @@ export default function ReviewModal({
       setTimeout(() => {
         onClose();
       }, 1500);
-    } catch (err: any) {
-      setError(err.message || 'Bir hata oluştu.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Bir hata oluştu.");
     } finally {
       setLoading(false);
     }
@@ -92,10 +94,7 @@ export default function ReviewModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div
-        className="fixed inset-0"
-        onClick={() => !loading && onClose()}
-      />
+      <div className="fixed inset-0" onClick={() => !loading && onClose()} />
 
       <div className="relative w-full max-w-md bg-white/95 dark:bg-slate-900/95 backdrop-blur-3xl rounded-[32px] border border-white/60 dark:border-slate-800 shadow-2xl p-6 sm:p-7 overflow-hidden z-10 animate-in zoom-in-95 duration-200">
         {/* Close Button */}
@@ -117,14 +116,15 @@ export default function ReviewModal({
               Teşekkürler!
             </h3>
             <p className="text-sm font-medium text-slate-500 dark:text-slate-400 max-w-xs">
-              Değerlendirmeniz başarıyla kaydedildi ve işletme sayfasında yayınlandı.
+              Değerlendirmeniz başarıyla kaydedildi ve işletme sayfasında
+              yayınlandı.
             </p>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Header */}
             <div>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 text-xs font-bold mb-2">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--brand-soft)] bg-[var(--brand-soft)] text-[var(--brand-text)] text-[var(--brand-text)] text-xs font-bold mb-2">
                 <Sparkles size={13} />
                 <span>Deneyiminizi Paylaşın</span>
               </div>
@@ -133,7 +133,10 @@ export default function ReviewModal({
               </h3>
               {serviceName && (
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  Hizmet: <span className="font-semibold text-slate-700 dark:text-slate-300">{serviceName}</span>
+                  Hizmet:{" "}
+                  <span className="font-semibold text-slate-700 dark:text-slate-300">
+                    {serviceName}
+                  </span>
                 </p>
               )}
             </div>
@@ -162,8 +165,8 @@ export default function ReviewModal({
                         size={32}
                         className={`transition-colors duration-150 ${
                           isFilled
-                            ? 'fill-amber-400 text-amber-400 drop-shadow-[0_2px_8px_rgba(251,191,36,0.4)]'
-                            : 'text-slate-300 dark:text-slate-600'
+                            ? "fill-amber-400 text-amber-400 drop-shadow-[0_2px_8px_rgba(251,191,36,0.4)]"
+                            : "text-slate-300 dark:text-slate-600"
                         }`}
                       />
                     </button>
@@ -171,7 +174,7 @@ export default function ReviewModal({
                 })}
               </div>
               <span className="text-xs font-bold text-slate-600 dark:text-slate-300 mt-2">
-                {RATING_LABELS[currentDisplayRating]?.tr || 'Puanınızı seçin'}
+                {RATING_LABELS[currentDisplayRating]?.tr || "Puanınızı seçin"}
               </span>
             </div>
 
@@ -185,7 +188,7 @@ export default function ReviewModal({
                 onChange={(e) => setComment(e.target.value)}
                 placeholder="Personelin ilgisi, temizlik, randevu zamanlaması nasıldı? Deneyiminizi birkaç cümleyle anlatın..."
                 rows={4}
-                className="w-full p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/60 text-xs sm:text-sm font-medium text-slate-800 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all resize-none"
+                className="w-full p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/60 text-xs sm:text-sm font-medium text-slate-800 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-all resize-none"
               />
             </div>
 
@@ -202,7 +205,7 @@ export default function ReviewModal({
               <button
                 type="submit"
                 disabled={loading || rating < 1}
-                className="flex-1 py-3 px-4 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs sm:text-sm shadow-md shadow-indigo-600/20 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+                className="flex-1 py-3 px-4 rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white font-extrabold text-xs sm:text-sm shadow-md shadow-[color:var(--brand-shadow)] transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
               >
                 {loading ? (
                   <>

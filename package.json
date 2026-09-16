@@ -14,6 +14,7 @@
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.108.0",
     "date-fns": "^4.4.0",
+    "leaflet": "^1.9.4",
     "lucide-react": "^1.17.0",
     "next": "16.2.7",
     "react": "19.2.4",
@@ -21,11 +22,15 @@
     "web-push": "^3.6.7",
     "zod": "^4.5.4"
   },
-  "allowScripts": ["sharp", "unrs-resolver"],
+  "allowScripts": [
+    "sharp",
+    "unrs-resolver"
+  ],
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
+    "@types/leaflet": "^1.9.22",
     "@types/node": "^20.19.43",
     "@types/react": "^19",
     "@types/react-dom": "^19",

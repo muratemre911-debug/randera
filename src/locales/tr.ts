@@ -8,6 +8,16 @@ export const tr = {
   "nav.customers": "Müşteriler",
   "nav.settings": "Ayarlar",
   "nav.business_account": "İşletme Hesabı",
+  "nav.customer_account": "Müşteri Hesabı",
+  "nav.business_panel": "İşletme Paneli",
+  "nav.business_panel_short": "İşletme",
+  "nav.customer_area": "Müşteri Alanı",
+  "nav.go_to_business_panel": "İşletme Paneline Git",
+  "nav.return_to_business": "İşletme Paneline Dön",
+  "nav.switch_to_customer": "Müşteri Hesabına Dön",
+  "nav.upgrade_to_business": "İşletme Hesabına Geç",
+  "nav.browse_businesses": "Keşfet",
+  "nav.my_appointments": "Randevularım",
   "nav.logout": "Çıkış Yap",
 
   // Header & Notifications
@@ -37,7 +47,8 @@ export const tr = {
   "dashboard.link_copied": "Kopyalandı!",
   "dashboard.view_page": "Sayfayı Gör",
   "dashboard.qr_code": "Masa QR Kodu",
-  "dashboard.qr_desc": "Müşterileriniz bu QR kodu okutarak hemen randevu oluşturabilir.",
+  "dashboard.qr_desc":
+    "Müşterileriniz bu QR kodu okutarak hemen randevu oluşturabilir.",
   "dashboard.today_flow": "Bugünün Randevu Akışı",
   "dashboard.no_today_appointments": "Bugün için henüz randevu bulunmuyor.",
   "dashboard.mark_completed": "Tamamla",
@@ -46,7 +57,7 @@ export const tr = {
   "dashboard.completed_revenue": "Tamamlanan Ciro",
   "dashboard.projected_revenue": "Beklenen Ciro",
   "dashboard.occupancy_rate": "Günlük Doluluk",
-  
+
   // Buttons & Common
   "btn.save": "Kaydet",
   "btn.cancel": "İptal",
@@ -82,7 +93,8 @@ export const tr = {
   // Settings
   "settings.title": "Ayarlar",
   "settings.whatsapp_notifs": "WhatsApp Bildirimleri",
-  "settings.whatsapp_desc": "Müşterilere otomatik hatırlatma mesajları gönderin.",
+  "settings.whatsapp_desc":
+    "Müşterilere otomatik hatırlatma mesajları gönderin.",
   "settings.working_hours": "Çalışma Saatleri",
   "settings.working_hours_desc": "Müsait olduğunuz gün ve saatleri belirleyin.",
   "settings.active": "Aktif",
@@ -132,4 +144,137 @@ export const tr = {
   "posts.caption_placeholder": "Bu gönderi hakkında bir açıklama yazın...",
   "posts.choose_photo": "Fotoğraf seç",
   "posts.login_to_comment": "Giriş yaparak yorum yapın",
+
+  // Landing (tanıtım sayfası)
+  "landing.nav_features": "Özellikler",
+  "landing.nav_how": "Nasıl Çalışır",
+  "landing.nav_faq": "S.S.S.",
+  "landing.login": "Giriş Yap",
+  "landing.start": "Hemen Başla",
+  "landing.badge": "Yeni nesil randevu yönetimi",
+  "landing.hero_a": "İşletmeniz için",
+  "landing.hero_hl": "akıllı",
+  "landing.hero_b": "randevu sistemi",
+  "landing.hero_sub":
+    "Randera; berberden kliniğe, danışmandan stüdyoya kadar zamanla çalışan tüm işletmelerin takvimini, hizmetlerini ve müşterilerini tek panelde toplar. Müşterileriniz linke dokunup saniyeler içinde randevu alır.",
+  "landing.hero_cta": "Ücretsiz Deneyin",
+  "landing.hero_cta2": "İşletmeleri Keşfet",
+  "landing.hero_note": "14 gün ücretsiz deneme • Kurulum dakikalar sürer",
+  "landing.stat1_value": "14 gün",
+  "landing.stat1_label": "Ücretsiz deneme",
+  "landing.stat2_value": "7/24",
+  "landing.stat2_label": "Online randevu",
+  "landing.stat3_value": "TR · EN",
+  "landing.stat3_label": "Dil ve karanlık mod",
+  "landing.sectors_title": "Zamanla çalışan her işletme için",
+  "landing.sectors_sub":
+    "Sektörünüz ne olursa olsun aynı akıllı altyapı: takvim, hizmetler, müşteriler ve bildirimler.",
+  "landing.sector.barber": "Berber & Kuaför",
+  "landing.sector.clinic": "Klinik & Diş",
+  "landing.sector.consultant": "Danışmanlık",
+  "landing.sector.education": "Kurs & Eğitim",
+  "landing.sector.fitness": "Spor & Fitness",
+  "landing.sector.studio": "Güzellik Stüdyosu",
+  "landing.sector.photo": "Fotoğrafçı",
+  "landing.sector.vet": "Veteriner",
+  "landing.features_title": "Randevudan ciroya, her şey tek panelde",
+  "landing.features_sub":
+    "Kurulum, entegrasyon veya eğitim gerekmez: hesabınızı açın ve paneli kullanmaya başlayın.",
+  "landing.f1_title": "Randevu linkiniz ve QR kodu",
+  "landing.f1_desc":
+    "İşletmenize özel randevu sayfanızı paylaşın; QR kodunuzu okutan müşteri tek dokunuşla randevu oluşturur.",
+  "landing.f2_title": "Takvim ve günlük akış",
+  "landing.f2_desc":
+    "Günün randevularını saat saat görün, tamamlanan ziyaretleri tek dokunuşla işaretleyin.",
+  "landing.f3_title": "Hizmet, süre ve fiyat",
+  "landing.f3_desc":
+    "Her hizmet için süre ve fiyat tanımlayın; uygun saatler otomatik hesaplansın.",
+  "landing.f4_title": "Müşteri yönetimi",
+  "landing.f4_desc":
+    "Müşteri kayıtları, iletişim bilgileri ve randevu geçmişi tek listede.",
+  "landing.f5_title": "Anlık bildirimler",
+  "landing.f5_desc":
+    "Yeni randevu, iptal ve hatırlatmalar panelde ve tarayıcı bildirimi olarak elinizde.",
+  "landing.f6_title": "Keşfet: harita ve filtreler",
+  "landing.f6_desc":
+    "Müşteriler işletmeleri haritada bulur; il, ilçe, sektör ve müsaitliğe göre filtreler.",
+  "landing.f7_title": "Değerlendirmeler ve gönderiler",
+  "landing.f7_desc":
+    "Puanlar, yorumlar, beğeniler ve paylaşımlar işletme sayfanızı canlı tutar.",
+  "landing.f8_title": "Ciro ve doluluk",
+  "landing.f8_desc":
+    "Tamamlanan ve beklenen ciro ile günlük doluluğunuzu anlık takip edin.",
+  "landing.how_title": "Üç adımda hazır",
+  "landing.how_sub":
+    "Teknik bilgi gerekmez; hesabınızı açıp randevu linkinizi paylaşmanız yeterli.",
+  "landing.s1_title": "Hesabınızı açın",
+  "landing.s1_desc":
+    "14 gün ücretsiz denemeyle başlayın, işletme bilgilerinizi girin.",
+  "landing.s2_title": "Hizmet ve saatlerinizi ayarlayın",
+  "landing.s2_desc":
+    "Hizmetlerinizi, sürelerini ve çalışma saatlerinizi tanımlayın.",
+  "landing.s3_title": "Linkinizi paylaşın",
+  "landing.s3_desc":
+    "Randevu linkinizi veya QR kodunuzu paylaşın; randevular takviminize düşsün.",
+  "landing.roles_title": "Kimler için?",
+  "landing.roles_sub":
+    "İki taraf, tek deneyim: işletmeniz yönetir, müşteriniz saniyeler içinde randevu alır.",
+  "landing.biz_title": "İşletmeler",
+  "landing.biz_desc":
+    "Kendi randevu takviminizi yönetin, hizmetlerinizi listeleyin ve çalışma saatlerinizi belirleyin.",
+  "landing.biz_b1":
+    "Hizmetlerinizi, sürelerini ve fiyatlarını tek yerden yönetin",
+  "landing.biz_b2":
+    "Çalışma saatlerinizi ve müsaitliğinizi kendiniz belirleyin",
+  "landing.biz_b3": "Ciro, doluluk ve yaklaşan randevuları tek ekranda görün",
+  "landing.biz_b4": "Müşteri puanları ve yorumlarla itibarınızı büyütün",
+  "landing.biz_cta": "İşletmemi kur",
+  "landing.cust_title": "Müşteriler",
+  "landing.cust_desc":
+    "İstediğiniz işletmeden saniyeler içinde randevu alın. Yaklaşan ve geçmiş randevularınızı takip edin.",
+  "landing.cust_b1": "Haritada ve filtrelerle size en uygun işletmeyi bulun",
+  "landing.cust_b2":
+    "Favorilerinizi kaydedin, tek dokunuşla yeniden randevu alın",
+  "landing.cust_b3": "Yaklaşan ve geçmiş randevularınızı tek yerden takip edin",
+  "landing.cust_b4": "Deneyiminizi puanlayın, yorumunuzu paylaşın",
+  "landing.cust_cta": "İşletmeleri keşfet",
+  "landing.faq_title": "Sıkça sorulan sorular",
+  "landing.faq_sub": "En çok merak edilenler.",
+  "landing.q1": "Deneme süresi var mı?",
+  "landing.a1":
+    "Evet. İşletme hesabınız 14 gün boyunca ücretsiz deneme olarak açılır ve bu sürede tüm özellikleri kullanabilirsiniz.",
+  "landing.q2": "Kurulum ne kadar sürer?",
+  "landing.a2":
+    "Hesabınızı açtıktan sonra hizmetlerinizi ve çalışma saatlerinizi girip randevu linkinizi paylaşmanız yeterli; bu işlem dakikalar alır.",
+  "landing.q3": "Müşterilerim randevuyu nasıl alıyor?",
+  "landing.a3":
+    "Randevu linkinizi veya QR kodunuzu paylaşırsınız. Müşteriniz hizmeti ve uygun saati seçer; randevu anında takviminize düşer.",
+  "landing.q4": "Sektörüm için uygun mu?",
+  "landing.a4":
+    "Randera zaman tabanlı hizmet veren tüm işletmeler için tasarlandı: berber ve kuaförler, klinikler, danışmanlar, kurslar, stüdyolar ve daha fazlası.",
+  "landing.q5": "Uygulama indirmem gerekiyor mu?",
+  "landing.a5":
+    "Hayır. Randera tarayıcıda çalışır; telefon, tablet ve bilgisayardan aynı hesapla kullanabilirsiniz.",
+  "landing.band_title": "Randevu defterini kapatma zamanı",
+  "landing.band_sub":
+    "Randera ile randevularınızı tek panelden yönetin, müşterilerinize modern bir deneyim sunun.",
+  "landing.band_note": "14 gün ücretsiz • Kurulum dakikalar sürer",
+  "landing.footer_tagline":
+    "Randevu ile çalışan işletmeler için akıllı işletme yönetim sistemi.",
+  "landing.footer_product": "Ürün",
+  "landing.footer_legal": "Yasal",
+  "landing.footer_discover": "İşletmeleri Keşfet",
+  "landing.footer_register": "İşletme Hesabı Aç",
+  "landing.footer_privacy": "Gizlilik Politikası",
+  "landing.footer_terms": "Kullanım Koşulları",
+  "landing.footer_rights": "Tüm hakları saklıdır.",
+  "landing.mock_open": "Açık",
+  "landing.mock_today": "Bugün",
+  "landing.mock_service1": "Saç Kesimi · 30 dk",
+  "landing.mock_service2": "Sakal · 15 dk",
+  "landing.mock_service3": "Bakım · 45 dk",
+  "landing.mock_slots": "Uygun saatler",
+  "landing.mock_confirm": "Randevuyu Onayla",
+  "landing.mock_new_title": "Yeni randevu alındı",
+  "landing.mock_new_sub": "14:30 · Saç Kesimi",
 };
