@@ -271,7 +271,7 @@ export default function IceriklerPage() {
                   onChange={(e) => setDescription(e.target.value)}
                   rows={3}
                   placeholder={lang === "tr" ? "Bu çalışma veya model hakkında açıklama ekleyin..." : "Write a description..."}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-white resize-none"
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-white dark:focus:bg-slate-800 resize-none"
                 />
               </div>
 

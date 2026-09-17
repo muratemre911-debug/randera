@@ -145,7 +145,7 @@ export default function GecmisRandevularPage() {
                   badge: `₺${s.price}`,
                 })),
               ]}
-              buttonClassName="w-full flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-white transition-all cursor-pointer"
+              buttonClassName="w-full flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-white dark:focus:bg-slate-800 transition-all cursor-pointer"
               placeholder={lang === "tr" ? "Tüm Hizmetler" : "All Services"}
               searchPlaceholder={lang === "tr" ? "Hizmet ara..." : "Search services..."}
             />
@@ -159,7 +159,7 @@ export default function GecmisRandevularPage() {
               type="date"
               value={filterFrom}
               onChange={(e) => setFilterFrom(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-white"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-white dark:focus:bg-slate-800"
             />
           </div>
 
@@ -171,7 +171,7 @@ export default function GecmisRandevularPage() {
               type="date"
               value={filterTo}
               onChange={(e) => setFilterTo(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-white"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-white dark:focus:bg-slate-800"
             />
           </div>
 

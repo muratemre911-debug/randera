@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import dynamic from "next/dynamic";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
 import {
@@ -22,38 +21,16 @@ import DynamicLogoLink from "@/components/DynamicLogoLink";
 import RequirePhoneModal from "@/components/RequirePhoneModal";
 import { SHELL } from "@/components/layout/shell";
 import UserAvatar, { getDisplayName } from "@/components/layout/UserAvatar";
-import CustomerTabs, {
-  type CustomerTab,
-} from "@/components/customer/CustomerTabs";
 import CustomerBottomNav, {
   type BottomNavItem,
 } from "@/components/customer/CustomerBottomNav";
 import { preventFocusScroll } from "@/lib/preventFocusScroll";
 
-// Sekme sayfaları tembel yüklenir: sadece ekrandaki (ve mobilde yandaki) sekme indirilir
-const DiscoverPage = dynamic(() => import("@/app/(customer)/discover/page"));
-const FavoritesPage = dynamic(() => import("@/app/(customer)/favorites/page"));
-const MyAppointmentsPage = dynamic(
-  () => import("@/app/(customer)/my-appointments/page"),
-);
-const ProfilePage = dynamic(() => import("@/app/(customer)/profile/page"));
-
-// Alt menü öğeleri hem sidebar/bottom nav ikonlarını hem de rayın sayfasını taşır
-const customerNavItems: (CustomerTab & Omit<BottomNavItem, "href">)[] = [
-  { href: "/discover", icon: Search, label: "Keşfet", Page: DiscoverPage },
-  {
-    href: "/favorites",
-    icon: Heart,
-    label: "Favorilerim",
-    Page: FavoritesPage,
-  },
-  {
-    href: "/my-appointments",
-    icon: Calendar,
-    label: "Randevularım",
-    Page: MyAppointmentsPage,
-  },
-  { href: "/profile", icon: User, label: "Profilim", Page: ProfilePage },
+const navItems: BottomNavItem[] = [
+  { href: "/discover", icon: Search, label: "Keşfet" },
+  { href: "/favorites", icon: Heart, label: "Favorilerim" },
+  { href: "/my-appointments", icon: Calendar, label: "Randevularım" },
+  { href: "/profile", icon: User, label: "Profilim" },
 ];
 
 export default function CustomerLayout({
@@ -76,11 +53,6 @@ export default function CustomerLayout({
 
   // Business owners / staff can also use the customer area; return button is at bottom of sidebar
   const isBusinessAccount = userRole === "owner" || userRole === "staff";
-  const navItems = customerNavItems;
-  // Sekme sayfaları yatay rayda (kaydırmalı geçiş) gösterilir; diğer sayfalar (ör. /b/[slug]) normal render edilir
-  const isTabRoute = customerNavItems.some((item) =>
-    pathname.startsWith(item.href),
-  );
 
   useEffect(() => {
     const getUser = async () => {
@@ -308,17 +280,13 @@ export default function CustomerLayout({
           </div>
         </header>
 
-        {isTabRoute ? (
-          <CustomerTabs tabs={customerNavItems} />
-        ) : (
-          <main
-            ref={mainRef}
-            className={SHELL.main}
-            onMouseDown={preventFocusScroll}
-          >
-            {children}
-          </main>
-        )}
+        <main
+          ref={mainRef}
+          className={SHELL.main}
+          onMouseDown={preventFocusScroll}
+        >
+          {children}
+        </main>
       </div>
 
       {/* Mobile Bottom Navigation Bar (Instagram / TikTok / YouTube style) */}

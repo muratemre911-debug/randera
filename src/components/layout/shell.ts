@@ -28,24 +28,6 @@ export const SHELL = {
  main:
   "flex-1 min-h-0 rounded-2xl sm:rounded-[28px] bg-white/70 dark:bg-slate-900/60 backdrop-blur-3xl border border-white/50 dark:border-slate-800/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] overflow-y-auto overflow-x-hidden overscroll-y-contain custom-scrollbar p-3 sm:p-6 md:p-8 pb-24 sm:pb-24 lg:pb-8 pr-2.5 sm:pr-4 relative z-0",
 
- /**
-  * Müşteri alanında sekmeler arası kaydırmalı geçişte kullanılan içerik kartı.
-  * Dikey kaydırma ve iç boşluklar artık sekme sayfalarına (`pane`) aittir.
-  */
- mainPaged:
-  "flex-1 min-h-0 rounded-2xl sm:rounded-[28px] bg-white/70 dark:bg-slate-900/60 backdrop-blur-3xl border border-white/50 dark:border-slate-800/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] overflow-clip overscroll-none relative z-0",
-
- /** Yatay sekme rayı: parmakla sağa/sola kaydırma + sayfaya oturma (snap) */
- track:
-  "flex h-full w-full overflow-x-auto overflow-y-hidden snap-x snap-mandatory scrollbar-none",
-
- /**
-  * Tek bir sekme sayfası (kendi dikey kaydırması ve iç boşlukları vardır).
-  * `snap-always`: tek parmak hareketi en fazla bir sekme ilerler.
-  */
- pane:
-  "w-full h-full shrink-0 snap-center snap-always overflow-y-auto overflow-x-hidden overscroll-y-contain custom-scrollbar p-3 sm:p-6 md:p-8 pb-24 lg:pb-8 pr-2.5 sm:pr-4",
-
  /** Mobil alt navigasyon çubuğu */
  bottomNav:
   "fixed bottom-0 inset-x-0 z-40 lg:hidden bg-white/85 dark:bg-slate-900/85 backdrop-blur-2xl border-t border-gray-200/80 dark:border-slate-800/80 shadow-[0_-4px_25px_rgba(0,0,0,0.06)] dark:shadow-[0_-4px_25px_rgba(0,0,0,0.4)] pb-[max(env(safe-area-inset-bottom),0.6rem)] pt-1.5 px-3 select-none",

@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { act, render } from "@testing-library/react";
+import { render } from "@testing-library/react";
 import CustomerBottomNav from "./CustomerBottomNav";
-import { emitTabScroll } from "@/lib/tabSwipe";
 
 const nav = vi.hoisted(() => ({ pathname: "/discover" }));
 
@@ -25,23 +24,16 @@ describe("CustomerBottomNav", () => {
     nav.pathname = "/discover";
   });
 
-  it("ray yarım kaydırıldığında vurgu komşu sekmeye geçer", () => {
-    const { container } = render(<CustomerBottomNav tabs={tabs} />);
-    expect(links(container)[0].className).toContain("font-extrabold");
-
-    act(() => emitTabScroll(0.6)); // parmak yarıyı geçti
-
-    expect(links(container)[0].className).toContain("font-medium");
-    expect(links(container)[1].className).toContain("font-extrabold");
-    expect(links(container)[2].className).toContain("font-medium");
-  });
-
-  it("ray henüz yarıma gelmediyse vurgu yerinde kalır", () => {
-    const { container } = render(<CustomerBottomNav tabs={tabs} />);
-    act(() => emitTabScroll(0.4));
-
+  it("geçerli yola göre ilgili sekme aktif vurgulanır", () => {
+    nav.pathname = "/discover";
+    const { container, rerender } = render(<CustomerBottomNav tabs={tabs} />);
     expect(links(container)[0].className).toContain("font-extrabold");
     expect(links(container)[1].className).toContain("font-medium");
+
+    nav.pathname = "/favorites";
+    rerender(<CustomerBottomNav tabs={tabs} />);
+    expect(links(container)[0].className).toContain("font-medium");
+    expect(links(container)[1].className).toContain("font-extrabold");
   });
 
   it("sekme olmayan sayfada (/b/[slug]) hiçbiri aktif görünmez", () => {

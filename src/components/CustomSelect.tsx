@@ -235,14 +235,18 @@ export default function CustomSelect({
         onClick={toggleOpen}
         className={
           buttonClassName ||
-          `w-full flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-[15px] font-medium text-slate-900 transition-all hover:border-slate-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-white dark:hover:border-slate-600 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none select-none`
+          `w-full flex items-center justify-between rounded-2xl border bg-slate-50/80 px-4 py-3 text-[15px] font-medium text-slate-900 transition-all hover:border-slate-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:bg-slate-800/60 dark:text-white dark:hover:border-slate-600 dark:focus:bg-slate-800 dark:focus:border-indigo-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none select-none ${
+            isOpen
+              ? "border-indigo-500 ring-2 ring-indigo-500/20 bg-white dark:bg-slate-800 dark:border-indigo-500"
+              : "border-slate-200 dark:border-slate-700"
+          }`
         }
       >
         <div className="flex items-center gap-2 truncate mr-2 min-w-0">
           <span
             className={`truncate ${
               !selectedOption
-                ? "text-slate-400 dark:text-slate-500 font-normal"
+                ? "text-slate-400 dark:text-slate-400 font-normal"
                 : "text-slate-900 dark:text-white font-medium"
             }`}
           >
@@ -254,7 +258,7 @@ export default function CustomSelect({
             </span>
           )}
           {selectedOption?.sublabel && (
-            <span className="text-xs text-slate-400 dark:text-slate-500 shrink-0 font-normal">
+            <span className="text-xs text-slate-400 dark:text-slate-400 shrink-0 font-normal">
               ({selectedOption.sublabel})
             </span>
           )}

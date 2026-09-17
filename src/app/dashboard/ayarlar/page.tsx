@@ -777,7 +777,7 @@ export default function AyarlarPage() {
                           setProfile({ ...profile, name: e.target.value })
                         }
                         placeholder="Örn: Kuaför Ahmet"
-                        className="w-full rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-[15px] font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-white transition-all"
+                        className="w-full rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-[15px] font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-white dark:focus:bg-slate-800 transition-all"
                       />
                     </div>
 
@@ -792,7 +792,7 @@ export default function AyarlarPage() {
                           setProfile({ ...profile, phone: e.target.value })
                         }
                         placeholder="05XX XXX XX XX"
-                        className="w-full rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-[15px] font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-white transition-all"
+                        className="w-full rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-[15px] font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-white dark:focus:bg-slate-800 transition-all"
                       />
                     </div>
 
@@ -807,7 +807,7 @@ export default function AyarlarPage() {
                           setProfile({ ...profile, email: e.target.value })
                         }
                         placeholder="info@isletme.com"
-                        className="w-full rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-[15px] font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-white transition-all"
+                        className="w-full rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-[15px] font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-white dark:focus:bg-slate-800 transition-all"
                       />
                     </div>
                   </div>
@@ -836,7 +836,7 @@ export default function AyarlarPage() {
                           setProfile({ ...profile, address: e.target.value })
                         }
                         placeholder="Müşterilerin sizi kolayca bulabileceği ek tarif (kat, daire, avm içi, yol tarifi...)"
-                        className="w-full rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-[15px] font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-white transition-all resize-none"
+                        className="w-full rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-[15px] font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-white dark:focus:bg-slate-800 transition-all resize-none"
                       />
                     </div>
 
@@ -854,7 +854,7 @@ export default function AyarlarPage() {
                           })
                         }
                         placeholder="İşletmeniz, ekibiniz ve sunduğunuz deneyim hakkında müşterileri bilgilendirin..."
-                        className="w-full rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-[15px] font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-white transition-all resize-none"
+                        className="w-full rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-[15px] font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-white dark:focus:bg-slate-800 transition-all resize-none"
                       />
                     </div>
                   </div>
@@ -1361,7 +1361,7 @@ export default function AyarlarPage() {
                             : "Önce ilçe seçin"
                         }
                         disabled={!district}
-                        className="w-full rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-[15px] font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-white transition-all disabled:opacity-60"
+                        className="w-full rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-[15px] font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-white dark:focus:bg-slate-800 transition-all disabled:opacity-60"
                       />
                       <datalist id="neighborhood-options">
                         {neighborhoods.map((n) => (
@@ -1379,7 +1379,7 @@ export default function AyarlarPage() {
                         value={street}
                         onChange={(e) => setStreet(e.target.value)}
                         placeholder="örn: Bağdat Caddesi"
-                        className="w-full rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-[15px] font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-white transition-all"
+                        className="w-full rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-[15px] font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-white dark:focus:bg-slate-800 transition-all"
                       />
                     </div>
                   </div>
@@ -1394,7 +1394,7 @@ export default function AyarlarPage() {
                         value={buildingNo}
                         onChange={(e) => setBuildingNo(e.target.value)}
                         placeholder="12/A"
-                        className="w-full rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-[15px] font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-white transition-all"
+                        className="w-full rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-[15px] font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-white dark:focus:bg-slate-800 transition-all"
                       />
                     </div>
 
