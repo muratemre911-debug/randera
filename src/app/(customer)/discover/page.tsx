@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { createClient } from "@/utils/supabase/client";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useLanguage } from "@/context/LanguageContext";
 import {
   Building2,
@@ -21,6 +21,7 @@ import {
   Check,
 } from "lucide-react";
 import citiesData from "@/lib/cities.json";
+import SafeImage from "@/components/SafeImage";
 import { formatFullAddress } from "@/lib/address";
 import { matchesPriceRange, parsePrice } from "@/lib/price";
 import { isDiscoverable } from "@/lib/membership";
@@ -55,7 +56,6 @@ const SECTOR_IMAGES: Record<string, string> = {
 
 export default function DiscoverPage() {
   const supabase = createClient();
-  const router = useRouter();
   const { lang } = useLanguage();
 
   const [tenants, setTenants] = useState<TenantWithDetails[]>([]);
@@ -213,14 +213,18 @@ export default function DiscoverPage() {
   };
 
   // Kapak görseli çözümleme
-  const getCoverImage = (tenant: TenantWithDetails) => {
-    if (tenant.cover_image_url) return tenant.cover_image_url;
-    if (tenant.profile_image_url) return tenant.profile_image_url;
+  const getSectorImage = (tenant: TenantWithDetails) => {
     const sectorKey = tenant.sector?.toLowerCase() || "";
     for (const [key, img] of Object.entries(SECTOR_IMAGES)) {
       if (sectorKey.includes(key)) return img;
     }
     return SECTOR_IMAGES.default;
+  };
+
+  const getCoverImage = (tenant: TenantWithDetails) => {
+    if (tenant.cover_image_url) return tenant.cover_image_url;
+    if (tenant.profile_image_url) return tenant.profile_image_url;
+    return getSectorImage(tenant);
   };
 
   // Sektör adını çöz
@@ -607,13 +611,25 @@ export default function DiscoverPage() {
                   return (
                     <div
                       key={tenant.id}
-                      onClick={() => router.push(`/b/${tenant.slug}`)}
-                      className="group bg-white/70 dark:bg-slate-900/60 backdrop-blur-3xl rounded-[28px] border border-slate-200/70 dark:border-slate-800/70 shadow-sm hover:shadow-xl hover:-translate-y-1 hover:border-slate-300/90 dark:hover:border-slate-700/90 transition-all duration-300 cursor-pointer overflow-hidden flex flex-col"
+                      className="group relative bg-white/70 dark:bg-slate-900/60 backdrop-blur-3xl rounded-[28px] border border-slate-200/70 dark:border-slate-800/70 shadow-sm hover:shadow-xl hover:-translate-y-1 hover:border-slate-300/90 dark:hover:border-slate-700/90 transition-all duration-300 cursor-pointer overflow-hidden flex flex-col"
                     >
+                      {/*
+                        Kartın tamamı GERÇEK bir bağlantıdır (stretched link):
+                        klavye ile odaklanabilir, uzun basıp/ctrl ile yeni
+                        sekmede açılabilir, ekran okuyucu bağlantı olarak
+                        duyurur. Önceden `<div onClick>` idi ve bu yolların
+                        hiçbiri çalışmıyordu. Favori butonu z-10 ile üstte
+                        kaldığı için kendi tıklamasını almaya devam eder.
+                      */}
+                      <Link
+                        href={`/b/${tenant.slug}`}
+                        aria-label={tenant.name}
+                        className="absolute inset-0 z-[1] rounded-[28px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand)]"
+                      />
                       {/* Kapak Görseli (Airbnb Tarzı aspect-video) */}
                       <div className="relative aspect-video w-full overflow-hidden bg-slate-100 dark:bg-slate-800">
                         {/* Sol Üst: 'Bugün Müsait' Rozeti */}
-                        <div className="absolute top-3 left-3 z-10 flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/45 dark:bg-black/60 backdrop-blur-md text-white text-[11px] font-bold border border-white/20 shadow-xs">
+                        <div className="pointer-events-none absolute top-3 left-3 z-10 flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/45 dark:bg-black/60 backdrop-blur-md text-white text-[11px] font-bold border border-white/20 shadow-xs">
                           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                           <span>
                             {lang === "tr" ? "Bugün Müsait" : "Available Today"}
@@ -645,14 +661,21 @@ export default function DiscoverPage() {
                         </button>
 
                         {/* Sağ Alt: Sektör Etiketi (sol alt profil fotoğrafına ayrıldı) */}
-                        <div className="absolute bottom-3 right-3 z-10 px-2.5 py-0.5 rounded-full bg-white/90 dark:bg-slate-900/90 backdrop-blur-md text-slate-800 dark:text-slate-100 text-[11px] font-bold shadow-xs">
+                        <div className="pointer-events-none absolute bottom-3 right-3 z-10 px-2.5 py-0.5 rounded-full bg-white/90 dark:bg-slate-900/90 backdrop-blur-md text-slate-800 dark:text-slate-100 text-[11px] font-bold shadow-xs">
                           {sectorLabel}
                         </div>
 
                         {/* Görsel */}
-                        <img
+                        <SafeImage
                           src={coverImage}
                           alt={tenant.name}
+                          fallbackSrc={getSectorImage(tenant)}
+                          fallbackIcon={
+                            <Building2
+                              size={40}
+                              className="text-indigo-400/70"
+                            />
+                          }
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
                         />
                       </div>
@@ -660,20 +683,19 @@ export default function DiscoverPage() {
                       {/* Kart Bilgileri (Airbnb Hiyerarşisi) */}
                       <div className="p-5 pt-0 flex flex-col flex-1">
                         {/* Profil Fotoğrafı: kapak görselinden taşan avatar */}
-                        <div className="relative z-20 -mt-8 mb-3 flex items-end">
+                        <div className="pointer-events-none relative z-20 -mt-8 mb-3 flex items-end">
                           <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border-4 border-white bg-white shadow-md dark:border-slate-900 dark:bg-slate-800">
-                            {tenant.profile_image_url ? (
-                              <img
-                                src={tenant.profile_image_url}
-                                alt={tenant.name}
-                                className="h-full w-full object-cover"
-                              />
-                            ) : (
-                              <Building2
-                                size={26}
-                                className="text-indigo-600 dark:text-indigo-400"
-                              />
-                            )}
+                            <SafeImage
+                              src={tenant.profile_image_url}
+                              alt={tenant.name}
+                              className="h-full w-full object-cover"
+                              fallbackIcon={
+                                <Building2
+                                  size={26}
+                                  className="text-indigo-600 dark:text-indigo-400"
+                                />
+                              }
+                            />
                           </div>
                         </div>
 

@@ -16,6 +16,8 @@ import {
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useLanguage } from "@/context/LanguageContext";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import InlineAlert from "@/components/ui/InlineAlert";
 import {
   buildWhatsAppInviteUrl,
   sortStaffOwnerFirst,
@@ -43,6 +45,12 @@ export default function EkipPage() {
   const [invites, setInvites] = useState<Invite[]>([]);
   const [creating, setCreating] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  /** İşlem hataları: `alert()` yerine sayfa içinde gösterilir. */
+  const [pageError, setPageError] = useState<string | null>(null);
+  /** Üye çıkarma onayı: `confirm()` yerine uygulama içi diyalog. */
+  const [pendingRemove, setPendingRemove] = useState<StaffMember | null>(null);
+  /** Davet iptali onayı (id). */
+  const [pendingRevoke, setPendingRevoke] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   // Link paylaşılır (WhatsApp/başka cihaz): origin sadece yedek, localhost paylaşılamaz.
@@ -92,7 +100,7 @@ export default function EkipPage() {
         .from("profiles")
         .select("role, tenant_id")
         .eq("id", user.id)
-        .single();
+        .maybeSingle();
 
       if (!profile?.tenant_id || profile.role !== "owner") {
         setAuthorized(false);
@@ -102,11 +110,13 @@ export default function EkipPage() {
 
       setTenantId(profile.tenant_id);
 
+      // `maybeSingle()`: işletme silinmişse veya RLS satırı gizliyorsa 0 satır
+      // dönmesi hata olmamalı (PostgREST 406 üretiyordu).
       const { data: tenant } = await supabase
         .from("tenants")
         .select("name")
         .eq("id", profile.tenant_id)
-        .single();
+        .maybeSingle();
 
       setTenantName(tenant?.name ?? "Randera");
 
@@ -140,7 +150,7 @@ export default function EkipPage() {
       .single();
 
     if (error) {
-      alert(
+      setPageError(
         (lang === "tr"
           ? "Davet oluşturulamadı: "
           : "Could not create invite: ") + error.message,
@@ -153,15 +163,7 @@ export default function EkipPage() {
   };
 
   const handleRevoke = async (id: string) => {
-    if (
-      !confirm(
-        lang === "tr"
-          ? "Bu davet linkini iptal etmek istiyor musunuz? Link artık çalışmayacak."
-          : "Revoke this invite link? It will stop working.",
-      )
-    )
-      return;
-
+    setPendingRevoke(null);
     setBusyId(id);
     const { error } = await supabase
       .from("staff_invites")
@@ -178,20 +180,16 @@ export default function EkipPage() {
       setCopiedId(id);
       setTimeout(() => setCopiedId(null), 2000);
     } catch {
-      alert(lang === "tr" ? "Kopyalanamadı." : "Copy failed.");
+      setPageError(
+        lang === "tr"
+          ? "Bağlantı kopyalanamadı. Lütfen elle seçip kopyalayın."
+          : "Could not copy the link. Please select and copy it manually.",
+      );
     }
   };
 
   const handleRemoveMember = async (member: StaffMember) => {
-    if (
-      !confirm(
-        lang === "tr"
-          ? `${member.full_name ?? "Bu eleman"} ekibinizden çıkarılsın mı? Hizmetleri işletme sahibine devredilir.`
-          : `Remove ${member.full_name ?? "this member"} from your team? Their services will move to the business owner.`,
-      )
-    )
-      return;
-
+    setPendingRemove(null);
     setBusyId(member.id);
 
     // Hizmetler sahipsiz kalmasın: işletme sahibine devret
@@ -208,7 +206,7 @@ export default function EkipPage() {
       .eq("id", member.id);
 
     if (error) {
-      alert(
+      setPageError(
         (lang === "tr" ? "Çıkarılamadı: " : "Could not remove: ") +
           error.message,
       );
@@ -245,6 +243,41 @@ export default function EkipPage() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-6 pb-12 w-full min-w-0">
+      {pageError && (
+        <InlineAlert kind="error" onDismiss={() => setPageError(null)}>
+          {pageError}
+        </InlineAlert>
+      )}
+      <ConfirmDialog
+        open={pendingRemove !== null}
+        destructive
+        loading={busyId !== null}
+        title={lang === "tr" ? "Ekipten çıkar" : "Remove from team"}
+        message={
+          lang === "tr"
+            ? `${pendingRemove?.full_name ?? "Bu eleman"} ekibinizden çıkarılsın mı? Hizmetleri işletme sahibine devredilir.`
+            : `Remove ${pendingRemove?.full_name ?? "this member"}? Their services will move to the business owner.`
+        }
+        confirmLabel={lang === "tr" ? "Çıkar" : "Remove"}
+        cancelLabel={lang === "tr" ? "Vazgeç" : "Cancel"}
+        onConfirm={() => pendingRemove && handleRemoveMember(pendingRemove)}
+        onCancel={() => setPendingRemove(null)}
+      />
+      <ConfirmDialog
+        open={pendingRevoke !== null}
+        destructive
+        loading={busyId !== null}
+        title={lang === "tr" ? "Daveti iptal et" : "Revoke invite"}
+        message={
+          lang === "tr"
+            ? "Bu davet bağlantısı iptal edilsin mi? Bağlantı artık çalışmayacak."
+            : "Revoke this invite link? It will stop working."
+        }
+        confirmLabel={lang === "tr" ? "İptal Et" : "Revoke"}
+        cancelLabel={lang === "tr" ? "Vazgeç" : "Cancel"}
+        onConfirm={() => pendingRevoke && handleRevoke(pendingRevoke)}
+        onCancel={() => setPendingRevoke(null)}
+      />
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between w-full min-w-0">
         <div>
@@ -332,7 +365,7 @@ export default function EkipPage() {
 
                 {!isOwner && (
                   <button
-                    onClick={() => handleRemoveMember(member)}
+                    onClick={() => setPendingRemove(member)}
                     disabled={busyId === member.id}
                     title={lang === "tr" ? "Ekipten çıkar" : "Remove from team"}
                     className="rounded-xl p-2 text-slate-400 transition-colors hover:bg-white hover:text-red-600 disabled:opacity-40 dark:hover:bg-slate-800 dark:hover:text-red-400 shrink-0"
@@ -432,7 +465,7 @@ export default function EkipPage() {
                     </a>
 
                     <button
-                      onClick={() => handleRevoke(invite.id)}
+                      onClick={() => setPendingRevoke(invite.id)}
                       disabled={busyId === invite.id}
                       title={lang === "tr" ? "İptal et" : "Revoke"}
                       className="rounded-2xl border border-slate-200 bg-white p-2 text-slate-400 transition-colors hover:text-red-600 disabled:opacity-40 dark:border-slate-700 dark:bg-slate-800 dark:hover:text-red-400 shrink-0"

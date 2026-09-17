@@ -75,7 +75,7 @@ export default function RequirePhoneModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-300">
+    <div data-no-swipe className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-300">
       <div
         className="w-full max-w-md bg-white dark:bg-slate-900 rounded-[32px] p-6 sm:p-8 shadow-2xl border border-white/60 dark:border-slate-800 text-center space-y-5 animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}

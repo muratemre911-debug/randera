@@ -9,13 +9,13 @@ export default function TermsPage() {
   const isTr = lang === "tr";
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200">
+    <div className="page-fill bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200">
       {/* Header */}
       <header className="sticky top-0 z-30 border-b border-gray-200/80 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md">
         <div className="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
           <Link
             href="/"
-            className="flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+            className="flex min-h-6 items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
           >
             <ArrowLeft size={18} />
             <span>{isTr ? "Ana Sayfaya Dön" : "Back to Home"}</span>
@@ -110,10 +110,10 @@ export default function TermsPage() {
         <div className="max-w-4xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p>© 2026 Randera. {isTr ? "Tüm hakları saklıdır." : "All rights reserved."}</p>
           <div className="flex items-center gap-4">
-            <Link href="/privacy" className="hover:underline">
+            <Link href="/privacy" className="flex min-h-6 items-center hover:underline">
               {isTr ? "Gizlilik Politikası" : "Privacy Policy"}
             </Link>
-            <Link href="/terms" className="text-indigo-600 dark:text-indigo-400 hover:underline">
+            <Link href="/terms" className="flex min-h-6 items-center text-indigo-600 dark:text-indigo-400 hover:underline">
               {isTr ? "Kullanım Koşulları" : "Terms of Service"}
             </Link>
           </div>

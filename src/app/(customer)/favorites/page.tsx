@@ -2,7 +2,9 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { createClient } from "@/utils/supabase/client";
+import SafeImage from "@/components/SafeImage";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useLanguage } from "@/context/LanguageContext";
 import {
   Heart,
@@ -126,14 +128,18 @@ export default function FavoritesPage() {
     return tenants.filter((t) => favorites.includes(t.id));
   }, [tenants, favorites]);
 
-  const getCoverImage = (tenant: Tenant) => {
-    if (tenant.cover_image_url) return tenant.cover_image_url;
-    if (tenant.profile_image_url) return tenant.profile_image_url;
+  const getSectorImage = (tenant: Tenant) => {
     const sectorKey = tenant.sector?.toLowerCase() || "";
     for (const [key, img] of Object.entries(SECTOR_IMAGES)) {
       if (sectorKey.includes(key)) return img;
     }
     return SECTOR_IMAGES.default;
+  };
+
+  const getCoverImage = (tenant: Tenant) => {
+    if (tenant.cover_image_url) return tenant.cover_image_url;
+    if (tenant.profile_image_url) return tenant.profile_image_url;
+    return getSectorImage(tenant);
   };
 
   // Fiyat: yalnızca gerçek hizmet fiyatı varsa gösterilir (uydurma fiyat yok)
@@ -215,9 +221,15 @@ export default function FavoritesPage() {
               return (
                 <div
                   key={tenant.id}
-                  onClick={() => router.push(`/b/${tenant.slug}`)}
-                  className="group bg-white/75 dark:bg-slate-900/65 backdrop-blur-3xl rounded-[28px] border border-slate-200/70 dark:border-slate-800/70 shadow-sm hover:shadow-xl hover:-translate-y-1 hover:border-slate-300/90 dark:hover:border-slate-700/90 transition-all duration-300 cursor-pointer overflow-hidden flex flex-col"
+                  className="group relative bg-white/75 dark:bg-slate-900/65 backdrop-blur-3xl rounded-[28px] border border-slate-200/70 dark:border-slate-800/70 shadow-sm hover:shadow-xl hover:-translate-y-1 hover:border-slate-300/90 dark:hover:border-slate-700/90 transition-all duration-300 cursor-pointer overflow-hidden flex flex-col"
                 >
+                  {/* Kartın tamamı gerçek bir bağlantı (stretched link):
+                      klavye erişimi + yeni sekmede açma + ekran okuyucu uyumu. */}
+                  <Link
+                    href={`/b/${tenant.slug}`}
+                    aria-label={tenant.name}
+                    className="absolute inset-0 z-[1] rounded-[28px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand)]"
+                  />
                   {/* Aspect Video Cover Image */}
                   <div className="relative aspect-video w-full overflow-hidden bg-slate-100 dark:bg-slate-800">
                     {/* 'Bugün Müsait' Rozeti */}
@@ -246,14 +258,18 @@ export default function FavoritesPage() {
 
                     {/* Sektör Çipi (sol alt profil fotoğrafına ayrıldı) */}
                     {tenant.sector && (
-                      <div className="absolute bottom-3 right-3 z-10 px-2.5 py-0.5 rounded-full bg-white/90 dark:bg-slate-900/90 backdrop-blur-md text-slate-800 dark:text-slate-100 text-[11px] font-bold shadow-xs capitalize">
+                      <div className="pointer-events-none absolute bottom-3 right-3 z-10 px-2.5 py-0.5 rounded-full bg-white/90 dark:bg-slate-900/90 backdrop-blur-md text-slate-800 dark:text-slate-100 text-[11px] font-bold shadow-xs capitalize">
                         {tenant.sector}
                       </div>
                     )}
 
-                    <img
+                    <SafeImage
                       src={coverImage}
                       alt={tenant.name}
+                      fallbackSrc={getSectorImage(tenant)}
+                      fallbackIcon={
+                        <Building2 size={40} className="text-indigo-400/70" />
+                      }
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
                     />
                   </div>
@@ -261,20 +277,19 @@ export default function FavoritesPage() {
                   {/* Body */}
                   <div className="p-5 pt-0 flex flex-col flex-1">
                     {/* Profil Fotoğrafı: kapak görselinden taşan avatar */}
-                    <div className="relative z-20 -mt-8 mb-3 flex items-end">
+                    <div className="pointer-events-none relative z-20 -mt-8 mb-3 flex items-end">
                       <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border-4 border-white bg-white shadow-md dark:border-slate-900 dark:bg-slate-800">
-                        {tenant.profile_image_url ? (
-                          <img
-                            src={tenant.profile_image_url}
-                            alt={tenant.name}
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          <Building2
-                            size={26}
-                            className="text-indigo-600 dark:text-indigo-400"
-                          />
-                        )}
+                        <SafeImage
+                          src={tenant.profile_image_url}
+                          alt={tenant.name}
+                          className="h-full w-full object-cover"
+                          fallbackIcon={
+                            <Building2
+                              size={26}
+                              className="text-indigo-600 dark:text-indigo-400"
+                            />
+                          }
+                        />
                       </div>
                     </div>
 

@@ -24,6 +24,7 @@ import UserAvatar, { getDisplayName } from "@/components/layout/UserAvatar";
 import CustomerBottomNav, {
   type BottomNavItem,
 } from "@/components/customer/CustomerBottomNav";
+import SwipePager from "@/components/layout/SwipePager";
 import { preventFocusScroll } from "@/lib/preventFocusScroll";
 
 const navItems: BottomNavItem[] = [
@@ -280,13 +281,14 @@ export default function CustomerLayout({
           </div>
         </header>
 
-        <main
+        <SwipePager
           ref={mainRef}
+          tabs={navItems}
           className={SHELL.main}
           onMouseDown={preventFocusScroll}
         >
           {children}
-        </main>
+        </SwipePager>
       </div>
 
       {/* Mobile Bottom Navigation Bar (Instagram / TikTok / YouTube style) */}

@@ -570,7 +570,7 @@ export default function SuperAdminPage() {
 
   if (authorized === null) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50 dark:bg-[#0B0D14]">
+      <div className="page-fill flex items-center justify-center bg-slate-50 dark:bg-[#0B0D14]">
         <Loader2 className="animate-spin text-indigo-600" size={40} />
       </div>
     );
@@ -578,7 +578,7 @@ export default function SuperAdminPage() {
 
   if (authorized === false) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4 dark:bg-[#0B0D14]">
+      <div className="page-fill flex items-center justify-center bg-slate-50 p-4 dark:bg-[#0B0D14]">
         <div className={`${CARD} w-full max-w-md p-10 text-center`}>
           <ShieldAlert className="mx-auto mb-4 h-16 w-16 text-red-500" />
           <h1 className="text-2xl font-black text-slate-900 dark:text-white">
@@ -722,7 +722,7 @@ export default function SuperAdminPage() {
                     <button
                       type="button"
                       onClick={fetchAccounts}
-                      className="text-xs font-bold text-indigo-600 hover:underline dark:text-indigo-400"
+                      className="inline-flex min-h-6 items-center px-1 text-xs font-bold text-indigo-600 hover:underline dark:text-indigo-400"
                     >
                       Yenile
                     </button>
@@ -1525,7 +1525,7 @@ export default function SuperAdminPage() {
                   <button
                     type="button"
                     onClick={fetchNotificationHistory}
-                    className="text-xs font-bold text-indigo-600 hover:underline dark:text-indigo-400"
+                    className="inline-flex min-h-6 items-center px-1 text-xs font-bold text-indigo-600 hover:underline dark:text-indigo-400"
                   >
                     Yenile
                   </button>

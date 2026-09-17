@@ -248,7 +248,22 @@ export async function POST(req: Request) {
     const customerName = profile?.full_name || "Bir müşteri";
     const customerPhone = profile?.phone || "";
 
-    // 1. Randevuyu kaydet (Onay bekliyor / pending olarak)
+    // İşletmenin randevu kuralları: "Otomatik onay" açıksa randevu doğrudan
+    // onaylanır. Bu ayar Ayarlar ekranında kullanıcıya "yeni randevular direkt
+    // kabul edilir" diye sunuluyor; burada okunmadığı için her randevu
+    // "pending" kalıyordu ve ayar hiçbir işe yaramıyordu.
+    const { data: tenantRules } = await supabaseAdmin
+      .from("tenants")
+      .select("booking_rules")
+      .eq("id", tenant_id)
+      .maybeSingle();
+
+    const autoApprove =
+      (tenantRules?.booking_rules as { autoApprove?: boolean } | null)
+        ?.autoApprove === true;
+    const appointmentStatus = autoApprove ? "confirmed" : "pending";
+
+    // 1. Randevuyu kaydet (otomatik onay kapalıysa onay bekliyor)
     const { error: apptError } = await supabaseAdmin
       .from("appointments")
       .insert({
@@ -258,7 +273,7 @@ export async function POST(req: Request) {
         staff_id: requestedStaffId,
         start_time,
         end_time,
-        status: "pending",
+        status: appointmentStatus,
         custom_fields: {
           customer_name: customerName,
           note: note || "",
@@ -276,13 +291,17 @@ export async function POST(req: Request) {
       locale: tr,
     });
     const staffSuffix = staffName ? ` Personel: ${staffName}.` : "";
-    const message = `${customerName} (${customerPhone}), ${formattedDate} için ${service.name} randevusu talep etti.${staffSuffix} Onayınızı bekliyor.`;
+    const message = autoApprove
+      ? `${customerName} (${customerPhone}), ${formattedDate} için ${service.name} randevusu aldı ve otomatik olarak onaylandı.${staffSuffix}`
+      : `${customerName} (${customerPhone}), ${formattedDate} için ${service.name} randevusu talep etti.${staffSuffix} Onayınızı bekliyor.`;
 
     const { error: notifError } = await supabaseAdmin
       .from("notifications")
       .insert({
         tenant_id,
-        title: "Yeni Randevu Talebi (Onay Bekliyor)",
+        title: autoApprove
+          ? "Yeni Randevu (Otomatik Onaylandı)"
+          : "Yeni Randevu Talebi (Onay Bekliyor)",
         message,
         is_read: false,
       });
@@ -308,10 +327,13 @@ export async function POST(req: Request) {
         .eq("tenant_id", tenant_id);
 
       if (subscriptions && subscriptions.length > 0) {
-        const payload = JSON.stringify({
-          title: "Yeni Randevu Talebi (Onay Bekliyor)",
-          body: `${customerName}, ${service.name}${staffName ? ` (${staffName})` : ""} için randevu oluşturdu. Onaylamak için dokunun.`,
-        });
+        const pushTitle = autoApprove
+          ? "Yeni Randevu (Otomatik Onaylandı)"
+          : "Yeni Randevu Talebi (Onay Bekliyor)";
+        const pushBody = autoApprove
+          ? `${customerName}, ${formattedDate} için ${service.name} randevusu aldı ve otomatik onaylandı.${staffSuffix}`
+          : `${customerName}, ${formattedDate} için ${service.name} randevusu oluşturdu. Onaylamak için dokunun.${staffSuffix}`;
+        const payload = JSON.stringify({ title: pushTitle, body: pushBody });
 
         await Promise.allSettled(
           subscriptions.map((sub) => {

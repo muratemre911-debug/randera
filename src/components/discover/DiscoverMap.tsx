@@ -210,7 +210,7 @@ export default function DiscoverMap({
   };
 
   return (
-    <div className="relative w-full h-[480px] sm:h-[580px] rounded-3xl overflow-hidden border border-slate-200/80 dark:border-slate-800/80 shadow-sm bg-[#f4f3f0] dark:bg-[#12141c]">
+    <div data-no-swipe className="relative w-full h-[480px] sm:h-[580px] rounded-3xl overflow-hidden border border-slate-200/80 dark:border-slate-800/80 shadow-sm bg-[#f4f3f0] dark:bg-[#12141c]">
       {/* Gerçek harita (Leaflet + OpenStreetMap) */}
       <div ref={containerRef} className="absolute inset-0 z-0" />
 

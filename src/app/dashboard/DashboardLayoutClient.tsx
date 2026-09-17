@@ -22,6 +22,8 @@ import {
   Compass,
   Lock,
   Mail,
+  AlertTriangle,
+  RefreshCw,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import NotificationBell from "@/components/NotificationBell";
@@ -36,8 +38,24 @@ import { useLanguage } from "@/context/LanguageContext";
 import { useTheme } from "@/context/ThemeContext";
 import DynamicLogoLink from "@/components/DynamicLogoLink";
 import { SHELL } from "@/components/layout/shell";
+import SwipePager from "@/components/layout/SwipePager";
 import UserAvatar, { getDisplayName } from "@/components/layout/UserAvatar";
 import { preventFocusScroll } from "@/lib/preventFocusScroll";
+
+/**
+ * Panelde parmakla geçiş yapılabilen sekmeler.
+ * Alt navigasyon çubuğunda görünen sekmelerle BİREBİR aynı sıradadır; böylece
+ * kaydırma hareketi ile sekme göstergesi hep tutarlı kalır. Menü sayfasından
+ * açılan diğer sayfalar (İçerikler, Geçmiş Randevular, Ayarlar) kaydırma
+ * kapsamı dışındadır — alt çubukta sekmesi yoktur.
+ */
+const DASHBOARD_SWIPE_TABS = [
+  { href: "/dashboard" },
+  { href: "/dashboard/takvim" },
+  { href: "/dashboard/hizmetler" },
+  { href: "/dashboard/ekip" },
+  { href: "/dashboard/musteriler" },
+];
 
 const navItems: {
   i18nKey: string;
@@ -83,6 +101,15 @@ export default function DashboardLayoutClient({
   const [userRole, setUserRole] = useState<string | null>(null);
   // İşletme üyeliği (deneme/ücretli süre) — süper admin kapattıysa panel bloke edilir
   const [membership, setMembership] = useState<MembershipInfo | null>(null);
+  /**
+   * İşletme durumu. RLS, askıya alınmış işletmenin satırını personelden
+   * gizlediği için istemciden okunamıyor; bu yüzden oturuma özel
+   * `/api/me/tenant-status` ucundan alınır. Aksi halde askıya alınmış bir
+   * işletmenin personeli "boş panel" görüyordu.
+   */
+  const [tenantState, setTenantState] = useState<
+    "unknown" | "ok" | "none" | "missing"
+  >("unknown");
   const [cmdOpen, setCmdOpen] = useState(false);
   const [cmdQuery, setCmdQuery] = useState("");
   const rootRef = useRef<HTMLDivElement>(null);
@@ -163,14 +190,33 @@ export default function DashboardLayoutClient({
         setUserAvatarUrl(profile?.avatar_url ?? null);
         setUserRole(profile?.role ?? null);
 
-        // Üyelik durumu (kolonlar yoksa sessizce atlanır)
+        // Üyelik/askıya alınma durumu: service-role ile okunur, böylece
+        // askıya alınmış işletmenin personeli de doğru ekranı görür.
         if (profile?.tenant_id) {
-          const { data: tenant } = await supabase
-            .from("tenants")
-            .select("membership_status, trial_ends_at, membership_ends_at")
-            .eq("id", profile.tenant_id)
-            .single();
-          if (tenant) setMembership(getMembership(tenant));
+          try {
+            const res = await fetch("/api/me/tenant-status", {
+              cache: "no-store",
+            });
+            if (res.ok) {
+              const status = await res.json();
+              if (status.state === "ok" && status.tenant) {
+                setTenantState("ok");
+                setMembership(
+                  getMembership({
+                    membership_status: status.tenant.membershipStatus,
+                    trial_ends_at: status.tenant.trialEndsAt,
+                    membership_ends_at: status.tenant.membershipEndsAt,
+                  }),
+                );
+              } else if (status.state === "none" || status.state === "missing") {
+                setTenantState(status.state);
+              }
+            }
+          } catch {
+            /* durum okunamazsa mevcut akış devam eder */
+          }
+        } else {
+          setTenantState("none");
         }
       }
     };
@@ -193,11 +239,52 @@ export default function DashboardLayoutClient({
     membership !== null &&
     (membership.kind === "suspended" || membership.kind === "expired");
 
+  // İşletme silinmişse / hesap bir işletmeye bağlı değilse net bir ekran göster
+  // (boş panel yerine). Süper admin muaf tutulur.
+  if (
+    (tenantState === "missing" || tenantState === "none") &&
+    !isSuperAdminUser
+  ) {
+    const removed = tenantState === "missing";
+    return (
+      <div className="page-fill flex items-center justify-center bg-slate-50 px-4 dark:bg-[#0B0D14]">
+        <div className="w-full max-w-md rounded-[28px] border border-amber-200/70 bg-amber-50/70 p-6 text-center dark:border-amber-500/25 dark:bg-amber-950/25">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-3xl bg-white shadow-sm dark:bg-slate-900">
+            <AlertTriangle size={24} className="text-amber-600 dark:text-amber-400" />
+          </div>
+          <h1 className="mt-4 text-lg font-bold text-slate-900 dark:text-slate-100">
+            {t(removed ? "dashboard.tenant_missing_title" : "dashboard.no_tenant_title")}
+          </h1>
+          <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-slate-600 dark:text-slate-400">
+            {t(removed ? "dashboard.tenant_missing_desc" : "dashboard.no_tenant_desc")}
+          </p>
+          <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="inline-flex min-h-6 items-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-600 px-5 py-2.5 text-sm font-bold text-white shadow-md shadow-indigo-500/25 transition active:scale-95"
+            >
+              <RefreshCw size={16} />
+              {t("dashboard.tenant_missing_retry")}
+            </button>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="inline-flex min-h-6 items-center rounded-2xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-700 transition active:scale-95 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-200"
+            >
+              {t("nav.logout")}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Üyelik kapatıldıysa / süresi dolduysa panel bloke edilir (süper admin hariç)
   if (membershipClosed && membership && !isSuperAdminUser) {
     const suspended = membership.kind === "suspended";
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4 dark:bg-[#0B0D14]">
+      <div className="page-fill flex items-center justify-center bg-slate-50 p-4 dark:bg-[#0B0D14]">
         <div className="w-full max-w-lg rounded-[28px] border border-slate-200/80 bg-white/80 p-8 text-center shadow-xl backdrop-blur-2xl dark:border-slate-800 dark:bg-slate-900/70">
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-3xl bg-red-50 dark:bg-red-500/10">
             <Lock size={28} className="text-red-500" />
@@ -440,14 +527,15 @@ export default function DashboardLayoutClient({
           </div>
         </header>
 
-        {/* Page content */}
-        <main
+        {/* Sayfa içeriği — alt navigasyon sekmeleri arasında parmakla geçiş */}
+        <SwipePager
           ref={mainRef}
+          tabs={DASHBOARD_SWIPE_TABS}
           className={SHELL.main}
           onMouseDown={preventFocusScroll}
         >
           {children}
-        </main>
+        </SwipePager>
       </div>
 
       {/* Mobile Bottom Navigation Bar (Instagram / TikTok / YouTube style) */}
@@ -582,7 +670,7 @@ export default function DashboardLayoutClient({
 
       {/* Mobile Bottom Sheet Menu (Drawer) */}
       {mobileMenuOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden">
+        <div data-no-swipe className="fixed inset-0 z-50 lg:hidden">
           <div
             className="fixed inset-0 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200"
             onClick={() => setMobileMenuOpen(false)}

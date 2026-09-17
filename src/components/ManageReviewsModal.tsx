@@ -137,7 +137,7 @@ export default function ManageReviewsModal({
   const currentDisplayRating = hoverRating || rating;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/65 backdrop-blur-sm animate-in fade-in duration-200">
+    <div data-no-swipe className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/65 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="fixed inset-0" onClick={() => !loading && onClose()} />
 
       <div className="relative w-full max-w-lg bg-white/95 dark:bg-slate-900/95 backdrop-blur-3xl rounded-[32px] border border-white/60 dark:border-slate-800 shadow-2xl p-6 sm:p-7 overflow-hidden z-10 animate-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col">

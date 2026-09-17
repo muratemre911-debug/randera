@@ -16,6 +16,8 @@ import { createClient } from "@/utils/supabase/client";
 
 import { useLanguage } from "@/context/LanguageContext";
 import CustomSelect from "@/components/CustomSelect";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import InlineAlert from "@/components/ui/InlineAlert";
 import { sortStaffOwnerFirst, type StaffMember } from "@/lib/staff";
 
 interface Service {
@@ -44,6 +46,11 @@ export default function HizmetlerPage() {
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingService, setEditingService] = useState<Service | null>(null);
+  /** Sayfa/işlem hataları: `alert()` yerine sayfa içinde gösterilir. */
+  const [pageError, setPageError] = useState<string | null>(null);
+  /** Silme onayı: `confirm()` yerine uygulama içi diyalog. */
+  const [pendingDelete, setPendingDelete] = useState<Service | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [tenantId, setTenantId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -117,10 +124,14 @@ export default function HizmetlerPage() {
       .order("created_at", { ascending: false });
 
     if (error) {
-      alert("Hizmetler çekilirken veritabanı hatası: " + error.message);
+      setPageError(
+        (lang === "tr" ? "Hizmetler yüklenemedi: " : "Could not load services: ") +
+          error.message,
+      );
       setServices([]);
       return;
     }
+    setPageError(null);
     setServices((data as Service[]) ?? []);
   };
 
@@ -142,7 +153,10 @@ export default function HizmetlerPage() {
         .single();
 
       if (profileErr) {
-        alert("Profil çekilirken veritabanı hatası: " + profileErr.message);
+        setPageError(
+          (lang === "tr" ? "Profil yüklenemedi: " : "Could not load profile: ") +
+            profileErr.message,
+        );
       }
       if (!profile?.tenant_id) {
         setLoading(false);
@@ -187,15 +201,22 @@ export default function HizmetlerPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!tenantId) {
-      alert(
-        "Hata: İşletme kimliğiniz (Tenant ID) bulunamadı! Lütfen SQL kodunu başarıyla çalıştırdığınızdan emin olun.",
+      setPageError(
+        lang === "tr"
+          ? "İşletme bilgisi bulunamadı. Lütfen sayfayı yenileyin veya yöneticinize başvurun."
+          : "Business information not found. Please refresh or contact your admin.",
       );
       return;
     }
     if (!selectedStaffId) {
-      alert("Hata: Hizmetin atanacağı eleman bulunamadı.");
+      setPageError(
+        lang === "tr"
+          ? "Hizmetin atanacağı eleman bulunamadı."
+          : "No staff member available to assign this service.",
+      );
       return;
     }
+    setPageError(null);
     setSaving(true);
 
     const finalDescription = form.description.trim();
@@ -217,7 +238,10 @@ export default function HizmetlerPage() {
         setForm({ name: "", description: "", duration: "", price: "" });
         fetchServices(tenantId, selectedStaffId);
       } else {
-        alert("Güncelleme hatası: " + error.message);
+        setPageError(
+          (lang === "tr" ? "Güncelleme hatası: " : "Update failed: ") +
+            error.message,
+        );
       }
     } else {
       const { error } = await supabase.from("services").insert({
@@ -235,7 +259,10 @@ export default function HizmetlerPage() {
         setForm({ name: "", description: "", duration: "", price: "" });
         fetchServices(tenantId, selectedStaffId);
       } else {
-        alert("Ekleme hatası: " + error.message);
+        setPageError(
+          (lang === "tr" ? "Ekleme hatası: " : "Could not add: ") +
+            error.message,
+        );
       }
     }
 
@@ -243,18 +270,27 @@ export default function HizmetlerPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (
-      !confirm(
-        "Bu hizmeti silmek istediğinize emin misiniz? (Mevcut randevular bu hizmeti kullanamaz hale gelebilir)",
-      )
-    )
+    setDeleting(true);
+    const { error } = await supabase.from("services").delete().eq("id", id);
+    setDeleting(false);
+    setPendingDelete(null);
+    if (error) {
+      setPageError(
+        (lang === "tr" ? "Silme hatası: " : "Delete failed: ") + error.message,
+      );
       return;
-    await supabase.from("services").delete().eq("id", id);
+    }
+    setPageError(null);
     if (tenantId && selectedStaffId) fetchServices(tenantId, selectedStaffId);
   };
 
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 max-w-4xl mx-auto space-y-6">
+      {pageError && (
+        <InlineAlert kind="error" onDismiss={() => setPageError(null)}>
+          {pageError}
+        </InlineAlert>
+      )}
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -440,7 +476,7 @@ export default function HizmetlerPage() {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleDelete(service.id);
+                          setPendingDelete(service);
                         }}
                         title={lang === "tr" ? "Sil" : "Delete"}
                         className="rounded-xl p-2 text-slate-500 hover:bg-white hover:text-red-600 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-red-400 transition-all shadow-xs cursor-pointer"
@@ -478,8 +514,24 @@ export default function HizmetlerPage() {
       )}
 
       {/* Modal */}
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        destructive
+        loading={deleting}
+        title={lang === "tr" ? "Hizmeti sil" : "Delete service"}
+        message={
+          lang === "tr"
+            ? `"${pendingDelete?.name ?? ""}" silinsin mi? Bu hizmete bağlı randevular da silinebilir; bu işlem geri alınamaz.`
+            : `Delete "${pendingDelete?.name ?? ""}"? Appointments linked to it may be removed too. This cannot be undone.`
+        }
+        confirmLabel={lang === "tr" ? "Sil" : "Delete"}
+        cancelLabel={lang === "tr" ? "Vazgeç" : "Cancel"}
+        onConfirm={() => pendingDelete && handleDelete(pendingDelete.id)}
+        onCancel={() => setPendingDelete(null)}
+      />
+
       {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div data-no-swipe className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
             className="absolute inset-0 backdrop-blur-md bg-black/20 dark:bg-black/40 animate-backdrop-in"
             onClick={() => setModalOpen(false)}

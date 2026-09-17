@@ -14,10 +14,7 @@ import {
   X, 
   ArrowUpDown, 
   TrendingUp, 
-  Clock, 
   Users, 
-  CheckCircle2, 
-  AlertCircle,
   CalendarCheck,
   PhoneCall
 } from "lucide-react";
@@ -25,6 +22,26 @@ import { createClient } from "@/utils/supabase/client";
 import { useLanguage } from "@/context/LanguageContext";
 import { format, parseISO } from "date-fns";
 import { tr, enUS } from "date-fns/locale";
+
+/**
+ * Sorgudan dönen ham randevu satırı
+ * (`select("id, customer_id, start_time, end_time, status, custom_fields, services(name, price)")`).
+ * Supabase istemcisi tiplendirilmediği için `data` `any` gelir; bu arayüz
+ * `any` kullanımını tek ve belgelenmiş bir noktaya indirir.
+ */
+interface RawCustomerAppointment {
+  id: string;
+  customer_id: string | null;
+  start_time: string;
+  end_time: string | null;
+  status: string;
+  custom_fields?: {
+    customer_name?: string;
+    phone?: string;
+    note?: string;
+  } | null;
+  services?: { name?: string; price?: number } | null;
+}
 
 interface CustomerAppointment {
   id: string;
@@ -98,7 +115,8 @@ export default function MusterilerPage() {
     ]);
 
     const profilesList = profilesRes.data || [];
-    const apptsList = (apptsRes.data || []) as any[];
+    const apptsList =
+      (apptsRes.data as unknown as RawCustomerAppointment[] | null) || [];
 
     // Harita oluştur
     const customerMap = new Map<string, Customer>();
@@ -182,8 +200,9 @@ export default function MusterilerPage() {
         cust.appointments.push({
           id: a.id,
           start_time: a.start_time,
-          end_time: a.end_time,
-          status: a.status,
+          // `end_time` DB'de nullable; eski kayıtlarda boş olabilir.
+          end_time: a.end_time ?? a.start_time,
+          status: a.status as CustomerAppointment["status"],
           service_name: a.services?.name || (lang === "tr" ? "Hizmet" : "Service"),
           price: price,
           note: a.custom_fields?.note || undefined,
@@ -212,6 +231,9 @@ export default function MusterilerPage() {
   };
 
   useEffect(() => {
+    // Veri çekme bir dış sistem aboneliğidir; setState çağrıları await'ten
+    // SONRA gerçekleşir, senkron kademeli render üretmez.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchCustomers();
   }, [lang]);
 
@@ -672,7 +694,7 @@ export default function MusterilerPage() {
 
       {/* 5. Customer Detail Slideover / Modal */}
       {selectedCustomer && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center sm:justify-end bg-black/40 backdrop-blur-sm p-3 sm:p-6 animate-in fade-in duration-200">
+        <div data-no-swipe className="fixed inset-0 z-50 flex items-center justify-center sm:justify-end bg-black/40 backdrop-blur-sm p-3 sm:p-6 animate-in fade-in duration-200">
           <div
             className="w-full max-w-lg max-h-[90vh] flex flex-col bg-white dark:bg-slate-900 rounded-[32px] shadow-2xl border border-white/60 dark:border-slate-800 overflow-hidden animate-in slide-in-from-right-8 duration-300"
             onClick={(e) => e.stopPropagation()}

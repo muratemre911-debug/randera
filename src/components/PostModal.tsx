@@ -242,6 +242,7 @@ export function PostModal({
   return createPortal(
     <div
       ref={modalRef}
+      data-no-swipe
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       role="dialog"
       aria-modal="true"

@@ -174,7 +174,7 @@ function LoginForm() {
   };
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden px-4">
+    <div className="page-fill relative flex items-center justify-center px-4">
       {/* Background gradient */}
       <div className="absolute inset-0 bg-gradient-to-br from-indigo-100 via-white to-purple-100" />
 
@@ -358,7 +358,7 @@ function LoginForm() {
                       setIsRegister(true);
                       setError(null);
                     }}
-                    className="text-indigo-600 font-semibold underline"
+                    className="inline-flex min-h-6 items-center px-1 font-semibold text-indigo-600 underline"
                   >
                     {lang === "tr" ? "Kayıt Ol" : "Sign Up"}
                   </button>
@@ -369,12 +369,12 @@ function LoginForm() {
         </div>
 
         {/* Legal Links */}
-        <div className="mt-6 text-center text-xs text-gray-500 flex items-center justify-center gap-3">
-          <Link href="/privacy" className="hover:text-indigo-600 transition-colors underline underline-offset-2">
+        <div className="mt-6 flex items-center justify-center gap-3 text-center text-xs text-gray-500">
+          <Link href="/privacy" className="flex min-h-6 items-center px-1 hover:text-indigo-600 transition-colors underline underline-offset-2">
             {lang === "tr" ? "Gizlilik Politikası" : "Privacy Policy"}
           </Link>
           <span>•</span>
-          <Link href="/terms" className="hover:text-indigo-600 transition-colors underline underline-offset-2">
+          <Link href="/terms" className="flex min-h-6 items-center px-1 hover:text-indigo-600 transition-colors underline underline-offset-2">
             {lang === "tr" ? "Kullanım Koşulları" : "Terms of Service"}
           </Link>
         </div>
@@ -387,7 +387,7 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-indigo-100 via-white to-purple-100">
+        <div className="page-fill flex items-center justify-center bg-gradient-to-br from-indigo-100 via-white to-purple-100">
           <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
         </div>
       }

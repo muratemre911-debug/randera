@@ -278,4 +278,27 @@ export const tr = {
   "landing.mock_confirm": "Randevuyu Onayla",
   "landing.mock_new_title": "Yeni randevu alındı",
   "landing.mock_new_sub": "14:30 · Saç Kesimi",
+
+  // PWA (ana ekrana ekleme, güncelleme, çevrimdışı)
+  "pwa.install_title": "Randera'yı telefonuna kur",
+  "pwa.install_desc": "Tam ekran, hızlı açılış ve bildirimler için ana ekrana ekle.",
+  "pwa.install_button": "Kur",
+  "pwa.install_later": "Sonra",
+  "pwa.ios_desc": "Safari'de alttaki Paylaş simgesine dokun, sonra \"Ana Ekrana Ekle\"yi seç.",
+  "pwa.update_ready": "Yeni sürüm hazır",
+  "pwa.update_button": "Yenile",
+  "pwa.offline_title": "İnternet bağlantısı yok",
+  "pwa.offline_desc": "Bağlantı geri geldiğinde sayfayı yenilemen yeterli. Bazı bölümler önbellekten görüntüleniyor.",
+  "pwa.offline_retry": "Tekrar dene",
+  "pwa.notif_title": "Randevu bildirimlerini aç",
+  "pwa.notif_desc": "Yeni randevu ve iptalleri anında telefonuna al.",
+  "pwa.notif_button": "Bildirimleri aç",
+  "pwa.notif_denied": "Bildirim izni kapalı. Tarayıcı ayarlarından açabilirsin.",
+
+  // Panel: kullanıcının bağlı olduğu işletme bulunamazsa (silinmiş işletme / yetki)
+  "dashboard.tenant_missing_title": "İşletmeniz bulunamadı",
+  "dashboard.tenant_missing_desc": "Hesabınız silinmiş veya erişiminiz kaldırılmış bir işletmeye bağlı görünüyor. İşletmeniz yeniden oluşturulduysa sayfayı yenileyin; sorun sürerse sistem yöneticisiyle iletişime geçin.",
+  "dashboard.tenant_missing_retry": "Tekrar dene",
+  "dashboard.no_tenant_title": "Bir işletmeye bağlı değilsiniz",
+  "dashboard.no_tenant_desc": "Hesabınız herhangi bir işletmeye bağlı görünmüyor. Bir işletme sahibi sizi ekibine davet edebilir; davet bağlantısıyla katıldıktan sonra panel burada görünür.",
 };

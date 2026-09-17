@@ -686,7 +686,7 @@ export default function HomeClient() {
                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                   {t("landing.footer_product")}
                 </h3>
-                <ul className="mt-4 space-y-2.5 text-[13px] font-semibold">
+                <ul className="mt-3 space-y-0.5 text-[13px] font-semibold">
                   {[
                     { href: "/discover", label: t("landing.footer_discover") },
                     { href: "/login", label: t("landing.login") },
@@ -698,7 +698,7 @@ export default function HomeClient() {
                     <li key={link.href}>
                       <Link
                         href={link.href}
-                        className="text-slate-600 transition-colors hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400"
+                        className="flex min-h-6 items-center text-slate-600 transition-colors hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400"
                       >
                         {link.label}
                       </Link>
@@ -711,7 +711,7 @@ export default function HomeClient() {
                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                   {t("landing.footer_legal")}
                 </h3>
-                <ul className="mt-4 space-y-2.5 text-[13px] font-semibold">
+                <ul className="mt-3 space-y-0.5 text-[13px] font-semibold">
                   {[
                     { href: "/privacy", label: t("landing.footer_privacy") },
                     { href: "/terms", label: t("landing.footer_terms") },
@@ -719,7 +719,7 @@ export default function HomeClient() {
                     <li key={link.href}>
                       <Link
                         href={link.href}
-                        className="text-slate-600 transition-colors hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400"
+                        className="flex min-h-6 items-center text-slate-600 transition-colors hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400"
                       >
                         {link.label}
                       </Link>
@@ -731,16 +731,16 @@ export default function HomeClient() {
 
             <div className="mt-10 flex flex-col items-center justify-between gap-3 border-t border-slate-900/5 pt-6 text-xs text-slate-500 sm:flex-row dark:border-white/10 dark:text-slate-400">
               <p>© 2026 Randera. {t("landing.footer_rights")}</p>
-              <p className="flex items-center gap-4">
+              <p className="flex flex-wrap items-center justify-center gap-x-4 gap-y-0">
                 <button
                   onClick={toggleLanguage}
-                  className="font-semibold transition-colors hover:text-indigo-600 dark:hover:text-indigo-400"
+                  className="flex min-h-6 items-center font-semibold transition-colors hover:text-indigo-600 dark:hover:text-indigo-400"
                 >
                   {lang === "tr" ? "English" : "Türkçe"}
                 </button>
                 <button
                   onClick={toggleTheme}
-                  className="font-semibold transition-colors hover:text-indigo-600 dark:hover:text-indigo-400"
+                  className="flex min-h-6 items-center font-semibold transition-colors hover:text-indigo-600 dark:hover:text-indigo-400"
                 >
                   {theme === "light" ? "Dark mode" : "Light mode"}
                 </button>

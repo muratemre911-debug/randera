@@ -162,6 +162,7 @@ export default function MapPoint({
   return (
     <div
       ref={containerRef}
+      data-no-swipe
       className={`w-full ${heightClass} rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 z-0 ${className}`}
     />
   );

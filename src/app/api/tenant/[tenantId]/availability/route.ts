@@ -8,7 +8,12 @@ export const dynamic = "force-dynamic";
  *
  * Randevu sihirbazı bu uçtan beslenir: `appointments` tablosunda RLS müşteriye
  * yalnızca kendi randevularını gösterdiği için dolu saatler istemciden doğrudan
- * okunamaz. Burada yalnızca başlangıç zamanları döner; müşteri bilgisi sızmaz.
+ * okunamaz. Burada başlangıç/bitiş zamanları döner; müşteri bilgisi sızmaz.
+ *
+ * `busy` yalnızca başlangıç zamanlarını verir (geriye dönük uyumluluk), ancak
+ * tek başına yeterli DEĞİLDİR: 150 dakikalık bir hizmette 10:00'daki kayıt
+ * 11:00 ve 12:00'i de kapatır. Bu yüzden `busyRanges` ile aralıklar da döner
+ * ve istemci, hizmet süresine göre çakışan saatleri kapatır.
  *
  *   GET ?from=<ISO>&to=<ISO>&staffId=<uuid|yok>
  */
@@ -35,10 +40,12 @@ export async function GET(
     const buildQuery = (withStaff: boolean) => {
       let q = supabaseAdmin
         .from("appointments")
-        .select("start_time")
+        .select("start_time, end_time")
         .eq("tenant_id", tenantId)
         .neq("status", "cancelled")
-        .gte("start_time", from)
+        // `gte(start_time)` tek başına yetmez: önceki gün başlayıp bu güne
+        // taşan bir kayıt da çakışır. Bu yüzden sorgu 1 gün öncesinden başlar.
+        .gte("start_time", new Date(new Date(from).getTime() - 86400000).toISOString())
         .lte("start_time", to)
         .order("start_time");
       if (withStaff && staffId) q = q.eq("staff_id", staffId);
@@ -58,8 +65,16 @@ export async function GET(
 
     if (error) throw error;
 
+    const rowsSafe = rows ?? [];
     return NextResponse.json({
-      busy: (rows ?? []).map((r) => r.start_time),
+      busy: rowsSafe.map((r) => r.start_time),
+      busyRanges: rowsSafe.map((r) => ({
+        start: r.start_time,
+        // end_time boşsa (eski kayıtlar) 1 saatlik varsayım kullanılır.
+        end:
+          r.end_time ??
+          new Date(new Date(r.start_time).getTime() + 3600000).toISOString(),
+      })),
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Bilinmeyen hata";

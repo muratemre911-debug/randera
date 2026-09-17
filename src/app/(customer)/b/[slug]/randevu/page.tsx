@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { useParams, useRouter } from "next/navigation";
 import { useLanguage } from "@/context/LanguageContext";
@@ -17,6 +17,7 @@ import {
   ArrowRight,
   Info,
   Crown,
+  AlertCircle,
 } from "lucide-react";
 import { format, addDays, isSameDay } from "date-fns";
 import { tr, enUS } from "date-fns/locale";
@@ -27,6 +28,11 @@ import {
   sortStaffOwnerFirst,
   type StaffMember,
 } from "@/lib/staff";
+
+/** Hizmetin süresini dakika cinsinden döner (kolon adı iki biçimde olabilir). */
+function getServiceDuration(svc: ServiceItem): number {
+  return svc.duration || svc.duration_minutes || 30;
+}
 
 const dayMap: Record<string, number> = {
   pazartesi: 1,
@@ -109,7 +115,13 @@ export default function BookPage() {
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [timeFilter, setTimeFilter] = useState<TimeFilter>("all");
   const [serviceSearch, setServiceSearch] = useState("");
-  const [bookedSlots, setBookedSlots] = useState<string[]>([]);
+  /** Dolu zaman aralıkları (epoch ms). Yalnızca başlangıç saatleri yetmez:
+   *  150 dk'lık hizmette 10:00 kaydı 11:00 ve 12:00'i de kapatır. */
+  const [busyRanges, setBusyRanges] = useState<{ start: number; end: number }[]>(
+    [],
+  );
+  /** Randevu gönderiminde oluşan hata (alert yerine satır içi gösterilir). */
+  const [bookingError, setBookingError] = useState<string | null>(null);
   const [bookingLoading, setBookingLoading] = useState(false);
   const [bookingSuccess, setBookingSuccess] = useState(false);
   const [note, setNote] = useState("");
@@ -179,9 +191,11 @@ export default function BookPage() {
       const endOfDay = new Date(selectedDate);
       endOfDay.setHours(23, 59, 59, 999);
 
+      // Sorgu penceresi, önceki gün başlayıp bu güne taşan kayıtları da
+      // kapsamalı; bu yüzden bir gün öncesinden/sonrasından istenir.
       const query = new URLSearchParams({
-        from: startOfDay.toISOString(),
-        to: endOfDay.toISOString(),
+        from: new Date(startOfDay.getTime() - 86400000).toISOString(),
+        to: new Date(endOfDay.getTime() + 86400000).toISOString(),
       });
       if (selectedStaff) query.set("staffId", selectedStaff.id);
 
@@ -190,61 +204,100 @@ export default function BookPage() {
           `/api/tenant/${tenant.id}/availability?${query.toString()}`,
         );
         const json = await res.json();
-        const busy: string[] = json?.busy ?? [];
+        const ranges: { start: string; end?: string }[] =
+          json?.busyRanges ?? [];
 
-        // Sunucudan gelen ISO zamanlar müşterinin yerel saatine çevrilir
-        setBookedSlots(
-          busy.map((iso) => {
-            const d = new Date(iso);
-            return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
-          }),
-        );
+        // Tek geçişte hem dönüştür hem geçersizleri ele (map + filter yerine).
+        const parsed: { start: number; end: number }[] = [];
+        for (const r of ranges) {
+          const start = new Date(r.start).getTime();
+          const end = new Date(
+            r.end ?? new Date(r.start).getTime() + 3600000,
+          ).getTime();
+          if (Number.isFinite(start) && Number.isFinite(end)) {
+            parsed.push({ start, end });
+          }
+        }
+        setBusyRanges(parsed);
       } catch {
-        setBookedSlots([]);
+        setBusyRanges([]);
       }
     };
 
     loadBookedSlots();
   }, [tenant, selectedDate, selectedStaff]);
 
-  const getServiceDuration = (svc: ServiceItem) => {
-    return svc.duration || svc.duration_minutes || 30;
+  /**
+   * Seçilen saat, mevcut bir randevuyla ÇAKIŞIYOR mu?
+   * Randevunun süresi (hizmet süresi) hesaba katılır; böylece kullanıcı
+   * yalnızca reddedilecek bir saati seçip akışı baştan yaşamaz.
+   */
+  const clearBookingError = () => {
+    if (bookingError) setBookingError(null);
   };
 
-  const getAvailableTimeSlots = (date: Date) => {
-    const workingHours = tenant?.working_hours;
-    const hoursSource = workingHours || defaultWorkingHours;
-    const slotDuration = tenant?.booking_rules?.slotDuration || 30;
+  const isSlotBusy = (time: string) => {
+    if (!selectedService || busyRanges.length === 0) return false;
+    const [hour, minute] = time.split(":").map(Number);
+    const slotStart = new Date(selectedDate);
+    slotStart.setHours(hour, minute, 0, 0);
+    const start = slotStart.getTime();
+    const end = start + getServiceDuration(selectedService) * 60000;
+    return busyRanges.some((r) => start < r.end && end > r.start);
+  };
 
-    const dayOfWeek = date.getDay();
-    const dayName = Object.keys(dayMap).find(
-      (key) => dayMap[key] === dayOfWeek,
-    );
-    if (!dayName) return [];
+  /**
+   * Verilen gün için uygun saatleri üretir.
+   *
+   * KRİTİK: Son saat dilimi, hizmet süresi de hesaba katılarak seçilir.
+   * Sunucu (`/api/book`) "randevu kapanış saatinden önce bitmeli" kuralını
+   * uygular; burası yalnızca ızgara adımını (slotDuration) kontrol ettiği için
+   * 150 dakikalık bir hizmette 20:00 gibi imkânsız saatler öneriliyor ve
+   * kullanıcı akışı baştan yaşayıp 409 hatası alıyordu.
+   */
+  const getAvailableTimeSlots = useCallback(
+    (date: Date) => {
+      const workingHours = tenant?.working_hours;
+      const hoursSource = workingHours || defaultWorkingHours;
+      const slotDuration = tenant?.booking_rules?.slotDuration || 30;
+      // Hizmet seçilmediyse adım süresi kadar varsayılır.
+      const serviceDuration = selectedService
+        ? getServiceDuration(selectedService)
+        : slotDuration;
 
-    const hours = hoursSource[dayName];
-    if (!hours || !hours.isOpen) return [];
-
-    const slots: string[] = [];
-    const [openH, openM] = hours.openTime.split(":").map(Number);
-    const [closeH, closeM] = hours.closeTime.split(":").map(Number);
-    const openTotal = openH * 60 + openM;
-    const closeTotal = closeH * 60 + closeM;
-    const now = new Date();
-    const isToday = isSameDay(date, now);
-    const nowTotal = now.getHours() * 60 + now.getMinutes();
-
-    for (let m = openTotal; m + slotDuration <= closeTotal; m += slotDuration) {
-      // Don't show past slots for today
-      if (isToday && m < nowTotal) continue;
-      const h = Math.floor(m / 60);
-      const min = m % 60;
-      slots.push(
-        `${h.toString().padStart(2, "0")}:${min.toString().padStart(2, "0")}`,
+      const dayOfWeek = date.getDay();
+      const dayName = Object.keys(dayMap).find(
+        (key) => dayMap[key] === dayOfWeek,
       );
-    }
-    return slots;
-  };
+      if (!dayName) return [];
+
+      const hours = hoursSource[dayName];
+      if (!hours || !hours.isOpen) return [];
+
+      const slots: string[] = [];
+      const [openH, openM] = hours.openTime.split(":").map(Number);
+      const [closeH, closeM] = hours.closeTime.split(":").map(Number);
+      const openTotal = openH * 60 + openM;
+      const closeTotal = closeH * 60 + closeM;
+      const now = new Date();
+      const isToday = isSameDay(date, now);
+      const nowTotal = now.getHours() * 60 + now.getMinutes();
+
+      for (let m = openTotal; m + slotDuration <= closeTotal; m += slotDuration) {
+        // Don't show past slots for today
+        if (isToday && m < nowTotal) continue;
+        // Hizmet kapanış saatine kadar bitmeli (sunucudaki kuralın aynısı).
+        if (m + serviceDuration > closeTotal) continue;
+        const h = Math.floor(m / 60);
+        const min = m % 60;
+        slots.push(
+          `${h.toString().padStart(2, "0")}:${min.toString().padStart(2, "0")}`,
+        );
+      }
+        return slots;
+      },
+    [tenant, selectedService],
+  );
 
   const filteredSlots = useMemo(() => {
     const allSlots = getAvailableTimeSlots(selectedDate);
@@ -259,7 +312,7 @@ export default function BookPage() {
       if (timeFilter === "evening") return total >= 17 * 60;
       return true;
     });
-  }, [selectedDate, timeFilter, tenant]);
+  }, [selectedDate, timeFilter, getAvailableTimeSlots]);
 
   // Seçilen elemanın hizmetleri (staff_id kolonu yoksa tümü gösterilir)
   const staffServices = useMemo(
@@ -343,7 +396,7 @@ export default function BookPage() {
     } = await supabase.auth.getUser();
 
     if (!user) {
-      alert(
+      setBookingError(
         lang === "tr"
           ? "Randevu almak için giriş yapmalısınız."
           : "You must log in to book an appointment.",
@@ -391,7 +444,10 @@ export default function BookPage() {
 
     const data = await res.json();
     if (!res.ok || data.error) {
-      alert(
+      // `alert()` yerine satır içi hata: mobilde tarayıcı diyaloğu tüm akışı
+      // kesiyordu ve sunucu mesajı (ör. "bu saatte başka randevu var")
+      // kullanıcı tarafından fark edilmiyordu.
+      setBookingError(
         data.error ||
           (lang === "tr"
             ? "Randevu oluşturulurken bir hata oluştu."
@@ -813,6 +869,7 @@ export default function BookPage() {
                   onClick={() => {
                     setSelectedService(svc);
                     setSelectedTime(null);
+                    clearBookingError();
                     setStep(3);
                   }}
                   className={`group relative flex items-center justify-between p-5 rounded-3xl border transition-all text-left ${
@@ -925,6 +982,7 @@ export default function BookPage() {
                     onClick={() => {
                       setSelectedDate(date);
                       setSelectedTime(null);
+                      clearBookingError();
                     }}
                     className={`flex flex-col items-center min-w-[74px] p-3 rounded-2xl border transition-all shrink-0 ${
                       isSelected
@@ -1001,7 +1059,7 @@ export default function BookPage() {
               <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2.5">
                 {filteredSlots.length > 0 ? (
                   filteredSlots.map((time) => {
-                    const isBooked = bookedSlots.includes(time);
+                    const isBooked = isSlotBusy(time);
                     const isSelected = selectedTime === time;
 
                     return (
@@ -1009,9 +1067,15 @@ export default function BookPage() {
                         key={time}
                         disabled={isBooked}
                         onClick={() => {
+                          clearBookingError();
                           setSelectedTime(time);
+                          // Adımlar 1 tabanlıdır: 3 = Tarih & Saat, 4 = Onay & Not.
+                          // Burada 3 yazıyordu, yani kullanıcı zaten 3. adımda
+                          // olduğu için saat seçmek HİÇBİR ŞEY yapmıyordu ve
+                          // akış otomatik ilerlemiyordu. Kısa gecikme, seçim
+                          // animasyonunun görünmesini sağlar.
                           setTimeout(() => {
-                            setStep(3);
+                            setStep(4);
                           }, 220);
                         }}
                         className={`py-3 rounded-2xl text-xs sm:text-sm font-black border transition-all ${
@@ -1189,6 +1253,32 @@ export default function BookPage() {
               />
             </div>
 
+            {/* Sunucu hatası (ör. saat artık müsait değil): alert() yerine
+                satır içi, kapatılabilir uyarı — mobilde tarayıcı diyaloğu
+                akışı kesiyordu ve mesaj fark edilmiyordu. */}
+            {bookingError && (
+              <div
+                role="alert"
+                className="mt-6 flex items-start gap-2.5 rounded-2xl border border-red-200 bg-red-50 p-3.5 dark:border-red-500/30 dark:bg-red-950/40"
+              >
+                <AlertCircle
+                  size={16}
+                  className="mt-0.5 shrink-0 text-red-600 dark:text-red-400"
+                />
+                <p className="flex-1 text-[12.5px] font-semibold leading-snug text-red-700 dark:text-red-300">
+                  {bookingError}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setBookingError(null)}
+                  aria-label={lang === "tr" ? "Kapat" : "Dismiss"}
+                  className="shrink-0 rounded-full px-1.5 text-red-500 active:scale-90 dark:text-red-400"
+                >
+                  ×
+                </button>
+              </div>
+            )}
+
             {/* Action Buttons */}
             <div className="mt-8 flex items-center gap-3">
               <button
@@ -1208,8 +1298,7 @@ export default function BookPage() {
                 disabled={bookingLoading}
                 onClick={handleBook}
                 className="flex-1 flex items-center justify-center gap-2 py-3.5 px-6 rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white text-sm font-black shadow-lg shadow-[color:var(--brand-shadow)] hover:-translate-y-0.5 active:scale-95 transition-all disabled:opacity-50"
-              >
-                {bookingLoading ? (
+              >                {bookingLoading ? (
                   <Loader2 className="animate-spin" size={18} />
                 ) : (
                   <CalendarIcon size={18} />

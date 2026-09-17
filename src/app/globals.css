@@ -37,6 +37,33 @@
   /* Landing: yüzen kart animasyonu */
   --animate-float: float 6s ease-in-out infinite;
 
+  /* Sekmeler arası swipe: yeni sayfanın giriş animasyonu */
+  --animate-swipe-in-right: swipeInRight 0.3s cubic-bezier(0.22, 1, 0.36, 1)
+    both;
+  --animate-swipe-in-left: swipeInLeft 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+
+  @keyframes swipeInRight {
+    from {
+      transform: translate3d(26%, 0, 0);
+      opacity: 0.35;
+    }
+    to {
+      transform: translate3d(0, 0, 0);
+      opacity: 1;
+    }
+  }
+
+  @keyframes swipeInLeft {
+    from {
+      transform: translate3d(-26%, 0, 0);
+      opacity: 0.35;
+    }
+    to {
+      transform: translate3d(0, 0, 0);
+      opacity: 1;
+    }
+  }
+
   @keyframes float {
     0%,
     100% {
@@ -71,6 +98,140 @@ html, body {
   overscroll-behavior: none;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* iOS: dokunma vurgusu ve tap gecikmesi kaldırılır (uygulama hissi) */
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+
+/*
+ * Çentik / home bar güvenli alanları tek yerden yönetilir.
+ * `env()` değerleri ve kabuk ölçüleri burada toplanır; bileşenler (ör. alt
+ * navigasyon) yalnızca `var(--safe-*)` okur — böylece hem tek kaynak kalır hem
+ * de test/geliştirme sırasında değerler enjekte edilebilir.
+ */
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --shell-pad: 0.5rem;
+}
+
+/* Alt navigasyon çubuğu: home bar payı + yanlarda çentik payı (yatay mod) */
+.shell-bottomnav {
+  padding-left: max(0.75rem, var(--safe-left));
+  padding-right: max(0.75rem, var(--safe-right));
+  padding-bottom: max(var(--safe-bottom), 0.6rem);
+}
+
+@media (min-width: 640px) {
+  :root {
+    --shell-pad: 1rem;
+  }
+}
+
+@media (min-width: 768px) {
+  :root {
+    --shell-pad: 1.5rem;
+  }
+}
+
+/*
+ * Uygulama kabuğunun dış boşluğu. Tailwind `p-*` yerine burada tanımlanır çünkü
+ * çentik/home-bar payı her kenarda ayrı ayrı `max()` ile birleştirilmelidir:
+ * cihazda çentik yoksa (env = 0) normal boşluğa düşer, varsa çentiği geçer.
+ * (Kenar çubuğu ve sayfa kartı aynı ölçüleri `SHELL` üzerinden paylaşır.)
+ */
+/*
+ * Uygulama kabuğunun dış boşluğu. Tailwind `p-*` yerine burada tanımlanır çünkü
+ * çentik/home-bar payı her kenarda ayrı ayrı `max()` ile birleştirilmelidir:
+ * cihazda çentik yoksa (env = 0) normal boşluğa düşer, varsa çentiği geçer.
+ * (Kenar çubuğu ve sayfa kartı aynı ölçüleri `SHELL` üzerinden paylaşır.)
+ */
+.shell-root {
+  padding-top: max(var(--shell-pad), var(--safe-top));
+  padding-bottom: max(var(--shell-pad), var(--safe-bottom));
+  padding-left: max(var(--shell-pad), var(--safe-left));
+  padding-right: max(var(--shell-pad), var(--safe-right));
+}
+
+/*
+ * Dil kapısı (LanguageProvider): kayıtlı dil okunana kadar içerik gizlenir,
+ * böylece EN seçen ısrarcı kullanıcı bir an Türkçe metin görmez.
+ *
+ * Ancak JS hiç çalışmazsa (yavaş/kesik bağlantı, çevrimdışı, chunk hatası)
+ * içerik KALICI olarak gizli kalırdı: kullanıcı boş beyaz sayfa görüyordu.
+ * Bu yüzden CSS tarafında bir emniyet supabı var — 4 saniye sonra kapı
+ * kendiliğinden açılır. JS zamanında bağlanırsa sınıf tamamen kaldırılır ve
+ * animasyon hiç devreye girmez.
+ */
+.lang-gate {
+  visibility: hidden;
+  animation: langGateReveal 0s linear 4s forwards;
+}
+
+@keyframes langGateReveal {
+  to {
+    visibility: visible;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lang-gate {
+    animation-duration: 0s;
+  }
+}
+
+/*
+ * Belge tipi sayfalar (giriş, davet, yasal metinler, hata sayfaları).
+ * Gövde `overflow: clip` olduğu için bu sayfalar kaydırmayı KENDİLERİ
+ * üstlenmek zorundadır; aksi halde içerik çentiğin altında kırpılır ve
+ * kullanıcı sayfayı kaydıramaz (100vh değil dvh: mobil araç çubuğu payı).
+ */
+.page-fill {
+  height: 100dvh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Yer varsa çocuğu dikeyde ortalar; içerik sığmadığında `justify-content:
+   center` gibi üstten kırpmaz (auto margin kuralı). */
+.page-fill > * {
+  margin-block: auto;
+}
+
+/*
+ * Dokunmatik cihazlarda mesh (blob) animasyonları kapatılır.
+ * 3 adet animasyonlu `blur(3xl)` katmanı, mobil GPU'da her karede yeniden
+ * rasterize edildiği için kaydırma sırasında belirgin takılma üretiyordu.
+ * Statik mesh görsel olarak aynı kalır, kaydırma ise akıcı olur.
+ */
+@media (hover: none), (prefers-reduced-motion: reduce) {
+  .animate-blob,
+  .animate-blob-slow {
+    animation: none !important;
+  }
+}
+
+/* Hareket azaltma tercihinde swipe geçiş animasyonu da kapatılır.
+   (Katmansız CSS, Tailwind `utilities` katmanını yendiği için `!important`
+   gerekmez.) */
+@media (prefers-reduced-motion: reduce) {
+  .animate-swipe-in-right,
+  .animate-swipe-in-left {
+    animation: none;
+    transform: none;
+    opacity: 1;
+  }
+}
+
+/* Kaydırılabilir her alan dokunmatikte ivmeli (momentum) kaydırmalı olmalı. */
+.custom-scrollbar,
+.scrollbar-none,
+.shell-pane {
+  -webkit-overflow-scrolling: touch;
 }
 
 /* clip: doküman programatik olarak da (scrollIntoView / window.scrollTo / hash /
@@ -177,6 +338,20 @@ html, body {
 /* ==========================================================================
    Modern SaaS User-Select Standards
    ========================================================================== */
+
+/* 0. Dokunmatikte çift dokunuşla yakınlaştırma ve 300ms tap gecikmesi kapatılır.
+   (Metin girişleri hariç: kullanıcı uzun basıp seçebilmeli.) */
+button,
+[role="button"],
+a[href],
+nav,
+select,
+summary,
+label[for],
+input[type="checkbox"],
+input[type="radio"] {
+  touch-action: manipulation;
+}
 
 /* 1. Global & Interactive controls: disable text selection to prevent accidental blue highlights */
 button,

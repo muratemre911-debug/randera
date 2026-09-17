@@ -131,7 +131,7 @@ export default async function DavetPage({
 
 function InviteNotice({ title, message }: { title: string; message: string }) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-indigo-100 via-white to-purple-100 px-4">
+    <div className="page-fill flex items-center justify-center bg-gradient-to-br from-indigo-100 via-white to-purple-100 px-4">
       <div className="w-full max-w-md rounded-2xl border border-white/40 bg-white/70 p-8 text-center shadow-xl shadow-black/5 backdrop-blur-2xl">
         <h1 className="text-xl font-bold text-gray-800">{title}</h1>
         <p className="mt-2 text-sm text-gray-500">{message}</p>

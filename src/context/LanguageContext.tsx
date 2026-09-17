@@ -46,7 +46,9 @@ export const LanguageProvider = ({ children }: { children: React.ReactNode }) =>
 
   return (
     <LanguageContext.Provider value={{ lang, t, toggleLanguage }}>
-      <div style={{ visibility: !mounted ? 'hidden' : 'visible', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+      <div
+        className={`flex min-h-dvh flex-col ${mounted ? "" : "lang-gate"}`}
+      >
         {children}
       </div>
     </LanguageContext.Provider>

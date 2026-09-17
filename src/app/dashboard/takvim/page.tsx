@@ -180,6 +180,10 @@ export default function TakvimPage() {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    // `createPortal` yalnızca istemcide çalışabilir; ilk render'da portal
+    // açmamak için "mounted" bayrağı sunucu render'ının ardından bir kez
+    // işaretlenir. Bu klasik hydration kalıbıdır (harici sistem: DOM hazır).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
   }, []);
 
@@ -240,7 +244,7 @@ export default function TakvimPage() {
       .from("profiles")
       .select("tenant_id")
       .eq("id", user.id)
-      .single();
+      .maybeSingle();
     if (!profile) {
       if (!quiet) setLoading(false);
       return;
@@ -248,11 +252,13 @@ export default function TakvimPage() {
     setTenantId(profile.tenant_id);
 
     // Fetch tenant working hours
+    // `maybeSingle()`: staff hesapları RLS nedeniyle kendi işletme satırını
+    // okuyamayabilir ya da işletme silinmiş olabilir; 0 satır hata değildir.
     const { data: tenantData } = await supabase
       .from("tenants")
       .select("working_hours")
       .eq("id", profile.tenant_id)
-      .single();
+      .maybeSingle();
 
     if (tenantData?.working_hours) {
       setWorkingHours(tenantData.working_hours as WorkingHours);
@@ -289,6 +295,9 @@ export default function TakvimPage() {
   };
 
   useEffect(() => {
+    // Veri çekme bir dış sistem aboneliğidir; setState çağrıları await'ten
+    // SONRA gerçekleşir, senkron kademeli render üretmez.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchData();
   }, [dateRange.start, dateRange.end]);
 
@@ -348,21 +357,6 @@ export default function TakvimPage() {
       const start = new Date(a.start_time);
       return isSameDay(start, day) && start.getHours() === hour;
     });
-
-  const scrollToAppointment = useCallback(
-    (targetDayIndex: number, targetHour: number) => {
-      setViewMode("weekly");
-      const el = document.querySelector(
-        `[data-cell="${targetDayIndex}-${targetHour}"]`,
-      );
-      if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "center" });
-        setHighlightedCell(`${targetDayIndex}-${targetHour}`);
-        setTimeout(() => setHighlightedCell(null), 2000);
-      }
-    },
-    [],
-  );
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -522,8 +516,11 @@ export default function TakvimPage() {
       string,
       unknown
     >;
-    const { cancel_requested, cancel_reason, cancel_requested_at, ...rest } =
-      prevFields;
+    // İptal talebi alanları temizlenir (kaydın geri kalanı korunur).
+    const rest: Record<string, unknown> = { ...prevFields };
+    delete rest.cancel_requested;
+    delete rest.cancel_reason;
+    delete rest.cancel_requested_at;
     const { error } = await supabase
       .from("appointments")
       .update({ custom_fields: rest })
@@ -903,6 +900,7 @@ export default function TakvimPage() {
       {/* Create Appointment Modal */}
       {mounted && selectedSlot && createPortal(
         <div
+          data-no-swipe
           className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto"
           onClick={() => setSelectedSlot(null)}
         >
@@ -1002,6 +1000,7 @@ export default function TakvimPage() {
       {/* Appointment Detail Modal */}
       {mounted && selectedAppointment && createPortal(
         <div
+          data-no-swipe
           className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto"
           onClick={() => setSelectedAppointment(null)}
         >

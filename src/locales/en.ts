@@ -274,4 +274,27 @@ export const en = {
   "landing.mock_confirm": "Confirm booking",
   "landing.mock_new_title": "New booking received",
   "landing.mock_new_sub": "2:30 PM · Haircut",
+
+  // PWA (install to home screen, update, offline)
+  "pwa.install_title": "Install Randera on your phone",
+  "pwa.install_desc": "Add to your home screen for full screen, faster launch and notifications.",
+  "pwa.install_button": "Install",
+  "pwa.install_later": "Later",
+  "pwa.ios_desc": "Tap the Share icon in Safari, then choose \"Add to Home Screen\".",
+  "pwa.update_ready": "A new version is ready",
+  "pwa.update_button": "Refresh",
+  "pwa.offline_title": "No internet connection",
+  "pwa.offline_desc": "Reload once you are back online. Some sections are shown from cache.",
+  "pwa.offline_retry": "Try again",
+  "pwa.notif_title": "Turn on booking notifications",
+  "pwa.notif_desc": "Get new bookings and cancellations straight on your phone.",
+  "pwa.notif_button": "Enable notifications",
+  "pwa.notif_denied": "Notifications are blocked. You can allow them in your browser settings.",
+
+  // Dashboard: the user's business could not be found (deleted tenant / permissions)
+  "dashboard.tenant_missing_title": "Your business was not found",
+  "dashboard.tenant_missing_desc": "Your account appears to be linked to a business that was deleted or that you no longer have access to. If your business has been recreated, refresh the page; if the problem persists, contact your system administrator.",
+  "dashboard.tenant_missing_retry": "Try again",
+  "dashboard.no_tenant_title": "You are not linked to a business",
+  "dashboard.no_tenant_desc": "Your account does not appear to belong to any business. A business owner can invite you to their team; once you join via the invite link, the dashboard will appear here.",
 };

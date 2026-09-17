@@ -19,12 +19,34 @@ import {
   X,
   AlertCircle,
   Bell,
+  Building2,
+  RefreshCw,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useLanguage } from "@/context/LanguageContext";
 import type { DashboardStats, Service, Profile } from "@/types";
 import { PageSkeleton } from "@/components/Skeleton";
 import CustomSelect from "@/components/CustomSelect";
+
+/**
+ * Sorgudan dönen ham randevu satırı.
+ * (`select("*, services(name, price, duration), profiles!fk(full_name, phone)")`)
+ * Supabase istemcisi tiplendirilmediği için `data` `any` gelir; bu arayüz
+ * `any` kullanımını tek noktada ve belgelenmiş şekilde sınırlar.
+ */
+interface RawAppointment {
+  id: string;
+  start_time: string;
+  end_time: string;
+  status: string;
+  services?: { name?: string; price?: number; duration?: number } | null;
+  profiles?: { full_name?: string; phone?: string } | null;
+  custom_fields?: {
+    note?: string;
+    customer_name?: string;
+    phone?: string;
+  } | null;
+}
 
 interface TodayAppointment {
   id: string;
@@ -62,6 +84,12 @@ export default function DashboardPage() {
   const [services, setServices] = useState<Service[]>([]);
   const [customers, setCustomers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
+  /**
+   * Kullanıcının `tenant_id`'si var ama işletme satırı okunamıyor
+   * (silinmiş işletme ya da RLS). Bu durumda boş bir panel göstermek yerine
+   * net bir bilgi verilir.
+   */
+  const [tenantMissing, setTenantMissing] = useState(false);
 
   // Modals & UI States
   const [copied, setCopied] = useState(false);
@@ -98,14 +126,19 @@ export default function DashboardPage() {
     const tId = profile.tenant_id;
 
     // Fetch tenant details
+    // `maybeSingle()`: RLS veya silinmiş bir işletme nedeniyle 0 satır dönerse
+    // istek hata üretmesin (staff hesapları kendi tenant satırını göremeyebiliyor).
     const { data: tenantData } = await supabase
       .from("tenants")
       .select("id, name, slug, sector")
       .eq("id", tId)
-      .single();
+      .maybeSingle();
 
     if (tenantData) {
       setTenant(tenantData);
+      setTenantMissing(false);
+    } else {
+      setTenantMissing(true);
     }
 
     const now = new Date();
@@ -129,7 +162,10 @@ export default function DashboardPage() {
       supabase
         .from("appointments")
         .select(
-          "*, services(name, price, duration, duration_minutes), profiles!appointments_customer_id_fkey(full_name, phone)",
+          // DİKKAT: `duration_minutes` diye bir kolon YOK (services.duration kullanılır).
+          // Yanlış kolon adı PostgREST'ten 400 döndürüyor ve sorgu tamamen boş
+          // dönüyordu; bu yüzden panel "bugün randevu yok" diyordu.
+          "*, services(name, price, duration), profiles!appointments_customer_id_fkey(full_name, phone)",
         )
         .eq("tenant_id", tId)
         .neq("status", "cancelled")
@@ -140,7 +176,7 @@ export default function DashboardPage() {
       supabase
         .from("appointments")
         .select(
-          "*, services(name, price, duration, duration_minutes), profiles!appointments_customer_id_fkey(full_name, phone)",
+          "*, services(name, price, duration), profiles!appointments_customer_id_fkey(full_name, phone)",
         )
         .eq("tenant_id", tId)
         .neq("status", "cancelled")
@@ -180,7 +216,8 @@ export default function DashboardPage() {
         .order("full_name"),
     ]);
 
-    const rawTodayAppts = todayApptsRes.data || [];
+    const rawTodayAppts =
+      (todayApptsRes.data as unknown as RawAppointment[] | null) || [];
     const dailyRev = rawTodayAppts.reduce(
       (sum, app) => sum + (app.services?.price || 0),
       0,
@@ -205,15 +242,13 @@ export default function DashboardPage() {
         service_name:
           app.services?.name || (lang === "tr" ? "Hizmet" : "Service"),
         service_price: app.services?.price || 0,
-        service_duration:
-          (app.services as any)?.duration ||
-          app.services?.duration_minutes ||
-          30,
+        service_duration: app.services?.duration || 30,
         note: app.custom_fields?.note || "",
       };
     });
 
-    const rawPendingAppts = (pendingCountRes.data as any[]) || [];
+    const rawPendingAppts =
+      (pendingCountRes.data as unknown as RawAppointment[] | null) || [];
     const formattedPending: TodayAppointment[] = rawPendingAppts.map((app) => {
       const name =
         app.profiles?.full_name ||
@@ -230,10 +265,7 @@ export default function DashboardPage() {
         service_name:
           app.services?.name || (lang === "tr" ? "Hizmet" : "Service"),
         service_price: app.services?.price || 0,
-        service_duration:
-          (app.services as any)?.duration ||
-          app.services?.duration_minutes ||
-          30,
+        service_duration: app.services?.duration || 30,
         note: app.custom_fields?.note || "",
       };
     });
@@ -261,6 +293,9 @@ export default function DashboardPage() {
   }, [supabase, lang]);
 
   useEffect(() => {
+    // Veri çekme bir "dış sistem" aboneliğidir; setState çağrıları await'ten
+    // SONRA gerçekleşir, senkron kademeli render üretmez.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchDashboardData();
   }, [fetchDashboardData]);
 
@@ -271,6 +306,9 @@ export default function DashboardPage() {
       const dateStr = d.toISOString().split("T")[0];
       d.setHours(d.getHours() + 1, 0, 0, 0);
       const timeStr = `${d.getHours().toString().padStart(2, "0")}:00`;
+      // Yeni randevu modalı için varsayılan tarih/saat, hizmetler yüklendikten
+      // SONRA türetilir (kullanıcı girdisi ezilmez).
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setAppointmentDate(dateStr);
       setAppointmentTime(timeStr);
       if (services.length > 0 && !selectedServiceId) {
@@ -417,10 +455,7 @@ export default function DashboardPage() {
     }
 
     const selectedService = services.find((s) => s.id === selectedServiceId);
-    const duration =
-      (selectedService as any)?.duration ||
-      selectedService?.duration_minutes ||
-      30;
+    const duration = selectedService?.duration || 30;
 
     const [hours, minutes] = appointmentTime.split(":").map(Number);
     const [year, month, day] = appointmentDate.split("-").map(Number);
@@ -518,6 +553,32 @@ export default function DashboardPage() {
 
   if (loading) {
     return <PageSkeleton />;
+  }
+
+  if (tenantMissing) {
+    return (
+      <div className="max-w-2xl mx-auto py-10 sm:py-16">
+        <div className="rounded-[28px] border border-amber-200/70 bg-amber-50/70 p-6 sm:p-8 text-center dark:border-amber-500/25 dark:bg-amber-950/25">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-3xl bg-white shadow-sm dark:bg-slate-900">
+            <Building2 size={24} className="text-amber-600 dark:text-amber-400" />
+          </div>
+          <h1 className="mt-4 text-lg sm:text-xl font-bold text-slate-900 dark:text-slate-100">
+            {t("dashboard.tenant_missing_title")}
+          </h1>
+          <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-slate-600 dark:text-slate-400">
+            {t("dashboard.tenant_missing_desc")}
+          </p>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="mt-5 inline-flex min-h-6 items-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-600 px-5 py-2.5 text-sm font-bold text-white shadow-md shadow-indigo-500/25 transition active:scale-95"
+          >
+            <RefreshCw size={16} />
+            {t("dashboard.tenant_missing_retry")}
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -1079,7 +1140,7 @@ export default function DashboardPage() {
 
       {/* QUICK ADD APPOINTMENT MODAL */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-md animate-backdrop-in">
+        <div data-no-swipe className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-md animate-backdrop-in">
           <div className="relative w-full max-w-lg rounded-[32px] bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 p-6 sm:p-8 shadow-2xl animate-modal-in">
             <button
               onClick={() => setShowAddModal(false)}
@@ -1121,7 +1182,7 @@ export default function DashboardPage() {
                   value={selectedServiceId}
                   onChange={(val) => setSelectedServiceId(val)}
                   options={services.map((s) => {
-                    const dur = (s as any).duration || s.duration_minutes || 30;
+                    const dur = s.duration || 30;
                     return {
                       value: s.id,
                       label: s.name,

@@ -225,7 +225,8 @@ export default function AyarlarPage() {
             "name, phone, email, address, description, province, district, neighborhood, street, building_no, latitude, longitude, theme_palette, profile_image_url, cover_image_url, sector, working_hours, booking_rules",
           )
           .eq("id", currentTenantId)
-          .single();
+          // 0 satır (silinmiş işletme / RLS) hata değildir.
+          .maybeSingle();
 
         // Konum kolonları henüz eklenmemişse (migration) eski kolonlarla devam et
         const locationData = error
@@ -236,7 +237,7 @@ export default function AyarlarPage() {
                   "name, phone, email, address, description, province, district, profile_image_url, cover_image_url, sector, working_hours, booking_rules",
                 )
                 .eq("id", currentTenantId)
-                .single()
+                .maybeSingle()
             ).data
           : data;
 
