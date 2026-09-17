@@ -53,10 +53,15 @@ function toMinutes(value: string | undefined): number | null {
 export async function POST(req: Request) {
   try {
     const supabaseUser = await createServerClient();
-    const { data: { user } } = await supabaseUser.auth.getUser();
+    const {
+      data: { user },
+    } = await supabaseUser.auth.getUser();
 
     if (!user) {
-      return NextResponse.json({ error: "Giriş yapmanız gerekiyor." }, { status: 401 });
+      return NextResponse.json(
+        { error: "Giriş yapmanız gerekiyor." },
+        { status: 401 },
+      );
     }
 
     const body = await req.json();
@@ -65,17 +70,24 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: validation.error }, { status: 400 });
     }
 
-    const { tenant_id, service_id, start_time, end_time, note } = validation.data;
+    const { tenant_id, service_id, staff_id, start_time, end_time, note } =
+      validation.data;
 
     const start = new Date(start_time);
     const end = new Date(end_time);
 
     if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-      return NextResponse.json({ error: "Geçersiz randevu zamanı." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Geçersiz randevu zamanı." },
+        { status: 400 },
+      );
     }
 
     if (end <= start) {
-      return NextResponse.json({ error: "Bitiş zamanı başlangıç zamanından sonra olmalı." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Bitiş zamanı başlangıç zamanından sonra olmalı." },
+        { status: 400 },
+      );
     }
 
     const supabaseAdmin = createAdminClient();
@@ -83,20 +95,65 @@ export async function POST(req: Request) {
     // Hizmetin bu işletmeye ait ve aktif olduğunu doğrula
     const { data: service, error: serviceError } = await supabaseAdmin
       .from("services")
-      .select("id, tenant_id, is_active, name")
+      .select("id, tenant_id, is_active, name, staff_id")
       .eq("id", service_id)
       .single();
 
     if (serviceError || !service) {
-      return NextResponse.json({ error: "Hizmet bulunamadı." }, { status: 404 });
+      return NextResponse.json(
+        { error: "Hizmet bulunamadı." },
+        { status: 404 },
+      );
     }
 
     if (service.tenant_id !== tenant_id) {
-      return NextResponse.json({ error: "Seçilen hizmet bu işletmeye ait değil." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Seçilen hizmet bu işletmeye ait değil." },
+        { status: 400 },
+      );
     }
 
     if (service.is_active === false) {
-      return NextResponse.json({ error: "Bu hizmet şu anda randevu almaya kapalı." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Bu hizmet şu anda randevu almaya kapalı." },
+        { status: 400 },
+      );
+    }
+
+    // Eleman doğrulama: istekte gelmezse hizmetin elemanı kullanılır.
+    // Hizmetin staff_id'si ile istekteki staff_id çelişirse istek reddedilir.
+    const requestedStaffId = staff_id ?? service.staff_id ?? null;
+    let staffName = "";
+
+    if (requestedStaffId) {
+      const { data: staff } = await supabaseAdmin
+        .from("profiles")
+        .select("id, full_name, tenant_id, role")
+        .eq("id", requestedStaffId)
+        .maybeSingle();
+
+      if (!staff || staff.tenant_id !== tenant_id) {
+        return NextResponse.json(
+          { error: "Seçilen eleman bu işletmeye ait değil." },
+          { status: 400 },
+        );
+      }
+
+      if (!["owner", "staff"].includes(staff.role)) {
+        return NextResponse.json(
+          { error: "Seçilen kişi bu işletmede randevu veremez." },
+          { status: 400 },
+        );
+      }
+
+      if (service.staff_id && service.staff_id !== requestedStaffId) {
+        return NextResponse.json(
+          { error: "Bu hizmeti seçilen eleman vermiyor." },
+          { status: 400 },
+        );
+      }
+
+      staffName = staff.full_name || "";
     }
 
     // Çalışma saatleri doğrulama
@@ -106,14 +163,20 @@ export async function POST(req: Request) {
       .eq("id", tenant_id)
       .single();
 
-    const workingHours = tenant?.working_hours as Record<string, WorkingDay> | null;
+    const workingHours = tenant?.working_hours as Record<
+      string,
+      WorkingDay
+    > | null;
 
     if (workingHours) {
       const dayName = getWeekdayInTr(start);
       const day = workingHours[dayName];
 
       if (day && day.isOpen === false) {
-        return NextResponse.json({ error: "Bu gün işletme kapalı." }, { status: 409 });
+        return NextResponse.json(
+          { error: "Bu gün işletme kapalı." },
+          { status: 409 },
+        );
       }
 
       if (day && day.isOpen === true) {
@@ -123,16 +186,22 @@ export async function POST(req: Request) {
         const endMin = getTimeOfDay(end).h * 60 + getTimeOfDay(end).m;
 
         if (openMin !== null && startMin < openMin) {
-          return NextResponse.json({ error: "Randevu çalışma saatleri dışında." }, { status: 409 });
+          return NextResponse.json(
+            { error: "Randevu çalışma saatleri dışında." },
+            { status: 409 },
+          );
         }
         if (closeMin !== null && endMin > closeMin) {
-          return NextResponse.json({ error: "Randevu çalışma saatleri dışında." }, { status: 409 });
+          return NextResponse.json(
+            { error: "Randevu çalışma saatleri dışında." },
+            { status: 409 },
+          );
         }
       }
     }
 
-    // Çakışma kontrolü (iptal edilmiş randevular hariç)
-    const { data: conflicts } = await supabaseAdmin
+    // Çakışma kontrolü — eleman bazlı (iptal edilmiş randevular hariç)
+    let conflictQuery = supabaseAdmin
       .from("appointments")
       .select("id")
       .eq("tenant_id", tenant_id)
@@ -140,8 +209,23 @@ export async function POST(req: Request) {
       .lt("start_time", end_time)
       .gt("end_time", start_time);
 
+    // Eleman seçiliyse aynı elemanın takvimi kontrol edilir; seçili değilse
+    // (eski akış) işletme genelinde çakışma aranır.
+    if (requestedStaffId) {
+      conflictQuery = conflictQuery.eq("staff_id", requestedStaffId);
+    }
+
+    const { data: conflicts } = await conflictQuery;
+
     if (conflicts && conflicts.length > 0) {
-      return NextResponse.json({ error: "Bu zaman aralığı zaten dolu." }, { status: 409 });
+      return NextResponse.json(
+        {
+          error: requestedStaffId
+            ? "Seçilen elemanın bu saatte başka bir randevusu var."
+            : "Bu zaman aralığı zaten dolu.",
+        },
+        { status: 409 },
+      );
     }
 
     // Müşteri adını ve telefonunu sunucu tarafında çek
@@ -153,8 +237,11 @@ export async function POST(req: Request) {
 
     if (!profile?.phone) {
       return NextResponse.json(
-        { error: "Randevu oluşturmak için lütfen profilinize geçerli bir telefon numarası ekleyin." },
-        { status: 400 }
+        {
+          error:
+            "Randevu oluşturmak için lütfen profilinize geçerli bir telefon numarası ekleyin.",
+        },
+        { status: 400 },
       );
     }
 
@@ -162,35 +249,43 @@ export async function POST(req: Request) {
     const customerPhone = profile?.phone || "";
 
     // 1. Randevuyu kaydet (Onay bekliyor / pending olarak)
-    const { error: apptError } = await supabaseAdmin.from("appointments").insert({
-      tenant_id,
-      customer_id: user.id,
-      service_id,
-      start_time,
-      end_time,
-      status: "pending",
-      custom_fields: {
-        customer_name: customerName,
-        note: note || "",
-        phone: customerPhone,
-        avatar_url: profile?.avatar_url || "",
-      },
-    });
+    const { error: apptError } = await supabaseAdmin
+      .from("appointments")
+      .insert({
+        tenant_id,
+        customer_id: user.id,
+        service_id,
+        staff_id: requestedStaffId,
+        start_time,
+        end_time,
+        status: "pending",
+        custom_fields: {
+          customer_name: customerName,
+          note: note || "",
+          phone: customerPhone,
+          avatar_url: profile?.avatar_url || "",
+        },
+      });
 
     if (apptError) {
       return NextResponse.json({ error: apptError.message }, { status: 500 });
     }
 
     // 2. İşletmeye in-app bildirim kaydet
-    const formattedDate = format(new Date(start_time), "dd MMMM yyyy HH:mm", { locale: tr });
-    const message = `${customerName} (${customerPhone}), ${formattedDate} için ${service.name} randevusu talep etti. Onayınızı bekliyor.`;
-
-    const { error: notifError } = await supabaseAdmin.from("notifications").insert({
-      tenant_id,
-      title: "Yeni Randevu Talebi (Onay Bekliyor)",
-      message,
-      is_read: false,
+    const formattedDate = format(new Date(start_time), "dd MMMM yyyy HH:mm", {
+      locale: tr,
     });
+    const staffSuffix = staffName ? ` Personel: ${staffName}.` : "";
+    const message = `${customerName} (${customerPhone}), ${formattedDate} için ${service.name} randevusu talep etti.${staffSuffix} Onayınızı bekliyor.`;
+
+    const { error: notifError } = await supabaseAdmin
+      .from("notifications")
+      .insert({
+        tenant_id,
+        title: "Yeni Randevu Talebi (Onay Bekliyor)",
+        message,
+        is_read: false,
+      });
 
     if (notifError) {
       console.error("Notification insert error:", notifError);
@@ -204,7 +299,7 @@ export async function POST(req: Request) {
       webpush.setVapidDetails(
         "mailto:test@example.com",
         vapidPublic,
-        vapidPrivate
+        vapidPrivate,
       );
 
       const { data: subscriptions } = await supabaseAdmin
@@ -215,7 +310,7 @@ export async function POST(req: Request) {
       if (subscriptions && subscriptions.length > 0) {
         const payload = JSON.stringify({
           title: "Yeni Randevu Talebi (Onay Bekliyor)",
-          body: `${customerName}, ${service.name} için randevu oluşturdu. Onaylamak için dokunun.`,
+          body: `${customerName}, ${service.name}${staffName ? ` (${staffName})` : ""} için randevu oluşturdu. Onaylamak için dokunun.`,
         });
 
         await Promise.allSettled(
@@ -227,18 +322,25 @@ export async function POST(req: Request) {
                 p256dh: sub.p256dh,
               },
             };
-            return webpush.sendNotification(pushSub, payload).catch((e: any) => {
-              if (e.statusCode === 410 || e.statusCode === 404) {
-                supabaseAdmin.from("push_subscriptions").delete().eq("endpoint", sub.endpoint).then();
-              }
-            });
-          })
+            return webpush
+              .sendNotification(pushSub, payload)
+              .catch((e: { statusCode?: number }) => {
+                if (e.statusCode === 410 || e.statusCode === 404) {
+                  supabaseAdmin
+                    .from("push_subscriptions")
+                    .delete()
+                    .eq("endpoint", sub.endpoint)
+                    .then();
+                }
+              });
+          }),
         );
       }
     }
 
     return NextResponse.json({ success: true });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Sunucu hatası";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

@@ -46,7 +46,7 @@ export type Database = {
         Update: {
           created_at?: string;
           custom_fields?: Json;
-          customer_id?: string;
+          customer_id?: string | null;
           end_time?: string;
           id?: string;
           notes?: string | null;
@@ -352,6 +352,7 @@ export type Database = {
           is_active: boolean;
           name: string;
           price: number;
+          staff_id: string | null;
           tenant_id: string;
           updated_at: string;
         };
@@ -364,6 +365,7 @@ export type Database = {
           is_active?: boolean;
           name: string;
           price: number;
+          staff_id?: string | null;
           tenant_id: string;
           updated_at?: string;
         };
@@ -376,12 +378,84 @@ export type Database = {
           is_active?: boolean;
           name?: string;
           price?: number;
+          staff_id?: string | null;
           tenant_id?: string;
           updated_at?: string;
         };
         Relationships: [
           {
+            foreignKeyName: "services_staff_id_fkey";
+            columns: ["staff_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
             foreignKeyName: "services_tenant_id_fkey";
+            columns: ["tenant_id"];
+            isOneToOne: false;
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      staff_invites: {
+        Row: {
+          accepted_at: string | null;
+          accepted_by: string | null;
+          created_at: string;
+          expires_at: string;
+          id: string;
+          invited_by: string | null;
+          note: string | null;
+          role: string;
+          status: string;
+          tenant_id: string;
+          token: string;
+        };
+        Insert: {
+          accepted_at?: string | null;
+          accepted_by?: string | null;
+          created_at?: string;
+          expires_at?: string;
+          id?: string;
+          invited_by?: string | null;
+          note?: string | null;
+          role?: string;
+          status?: string;
+          tenant_id: string;
+          token: string;
+        };
+        Update: {
+          accepted_at?: string | null;
+          accepted_by?: string | null;
+          created_at?: string;
+          expires_at?: string;
+          id?: string;
+          invited_by?: string | null;
+          note?: string | null;
+          role?: string;
+          status?: string;
+          tenant_id?: string;
+          token?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "staff_invites_accepted_by_fkey";
+            columns: ["accepted_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "staff_invites_invited_by_fkey";
+            columns: ["invited_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "staff_invites_tenant_id_fkey";
             columns: ["tenant_id"];
             isOneToOne: false;
             referencedRelation: "tenants";
@@ -392,13 +466,14 @@ export type Database = {
       tenants: {
         Row: {
           address: string | null;
+          booking_rules: Json | null;
+          building_no: string | null;
           cover_image_url: string | null;
           created_at: string;
           description: string | null;
           district: string | null;
           email: string | null;
           id: string;
-          building_no: string | null;
           is_active: boolean;
           latitude: number | null;
           logo_url: string | null;
@@ -407,26 +482,27 @@ export type Database = {
           membership_status: string | null;
           name: string;
           neighborhood: string | null;
-          street: string | null;
-          theme_palette: string | null;
-          trial_ends_at: string | null;
           phone: string | null;
           profile_image_url: string | null;
           province: string | null;
           sector: string;
           slug: string;
+          street: string | null;
+          theme_palette: string | null;
+          trial_ends_at: string | null;
           updated_at: string;
           working_hours: Json | null;
         };
         Insert: {
           address?: string | null;
+          booking_rules?: Json | null;
+          building_no?: string | null;
           cover_image_url?: string | null;
           created_at?: string;
           description?: string | null;
           district?: string | null;
           email?: string | null;
           id?: string;
-          building_no?: string | null;
           is_active?: boolean;
           latitude?: number | null;
           logo_url?: string | null;
@@ -435,26 +511,27 @@ export type Database = {
           membership_status?: string | null;
           name: string;
           neighborhood?: string | null;
-          street?: string | null;
-          theme_palette?: string | null;
-          trial_ends_at?: string | null;
           phone?: string | null;
           profile_image_url?: string | null;
           province?: string | null;
           sector: string;
           slug: string;
+          street?: string | null;
+          theme_palette?: string | null;
+          trial_ends_at?: string | null;
           updated_at?: string;
           working_hours?: Json | null;
         };
         Update: {
           address?: string | null;
+          booking_rules?: Json | null;
+          building_no?: string | null;
           cover_image_url?: string | null;
           created_at?: string;
           description?: string | null;
           district?: string | null;
           email?: string | null;
           id?: string;
-          building_no?: string | null;
           is_active?: boolean;
           latitude?: number | null;
           logo_url?: string | null;
@@ -463,14 +540,14 @@ export type Database = {
           membership_status?: string | null;
           name?: string;
           neighborhood?: string | null;
-          street?: string | null;
-          theme_palette?: string | null;
-          trial_ends_at?: string | null;
           phone?: string | null;
           profile_image_url?: string | null;
           province?: string | null;
           sector?: string;
           slug?: string;
+          street?: string | null;
+          theme_palette?: string | null;
+          trial_ends_at?: string | null;
           updated_at?: string;
           working_hours?: Json | null;
         };
@@ -488,7 +565,6 @@ export type Database = {
           tenant_id: string;
         }[];
       };
-      get_my_tenant_id: { Args: never; Returns: string };
     };
     Enums: {
       [_ in never]: never;

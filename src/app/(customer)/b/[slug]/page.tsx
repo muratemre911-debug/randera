@@ -109,6 +109,7 @@ export default function BusinessPage() {
   // Sticky Mobile Bar State & Ref
   const [showStickyBar, setShowStickyBar] = useState(false);
   const mainButtonRef = useRef<HTMLDivElement>(null);
+  const tabsBarRef = useRef<HTMLDivElement>(null);
 
   const minPrice =
     services.length > 0 ? Math.min(...services.map((s) => s.price)) : null;
@@ -139,6 +140,19 @@ export default function BusinessPage() {
     }
   }, [loading]);
 
+  // Mobilde sekme şeridi dar kalınca aktif sekme kırpılmasın: yatay olarak ortala
+  useEffect(() => {
+    const bar = tabsBarRef.current;
+    const tab = bar?.querySelector<HTMLElement>(`[data-tab="${activeTab}"]`);
+    if (!bar || !tab) return;
+    const delta =
+      tab.getBoundingClientRect().left - bar.getBoundingClientRect().left;
+    bar.scrollTo({
+      left: bar.scrollLeft + delta - (bar.clientWidth - tab.clientWidth) / 2,
+      behavior: "smooth",
+    });
+  }, [activeTab, showStickyBar]);
+
   const fetchTenantData = async () => {
     setLoading(true);
     const { data: tenantData, error: tenantError } = await supabase
@@ -163,7 +177,17 @@ export default function BusinessPage() {
       .order("price", { ascending: true });
 
     if (servicesData) {
-      setServices(servicesData);
+      // Aynı hizmet birden fazla elemanda tanımlı olabilir (ör. herkes saç kesimi
+      // yapar); vitrinde her hizmet adı tek kez gösterilir.
+      const seen = new Set<string>();
+      setServices(
+        (servicesData as Service[]).filter((s) => {
+          const key = s.name.trim().toLowerCase();
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        }),
+      );
     }
 
     // Check favorite status
@@ -496,11 +520,15 @@ export default function BusinessPage() {
         id="business-tabs"
         className="sticky top-0 z-30 -mx-3 sm:-mx-6 md:-mx-8 px-3 sm:px-6 md:px-8 py-2.5 bg-white/80 dark:bg-slate-900/80 backdrop-blur-2xl border-b border-slate-200/60 dark:border-slate-800/60 transition-all scroll-mt-4 flex items-center justify-between gap-3 select-none"
       >
-        <div className="flex items-center p-1 sm:p-1.5 rounded-2xl bg-slate-100/90 dark:bg-slate-800/70 border border-slate-200/60 dark:border-slate-700/60 w-auto backdrop-blur-md gap-1 overflow-x-auto scrollbar-none snap-x shrink-0">
+        <div
+          ref={tabsBarRef}
+          className="flex min-w-0 flex-1 items-center p-1 sm:p-1.5 sm:flex-none rounded-2xl bg-slate-100/90 dark:bg-slate-800/70 border border-slate-200/60 dark:border-slate-700/60 backdrop-blur-md gap-1 overflow-x-auto scrollbar-none snap-x"
+        >
           <button
             type="button"
+            data-tab="services"
             onClick={() => setActiveTab("services")}
-            className={`flex-1 sm:flex-none shrink-0 snap-start flex items-center justify-center gap-1.5 px-3 sm:px-5 py-2 rounded-xl text-[11px] min-[400px]:text-xs sm:text-sm font-bold whitespace-nowrap transition-all cursor-pointer ${
+            className={`flex-1 sm:flex-none shrink-0 snap-start flex items-center justify-center gap-1.5 px-2 sm:px-5 py-2 rounded-xl text-[10px] min-[400px]:text-[11px] sm:text-sm font-bold whitespace-nowrap transition-all cursor-pointer ${
               activeTab === "services"
                 ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm"
                 : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
@@ -516,8 +544,9 @@ export default function BusinessPage() {
 
           <button
             type="button"
+            data-tab="reviews"
             onClick={() => setActiveTab("reviews")}
-            className={`flex-1 sm:flex-none shrink-0 snap-start flex items-center justify-center gap-1.5 px-3 sm:px-5 py-2 rounded-xl text-[11px] min-[400px]:text-xs sm:text-sm font-bold whitespace-nowrap transition-all cursor-pointer ${
+            className={`flex-1 sm:flex-none shrink-0 snap-start flex items-center justify-center gap-1.5 px-2 sm:px-5 py-2 rounded-xl text-[10px] min-[400px]:text-[11px] sm:text-sm font-bold whitespace-nowrap transition-all cursor-pointer ${
               activeTab === "reviews"
                 ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm"
                 : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
@@ -531,8 +560,9 @@ export default function BusinessPage() {
 
           <button
             type="button"
+            data-tab="posts"
             onClick={() => setActiveTab("posts")}
-            className={`flex-1 sm:flex-none shrink-0 snap-start flex items-center justify-center gap-1.5 px-3 sm:px-5 py-2 rounded-xl text-[11px] min-[400px]:text-xs sm:text-sm font-bold whitespace-nowrap transition-all cursor-pointer ${
+            className={`flex-1 sm:flex-none shrink-0 snap-start flex items-center justify-center gap-1.5 px-2 sm:px-5 py-2 rounded-xl text-[10px] min-[400px]:text-[11px] sm:text-sm font-bold whitespace-nowrap transition-all cursor-pointer ${
               activeTab === "posts"
                 ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm"
                 : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
@@ -549,8 +579,9 @@ export default function BusinessPage() {
           {hasLocation && (
             <button
               type="button"
+              data-tab="location"
               onClick={() => setActiveTab("location")}
-              className={`flex-1 sm:flex-none shrink-0 snap-start flex items-center justify-center gap-1.5 px-3 sm:px-5 py-2 rounded-xl text-[11px] min-[400px]:text-xs sm:text-sm font-bold whitespace-nowrap transition-all cursor-pointer ${
+              className={`flex-1 sm:flex-none shrink-0 snap-start flex items-center justify-center gap-1.5 px-2 sm:px-5 py-2 rounded-xl text-[10px] min-[400px]:text-[11px] sm:text-sm font-bold whitespace-nowrap transition-all cursor-pointer ${
                 activeTab === "location"
                   ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm"
                   : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
@@ -580,7 +611,9 @@ export default function BusinessPage() {
               className="inline-flex items-center gap-1.5 rounded-full bg-[var(--brand)] hover:bg-[var(--brand-strong)] px-4 sm:px-5 py-2 text-xs sm:text-sm font-bold text-white shadow-md shadow-[color:var(--brand-shadow)] active:scale-95 transition-all cursor-pointer whitespace-nowrap"
             >
               <CalendarIcon size={14} strokeWidth={2.4} />
-              <span>{lang === "tr" ? "Randevu Al" : "Book"}</span>
+              <span className="hidden min-[400px]:inline">
+                {lang === "tr" ? "Randevu Al" : "Book"}
+              </span>
             </button>
           </div>
         )}

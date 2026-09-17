@@ -1,10 +1,22 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { Plus, X, Clock, Scissors, Trash2, Edit2, Search } from "lucide-react";
+import {
+  Plus,
+  X,
+  Clock,
+  Scissors,
+  Trash2,
+  Edit2,
+  Search,
+  Users,
+  ShieldCheck,
+} from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 
 import { useLanguage } from "@/context/LanguageContext";
+import CustomSelect from "@/components/CustomSelect";
+import { sortStaffOwnerFirst, type StaffMember } from "@/lib/staff";
 
 interface Service {
   id: string;
@@ -13,6 +25,8 @@ interface Service {
   duration: number;
   price: number;
   is_active: boolean;
+  /** Hizmeti veren ekip üyesi (services.staff_id) */
+  staff_id?: string | null;
 }
 
 const CATEGORY_MARKER = /\[Kategori:\s*[^\]]+\]\s*/gi;
@@ -33,6 +47,39 @@ export default function HizmetlerPage() {
   const [saving, setSaving] = useState(false);
   const [tenantId, setTenantId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  // Yetki: owner işletmedeki her elemanın hizmetlerini, staff sadece kendininkini yönetir
+  const [role, setRole] = useState<string | null>(null);
+  const [staffList, setStaffList] = useState<StaffMember[]>([]);
+  const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null);
+
+  const isOwner = role === "owner";
+  const ownerId = useMemo(
+    () => staffList.find((m) => m.role === "owner")?.id ?? null,
+    [staffList],
+  );
+  const selectedStaff = useMemo(
+    () => staffList.find((m) => m.id === selectedStaffId) ?? null,
+    [staffList, selectedStaffId],
+  );
+  const viewingOtherStaff =
+    isOwner && !!selectedStaffId && !!ownerId && selectedStaffId !== ownerId;
+  const staffOptions = useMemo(
+    () =>
+      staffList.map((m) => ({
+        value: m.id,
+        label: m.full_name?.trim() || (lang === "tr" ? "İsimsiz" : "Unnamed"),
+        badge: m.role === "owner" ? "👑" : undefined,
+        sublabel:
+          m.role === "owner"
+            ? lang === "tr"
+              ? "İşletme Sahibi"
+              : "Business Owner"
+            : lang === "tr"
+              ? "Eleman"
+              : "Staff",
+      })),
+    [staffList, lang],
+  );
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat(lang === "tr" ? "tr-TR" : "en-US", {
@@ -60,37 +107,82 @@ export default function HizmetlerPage() {
     price: "",
   });
 
-  const fetchServices = async () => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (user) {
-      const { data: profile, error: profileErr } = await supabase
-        .from("profiles")
-        .select("tenant_id")
-        .eq("id", user.id)
-        .single();
-      if (profileErr) {
-        alert("Profil çekilirken veritabanı hatası: " + profileErr.message);
-      }
-      if (profile) {
-        setTenantId(profile.tenant_id);
-        const { data } = await supabase
-          .from("services")
-          .select("*")
-          .eq("tenant_id", profile.tenant_id)
-          .eq("is_active", true)
-          .order("created_at", { ascending: false });
-        if (data) setServices(data as Service[]);
-      }
+  const fetchServices = async (tid: string, staffId: string) => {
+    const { data, error } = await supabase
+      .from("services")
+      .select("*")
+      .eq("tenant_id", tid)
+      .eq("staff_id", staffId)
+      .eq("is_active", true)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      alert("Hizmetler çekilirken veritabanı hatası: " + error.message);
+      setServices([]);
+      return;
     }
-    setLoading(false);
+    setServices((data as Service[]) ?? []);
   };
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- veri çekme; setState çağrıları await sonrasında çalışır
-    fetchServices();
+    const init = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+
+      const { data: profile, error: profileErr } = await supabase
+        .from("profiles")
+        .select("tenant_id, role")
+        .eq("id", user.id)
+        .single();
+
+      if (profileErr) {
+        alert("Profil çekilirken veritabanı hatası: " + profileErr.message);
+      }
+      if (!profile?.tenant_id) {
+        setLoading(false);
+        return;
+      }
+
+      setTenantId(profile.tenant_id);
+      setRole(profile.role);
+
+      // İşletmedeki ekip üyeleri (sahip + elemanlar)
+      const { data: team } = await supabase
+        .from("profiles")
+        .select("id, full_name, avatar_url, role")
+        .eq("tenant_id", profile.tenant_id)
+        .in("role", ["owner", "staff"])
+        .order("created_at", { ascending: true });
+
+      const teamList = sortStaffOwnerFirst((team as StaffMember[]) ?? []);
+      setStaffList(teamList);
+
+      // Varsayılan seçim: sahip kendi hizmetleriyle açılır, eleman kendisiyle
+      const initialStaffId =
+        profile.role === "owner"
+          ? (teamList.find((m) => m.role === "owner")?.id ?? user.id)
+          : user.id;
+
+      setSelectedStaffId(initialStaffId);
+      await fetchServices(profile.tenant_id, initialStaffId);
+      setLoading(false);
+    };
+
+    init();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- tek seferlik ilk yükleme
   }, []);
+
+  const handleStaffChange = (staffId: string) => {
+    setSelectedStaffId(staffId);
+    setSearchQuery("");
+    if (tenantId) fetchServices(tenantId, staffId);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,6 +190,10 @@ export default function HizmetlerPage() {
       alert(
         "Hata: İşletme kimliğiniz (Tenant ID) bulunamadı! Lütfen SQL kodunu başarıyla çalıştırdığınızdan emin olun.",
       );
+      return;
+    }
+    if (!selectedStaffId) {
+      alert("Hata: Hizmetin atanacağı eleman bulunamadı.");
       return;
     }
     setSaving(true);
@@ -119,13 +215,15 @@ export default function HizmetlerPage() {
         setModalOpen(false);
         setEditingService(null);
         setForm({ name: "", description: "", duration: "", price: "" });
-        fetchServices();
+        fetchServices(tenantId, selectedStaffId);
       } else {
         alert("Güncelleme hatası: " + error.message);
       }
     } else {
       const { error } = await supabase.from("services").insert({
         tenant_id: tenantId,
+        // Hizmet, seçili elemana atanır (staff için seçim kilitli)
+        staff_id: selectedStaffId,
         name: form.name,
         description: finalDescription,
         duration: parseInt(form.duration),
@@ -135,7 +233,7 @@ export default function HizmetlerPage() {
       if (!error) {
         setModalOpen(false);
         setForm({ name: "", description: "", duration: "", price: "" });
-        fetchServices();
+        fetchServices(tenantId, selectedStaffId);
       } else {
         alert("Ekleme hatası: " + error.message);
       }
@@ -152,7 +250,7 @@ export default function HizmetlerPage() {
     )
       return;
     await supabase.from("services").delete().eq("id", id);
-    fetchServices();
+    if (tenantId && selectedStaffId) fetchServices(tenantId, selectedStaffId);
   };
 
   return (
@@ -166,6 +264,9 @@ export default function HizmetlerPage() {
           <p className="mt-1 text-sm font-medium text-slate-500 dark:text-slate-400">
             {services.length}{" "}
             {lang === "tr" ? "hizmet tanımlı" : "services defined"}
+            {viewingOtherStaff && selectedStaff
+              ? ` • ${selectedStaff.full_name ?? ""}`
+              : ""}
           </p>
         </div>
         <button
@@ -180,6 +281,33 @@ export default function HizmetlerPage() {
           {t("btn.add")}
         </button>
       </div>
+
+      {/* Ekip filtresi: işletme sahibi başka elemanların hizmetlerini de yönetebilir */}
+      {isOwner && staffList.length > 1 && (
+        <div className="flex flex-col gap-3 rounded-3xl border border-slate-200/80 bg-white/70 p-4 backdrop-blur-2xl dark:border-slate-800 dark:bg-slate-900/60 sm:flex-row sm:items-center">
+          <div className="flex shrink-0 items-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-200">
+            <Users size={18} className="text-indigo-500" />
+            {lang === "tr" ? "Hangi elemanın hizmetleri?" : "Whose services?"}
+          </div>
+          <div className="min-w-0 flex-1 sm:max-w-xs">
+            <CustomSelect
+              value={selectedStaffId ?? ""}
+              onChange={handleStaffChange}
+              options={staffOptions}
+              searchable={staffOptions.length > 6}
+            />
+          </div>
+        </div>
+      )}
+
+      {!isOwner && role === "staff" && (
+        <div className="flex items-start gap-2.5 rounded-2xl border border-indigo-200/70 bg-indigo-50/70 p-3.5 text-xs font-medium text-indigo-800 dark:border-indigo-500/25 dark:bg-indigo-950/30 dark:text-indigo-200">
+          <ShieldCheck size={16} className="mt-0.5 shrink-0" />
+          {lang === "tr"
+            ? "Sadece kendi hizmetlerinizi görüntüleyip düzenleyebilirsiniz."
+            : "You can only view and manage your own services."}
+        </div>
+      )}
 
       {/* Arama Çubuğu (Hizmet varsa) */}
       {services.length > 0 && (
@@ -229,9 +357,13 @@ export default function HizmetlerPage() {
             {t("services.empty")}
           </p>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-sm mx-auto">
-            {lang === "tr"
-              ? "Müşterilerinizin randevu alabilmesi için ilk hizmetinizi ekleyin."
-              : "Add your first service so customers can start booking."}
+            {viewingOtherStaff
+              ? lang === "tr"
+                ? `${selectedStaff?.full_name ?? "Bu eleman"} için henüz hizmet eklenmemiş.`
+                : `No services added for ${selectedStaff?.full_name ?? "this staff member"} yet.`
+              : lang === "tr"
+                ? "Müşterilerinizin randevu alabilmesi için ilk hizmetinizi ekleyin."
+                : "Add your first service so customers can start booking."}
           </p>
           <button
             onClick={() => {

@@ -73,6 +73,33 @@ html, body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* clip: doküman programatik olarak da (scrollIntoView / window.scrollTo / hash /
+   Next scroll restorasyonu) kaymasın. Kaydırma her zaman kabuğun kendi iç
+   kaydırma alanlarında (pane / SHELL.main) yapılır; aksi halde fixed kabuk,
+   dışarıdan gelen kaydırmalarla görünümden çıkabiliyor. Desteklemeyen
+   tarayıcılar yukarıdaki overflow:hidden ile devam eder. */
+@supports (overflow: clip) {
+  html,
+  body {
+    overflow: clip;
+  }
+}
+
+/* Shell konteynerlerinin asla scroll context oluşturmamasını garanti et:
+   böylece mobil Safari/Chrome'da üst bar (header) kesinlikle yukarı kayıp kaybolamaz. */
+.shell-root,
+.shell-column {
+  overflow: clip !important;
+  overscroll-behavior: none !important;
+}
+
+@supports not (overflow: clip) {
+  .shell-root,
+  .shell-column {
+    overflow: hidden !important;
+  }
+}
+
 /* Placeholder Font: SF Pro */
 ::placeholder {
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", sans-serif !important;
@@ -118,6 +145,21 @@ html, body {
 
 .dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background-color: rgba(148, 163, 184, 0.4);
+}
+
+/* Mobilde (lg altı) kaydırma çubukları tamamen gizlenir: içeriğin kenarında
+   çubuk görünmez. Kaydırma/dokunmatik davranışı aynen çalışmaya devam eder. */
+@media (max-width: 1023px) {
+  .custom-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
 }
 
 /* Görünmez (scrollbar'sız) yatay kaydırma alanı: mobil sekme/filtre çubukları */

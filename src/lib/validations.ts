@@ -11,6 +11,8 @@ export const createTenantSchema = z.object({
 export const bookAppointmentSchema = z.object({
   tenant_id: z.string().uuid("Geçersiz işletme ID"),
   service_id: z.string().uuid("Geçersiz hizmet ID"),
+  /** Randevuyu verecek eleman (services.staff_id ile eşleşmeli) */
+  staff_id: z.string().uuid("Geçersiz eleman ID").nullable().optional(),
   start_time: z.string().datetime("Geçersiz başlangıç zamanı"),
   end_time: z.string().datetime("Geçersiz bitiş zamanı"),
   note: z.string().max(500, "Not en fazla 500 karakter olmalı").optional(),

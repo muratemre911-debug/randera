@@ -20,6 +20,7 @@ import {
   TURKEY_CENTER,
   TURKEY_ZOOM,
 } from "@/lib/provinceCoords";
+import { preventMapFocusScroll } from "@/lib/preventMapFocusScroll";
 
 export interface TenantWithDetails {
   id: string;
@@ -128,6 +129,10 @@ export default function DiscoverMap({
         maxZoom: 19,
         attribution: OSM_ATTRIBUTION,
       }).addTo(map);
+
+      // Harita/zoom kontrolüne dokununca sayfa kaymasın (Leaflet focus() verir)
+      preventMapFocusScroll(map.getContainer());
+
       map.on("click", () => selectRef.current(null));
 
       leafletRef.current = L;

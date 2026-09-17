@@ -464,7 +464,7 @@ export default function DiscoverPage() {
 
         {/* Kategori Çipleri */}
         <div className="w-full">
-          <div className="flex items-center gap-2 overflow-x-auto py-1 scrollbar-none">
+          <div className="flex items-center gap-2 overflow-x-auto overscroll-x-contain py-1 scrollbar-none">
             <button
               type="button"
               onClick={() => setFilterSector("")}

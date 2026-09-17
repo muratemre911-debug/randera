@@ -6,6 +6,7 @@ export const en = {
   "nav.services": "Services",
   "nav.posts": "Posts",
   "nav.customers": "Customers",
+  "nav.team": "Team",
   "nav.settings": "Settings",
   "nav.business_account": "Business Account",
   "nav.customer_account": "Customer Account",

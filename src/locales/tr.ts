@@ -6,6 +6,7 @@ export const tr = {
   "nav.services": "Hizmetler",
   "nav.posts": "İçerikler",
   "nav.customers": "Müşteriler",
+  "nav.team": "Ekip",
   "nav.settings": "Ayarlar",
   "nav.business_account": "İşletme Hesabı",
   "nav.customer_account": "Müşteri Hesabı",

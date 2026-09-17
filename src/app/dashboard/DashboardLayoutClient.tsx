@@ -9,11 +9,10 @@ import {
   History,
   Wrench,
   Users,
+  UserCog,
   Settings,
-  Bell,
   Menu,
   X,
-  ChevronDown,
   Sun,
   Moon,
   LogOut,
@@ -38,8 +37,14 @@ import { useTheme } from "@/context/ThemeContext";
 import DynamicLogoLink from "@/components/DynamicLogoLink";
 import { SHELL } from "@/components/layout/shell";
 import UserAvatar, { getDisplayName } from "@/components/layout/UserAvatar";
+import { preventFocusScroll } from "@/lib/preventFocusScroll";
 
-const navItems = [
+const navItems: {
+  i18nKey: string;
+  href: string;
+  icon: typeof LayoutDashboard;
+  ownerOnly?: boolean;
+}[] = [
   { i18nKey: "nav.overview", href: "/dashboard", icon: LayoutDashboard },
   { i18nKey: "nav.calendar", href: "/dashboard/takvim", icon: Calendar },
   {
@@ -48,6 +53,12 @@ const navItems = [
     icon: History,
   },
   { i18nKey: "nav.services", href: "/dashboard/hizmetler", icon: Wrench },
+  {
+    i18nKey: "nav.team",
+    href: "/dashboard/ekip",
+    icon: UserCog,
+    ownerOnly: true,
+  },
   { i18nKey: "nav.posts", href: "/dashboard/icerikler", icon: ImageIcon },
   { i18nKey: "nav.customers", href: "/dashboard/musteriler", icon: Users },
   { i18nKey: "nav.settings", href: "/dashboard/ayarlar", icon: Settings },
@@ -68,10 +79,14 @@ export default function DashboardLayoutClient({
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [userFullName, setUserFullName] = useState<string | null>(null);
   const [userAvatarUrl, setUserAvatarUrl] = useState<string | null>(null);
+  // Ekip yönetimi yalnızca işletme sahibine görünür
+  const [userRole, setUserRole] = useState<string | null>(null);
   // İşletme üyeliği (deneme/ücretli süre) — süper admin kapattıysa panel bloke edilir
   const [membership, setMembership] = useState<MembershipInfo | null>(null);
   const [cmdOpen, setCmdOpen] = useState(false);
   const [cmdQuery, setCmdQuery] = useState("");
+  const rootRef = useRef<HTMLDivElement>(null);
+  const columnRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLElement>(null);
 
   // Kalan gün rozetinin renkleri
@@ -84,12 +99,35 @@ export default function DashboardLayoutClient({
           ? "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/25 dark:bg-amber-500/10 dark:text-amber-400"
           : "border-red-200 bg-red-50 text-red-700 dark:border-red-500/25 dark:bg-red-500/10 dark:text-red-400";
 
+  // Dış pencere ve shell konteynerlerinin kaymasını önle (header mobilde yukarı kaçmasın)
+  useEffect(() => {
+    const lockExternalScroll = () => {
+      if (window.scrollY !== 0) window.scrollTo(0, 0);
+      if (document.documentElement.scrollTop !== 0) document.documentElement.scrollTop = 0;
+      if (document.body.scrollTop !== 0) document.body.scrollTop = 0;
+      if (columnRef.current && columnRef.current.scrollTop !== 0) {
+        columnRef.current.scrollTop = 0;
+      }
+      if (rootRef.current && rootRef.current.scrollTop !== 0) {
+        rootRef.current.scrollTop = 0;
+      }
+    };
+    window.addEventListener("scroll", lockExternalScroll, { passive: true });
+    return () => window.removeEventListener("scroll", lockExternalScroll);
+  }, []);
+
   // Close mobile bottom sheet and reset scroll when route changes
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- rota değişince mobil menüyü kapat
     setMobileMenuOpen(false);
     if (mainRef.current) {
       mainRef.current.scrollTop = 0;
+    }
+    if (columnRef.current) {
+      columnRef.current.scrollTop = 0;
+    }
+    if (rootRef.current) {
+      rootRef.current.scrollTop = 0;
     }
     window.scrollTo(0, 0);
   }, [pathname]);
@@ -118,11 +156,12 @@ export default function DashboardLayoutClient({
         setUserEmail(user.email || null);
         const { data: profile } = await supabase
           .from("profiles")
-          .select("full_name, avatar_url, tenant_id")
+          .select("full_name, avatar_url, tenant_id, role")
           .eq("id", user.id)
           .single();
         setUserFullName(profile?.full_name ?? null);
         setUserAvatarUrl(profile?.avatar_url ?? null);
+        setUserRole(profile?.role ?? null);
 
         // Üyelik durumu (kolonlar yoksa sessizce atlanır)
         if (profile?.tenant_id) {
@@ -142,6 +181,10 @@ export default function DashboardLayoutClient({
     await supabase.auth.signOut();
     router.push("/login");
   };
+
+  const visibleNavItems = navItems.filter(
+    (item) => !item.ownerOnly || userRole === "owner",
+  );
 
   const isSuperAdminUser = Boolean(
     userEmail && SUPER_ADMIN_EMAILS.includes(userEmail.toLowerCase()),
@@ -210,7 +253,7 @@ export default function DashboardLayoutClient({
   }
 
   return (
-    <div className={SHELL.root}>
+    <div ref={rootRef} className={SHELL.root}>
       {/* Animated Mesh Gradient Backgrounds */}
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-purple-400/20 mix-blend-multiply filter blur-3xl opacity-70 animate-blob dark:bg-purple-900/20 dark:mix-blend-screen" />
       <div
@@ -244,7 +287,7 @@ export default function DashboardLayoutClient({
 
         {/* Navigation */}
         <nav className="flex-1 space-y-2 overflow-y-auto px-4 py-6">
-          {navItems.map((item) => {
+          {visibleNavItems.map((item) => {
             const isActive =
               item.href === "/dashboard"
                 ? pathname === "/dashboard"
@@ -308,7 +351,7 @@ export default function DashboardLayoutClient({
       </aside>
 
       {/* Main content area */}
-      <div className={SHELL.column}>
+      <div ref={columnRef} className={SHELL.column}>
         {/* Floating Header */}
         <header className={SHELL.header}>
           {/* Mobile Logo Brand */}
@@ -398,7 +441,11 @@ export default function DashboardLayoutClient({
         </header>
 
         {/* Page content */}
-        <main ref={mainRef} className={SHELL.main}>
+        <main
+          ref={mainRef}
+          className={SHELL.main}
+          onMouseDown={preventFocusScroll}
+        >
           {children}
         </main>
       </div>
@@ -409,17 +456,17 @@ export default function DashboardLayoutClient({
           {/* 1. Özet */}
           <Link
             href="/dashboard"
-            className={`flex flex-col items-center justify-center flex-1 py-1 transition-all duration-200 active:scale-90 ${
+            className={`flex flex-col items-center justify-center flex-1 py-1 px-0.5 min-w-0 transition-all duration-200 active:scale-90 ${
               pathname === "/dashboard"
                 ? "text-indigo-600 dark:text-indigo-400 font-extrabold"
                 : "text-gray-400 hover:text-gray-600 dark:text-slate-400 dark:hover:text-slate-200 font-medium"
             }`}
           >
             <LayoutDashboard
-              size={22}
+              size={21}
               strokeWidth={pathname === "/dashboard" ? 2.5 : 1.8}
             />
-            <span className="text-[10px] mt-1 tracking-tight leading-none">
+            <span className="text-[9.5px] sm:text-[10px] mt-1 tracking-tight leading-none truncate max-w-full text-center">
               {t("nav.overview")}
             </span>
           </Link>
@@ -427,62 +474,84 @@ export default function DashboardLayoutClient({
           {/* 2. Takvim */}
           <Link
             href="/dashboard/takvim"
-            className={`flex flex-col items-center justify-center flex-1 py-1 transition-all duration-200 active:scale-90 ${
+            className={`flex flex-col items-center justify-center flex-1 py-1 px-0.5 min-w-0 transition-all duration-200 active:scale-90 ${
               pathname.startsWith("/dashboard/takvim")
                 ? "text-indigo-600 dark:text-indigo-400 font-extrabold"
                 : "text-gray-400 hover:text-gray-600 dark:text-slate-400 dark:hover:text-slate-200 font-medium"
             }`}
           >
             <Calendar
-              size={22}
+              size={21}
               strokeWidth={pathname.startsWith("/dashboard/takvim") ? 2.5 : 1.8}
             />
-            <span className="text-[10px] mt-1 tracking-tight leading-none">
+            <span className="text-[9.5px] sm:text-[10px] mt-1 tracking-tight leading-none truncate max-w-full text-center">
               {t("nav.calendar")}
             </span>
           </Link>
 
-          {/* 3. Müşteriler */}
-          <Link
-            href="/dashboard/musteriler"
-            className={`flex flex-col items-center justify-center flex-1 py-1 transition-all duration-200 active:scale-90 ${
-              pathname.startsWith("/dashboard/musteriler")
-                ? "text-indigo-600 dark:text-indigo-400 font-extrabold"
-                : "text-gray-400 hover:text-gray-600 dark:text-slate-400 dark:hover:text-slate-200 font-medium"
-            }`}
-          >
-            <Users
-              size={22}
-              strokeWidth={
-                pathname.startsWith("/dashboard/musteriler") ? 2.5 : 1.8
-              }
-            />
-            <span className="text-[10px] mt-1 tracking-tight leading-none">
-              {t("nav.customers")}
-            </span>
-          </Link>
-
-          {/* 4. Hizmetler */}
+          {/* 3. Hizmetler */}
           <Link
             href="/dashboard/hizmetler"
-            className={`flex flex-col items-center justify-center flex-1 py-1 transition-all duration-200 active:scale-90 ${
+            className={`flex flex-col items-center justify-center flex-1 py-1 px-0.5 min-w-0 transition-all duration-200 active:scale-90 ${
               pathname.startsWith("/dashboard/hizmetler")
                 ? "text-indigo-600 dark:text-indigo-400 font-extrabold"
                 : "text-gray-400 hover:text-gray-600 dark:text-slate-400 dark:hover:text-slate-200 font-medium"
             }`}
           >
             <Wrench
-              size={22}
+              size={21}
               strokeWidth={
                 pathname.startsWith("/dashboard/hizmetler") ? 2.5 : 1.8
               }
             />
-            <span className="text-[10px] mt-1 tracking-tight leading-none">
+            <span className="text-[9.5px] sm:text-[10px] mt-1 tracking-tight leading-none truncate max-w-full text-center">
               {t("nav.services")}
             </span>
           </Link>
 
-          {/* 5. Menü (More Drawer) */}
+          {/* 4. Ekip (Yalnızca işletme sahibi) */}
+          {(userRole === "owner" || pathname.startsWith("/dashboard/ekip")) && (
+            <Link
+              href="/dashboard/ekip"
+              className={`flex flex-col items-center justify-center flex-1 py-1 px-0.5 min-w-0 transition-all duration-200 active:scale-90 ${
+                pathname.startsWith("/dashboard/ekip")
+                  ? "text-indigo-600 dark:text-indigo-400 font-extrabold"
+                  : "text-gray-400 hover:text-gray-600 dark:text-slate-400 dark:hover:text-slate-200 font-medium"
+              }`}
+            >
+              <UserCog
+                size={21}
+                strokeWidth={
+                  pathname.startsWith("/dashboard/ekip") ? 2.5 : 1.8
+                }
+              />
+              <span className="text-[9.5px] sm:text-[10px] mt-1 tracking-tight leading-none truncate max-w-full text-center">
+                {t("nav.team")}
+              </span>
+            </Link>
+          )}
+
+          {/* 5. Müşteriler */}
+          <Link
+            href="/dashboard/musteriler"
+            className={`flex flex-col items-center justify-center flex-1 py-1 px-0.5 min-w-0 transition-all duration-200 active:scale-90 ${
+              pathname.startsWith("/dashboard/musteriler")
+                ? "text-indigo-600 dark:text-indigo-400 font-extrabold"
+                : "text-gray-400 hover:text-gray-600 dark:text-slate-400 dark:hover:text-slate-200 font-medium"
+            }`}
+          >
+            <Users
+              size={21}
+              strokeWidth={
+                pathname.startsWith("/dashboard/musteriler") ? 2.5 : 1.8
+              }
+            />
+            <span className="text-[9.5px] sm:text-[10px] mt-1 tracking-tight leading-none truncate max-w-full text-center">
+              {t("nav.customers")}
+            </span>
+          </Link>
+
+          {/* 6. Menü (More Drawer) */}
           {(() => {
             const isMoreActive =
               pathname.startsWith("/dashboard/icerikler") ||
@@ -492,17 +561,17 @@ export default function DashboardLayoutClient({
               <button
                 type="button"
                 onClick={() => setMobileMenuOpen(true)}
-                className={`flex flex-col items-center justify-center flex-1 py-1 transition-all duration-200 active:scale-90 ${
+                className={`flex flex-col items-center justify-center flex-1 py-1 px-0.5 min-w-0 transition-all duration-200 active:scale-90 ${
                   isMoreActive || mobileMenuOpen
                     ? "text-indigo-600 dark:text-indigo-400 font-extrabold"
                     : "text-gray-400 hover:text-gray-600 dark:text-slate-400 dark:hover:text-slate-200 font-medium"
                 }`}
               >
                 <Menu
-                  size={22}
+                  size={21}
                   strokeWidth={isMoreActive || mobileMenuOpen ? 2.5 : 1.8}
                 />
-                <span className="text-[10px] mt-1 tracking-tight leading-none">
+                <span className="text-[9.5px] sm:text-[10px] mt-1 tracking-tight leading-none truncate max-w-full text-center">
                   {lang === "tr" ? "Menü" : "Menu"}
                 </span>
               </button>
@@ -701,7 +770,7 @@ export default function DashboardLayoutClient({
                   {lang === "tr" ? "Sayfalar" : "Pages"}
                 </span>
                 <div className="mt-1 space-y-0.5">
-                  {navItems
+                  {visibleNavItems
                     .filter((item) =>
                       t(item.i18nKey)
                         .toLowerCase()

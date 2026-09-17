@@ -16,11 +16,17 @@ import {
   Download,
   ArrowRight,
   Info,
+  Crown,
 } from "lucide-react";
 import { format, addDays, isSameDay } from "date-fns";
 import { tr, enUS } from "date-fns/locale";
 import { getPalette, paletteCss } from "@/lib/palettes";
 import RequirePhoneModal from "@/components/RequirePhoneModal";
+import {
+  servicesForStaff,
+  sortStaffOwnerFirst,
+  type StaffMember,
+} from "@/lib/staff";
 
 const dayMap: Record<string, number> = {
   pazartesi: 1,
@@ -53,6 +59,8 @@ interface ServiceItem {
   duration?: number;
   duration_minutes?: number;
   price: number;
+  /** Hizmeti veren ekip üyesi (services.staff_id) */
+  staff_id?: string | null;
 }
 
 interface TenantItem {
@@ -90,8 +98,10 @@ export default function BookPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // Stepper: 1 = Hizmet, 2 = Tarih & Saat, 3 = Onay & Özet
+  // Stepper: 1 = Eleman, 2 = Hizmet, 3 = Tarih & Saat, 4 = Onay & Özet
   const [step, setStep] = useState(1);
+  const [staffList, setStaffList] = useState<StaffMember[]>([]);
+  const [selectedStaff, setSelectedStaff] = useState<StaffMember | null>(null);
   const [selectedService, setSelectedService] = useState<ServiceItem | null>(
     null,
   );
@@ -139,13 +149,28 @@ export default function BookPage() {
         setServices(serviceData as ServiceItem[]);
       }
 
+      // Ekip listesi (herkese açık uç): müşteri önce eleman seçer
+      try {
+        const res = await fetch(`/api/tenant/${tenantData.id}/staff`);
+        const json = await res.json();
+        const team = sortStaffOwnerFirst((json?.staff ?? []) as StaffMember[]);
+        setStaffList(team);
+        // Ekip kaydı yoksa adım atlanır (tek kişilik/eski işletmeler)
+        if (team.length === 0) setStep(2);
+      } catch {
+        setStaffList([]);
+        setStep(2);
+      }
+
       setLoading(false);
     };
 
     loadTenant();
   }, [slug, supabase, lang]);
 
-  // Seçilen günün dolu saatleri (çakışan randevuyu önlemek için)
+  // Seçilen elemanın o günkü dolu saatleri.
+  // Not: `appointments` RLS'i müşteriye sadece kendi randevularını gösterir, bu
+  // yüzden dolu saatler sunucu ucundan (yalnızca başlangıç zamanları) çekilir.
   useEffect(() => {
     const loadBookedSlots = async () => {
       if (!tenant || !selectedDate) return;
@@ -154,25 +179,33 @@ export default function BookPage() {
       const endOfDay = new Date(selectedDate);
       endOfDay.setHours(23, 59, 59, 999);
 
-      const { data: appts } = await supabase
-        .from("appointments")
-        .select("start_time")
-        .eq("tenant_id", tenant.id)
-        .neq("status", "cancelled")
-        .gte("start_time", startOfDay.toISOString())
-        .lte("start_time", endOfDay.toISOString());
+      const query = new URLSearchParams({
+        from: startOfDay.toISOString(),
+        to: endOfDay.toISOString(),
+      });
+      if (selectedStaff) query.set("staffId", selectedStaff.id);
 
-      if (appts) {
-        const taken = appts.map((a) => {
-          const d = new Date(a.start_time);
-          return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
-        });
-        setBookedSlots(taken);
+      try {
+        const res = await fetch(
+          `/api/tenant/${tenant.id}/availability?${query.toString()}`,
+        );
+        const json = await res.json();
+        const busy: string[] = json?.busy ?? [];
+
+        // Sunucudan gelen ISO zamanlar müşterinin yerel saatine çevrilir
+        setBookedSlots(
+          busy.map((iso) => {
+            const d = new Date(iso);
+            return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
+          }),
+        );
+      } catch {
+        setBookedSlots([]);
       }
     };
 
     loadBookedSlots();
-  }, [tenant, selectedDate, supabase]);
+  }, [tenant, selectedDate, selectedStaff]);
 
   const getServiceDuration = (svc: ServiceItem) => {
     return svc.duration || svc.duration_minutes || 30;
@@ -228,15 +261,78 @@ export default function BookPage() {
     });
   }, [selectedDate, timeFilter, tenant]);
 
+  // Seçilen elemanın hizmetleri (staff_id kolonu yoksa tümü gösterilir)
+  const staffServices = useMemo(
+    () => servicesForStaff(services, selectedStaff?.id),
+    [services, selectedStaff],
+  );
+
   const filteredServices = useMemo(() => {
-    if (!serviceSearch.trim()) return services;
+    if (!serviceSearch.trim()) return staffServices;
     const q = serviceSearch.toLowerCase();
-    return services.filter(
+    return staffServices.filter(
       (s) =>
         s.name.toLowerCase().includes(q) ||
         (s.description && s.description.toLowerCase().includes(q)),
     );
-  }, [services, serviceSearch]);
+  }, [staffServices, serviceSearch]);
+
+  // İlk adım her zaman eleman seçimi; ekip kaydı yoksa akış hizmetten başlar.
+  const hasStaffStep = staffList.length > 0;
+  const wizardSteps = hasStaffStep
+    ? [
+        {
+          num: 1,
+          labelTr: "1. Eleman",
+          labelTrFull: "1. Eleman Seçimi",
+          labelEn: "1. Staff",
+          labelEnFull: "1. Choose Staff",
+        },
+        {
+          num: 2,
+          labelTr: "2. Hizmet",
+          labelTrFull: "2. Hizmet Seçimi",
+          labelEn: "2. Service",
+          labelEnFull: "2. Service",
+        },
+        {
+          num: 3,
+          labelTr: "3. Tarih",
+          labelTrFull: "3. Tarih & Saat",
+          labelEn: "3. Date",
+          labelEnFull: "3. Date & Time",
+        },
+        {
+          num: 4,
+          labelTr: "4. Onay",
+          labelTrFull: "4. Onay & Not",
+          labelEn: "4. Confirm",
+          labelEnFull: "4. Confirm",
+        },
+      ]
+    : [
+        {
+          num: 2,
+          labelTr: "1. Hizmet",
+          labelTrFull: "1. Hizmet Seçimi",
+          labelEn: "1. Service",
+          labelEnFull: "1. Service",
+        },
+        {
+          num: 3,
+          labelTr: "2. Tarih",
+          labelTrFull: "2. Tarih & Saat",
+          labelEn: "2. Date",
+          labelEnFull: "2. Date & Time",
+        },
+        {
+          num: 4,
+          labelTr: "3. Onay",
+          labelTrFull: "3. Onay & Not",
+          labelEn: "3. Confirm",
+          labelEnFull: "3. Confirm",
+        },
+      ];
 
   const handleBook = async () => {
     if (!tenant || !selectedService || !selectedDate || !selectedTime) return;
@@ -284,6 +380,7 @@ export default function BookPage() {
       body: JSON.stringify({
         tenant_id: tenant.id,
         service_id: selectedService.id,
+        staff_id: selectedStaff?.id ?? null,
         start_time: start.toISOString(),
         end_time: end.toISOString(),
         note,
@@ -430,6 +527,14 @@ export default function BookPage() {
                   {selectedService.name}
                 </span>
               </div>
+              {selectedStaff && (
+                <div className="flex justify-between text-gray-500 dark:text-slate-400">
+                  <span>{lang === "tr" ? "Eleman" : "Staff"}:</span>
+                  <span className="font-bold text-amber-600 dark:text-amber-400">
+                    {selectedStaff.full_name ?? "-"}
+                  </span>
+                </div>
+              )}
               <div className="flex justify-between text-gray-500 dark:text-slate-400">
                 <span>{lang === "tr" ? "Tarih ve Saat" : "Date & Time"}:</span>
                 <span className="font-bold text-[var(--brand-text)]">
@@ -515,30 +620,12 @@ export default function BookPage() {
       </div>
 
       {/* Stepper Wizard Bar */}
-      <div className="grid grid-cols-3 gap-1.5 sm:gap-3 p-1 sm:p-1.5 rounded-2xl bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl border border-white/60 dark:border-slate-800/60 shadow-xs">
-        {[
-          {
-            num: 1,
-            labelTr: "1. Hizmet",
-            labelTrFull: "1. Hizmet Seçimi",
-            labelEn: "1. Service",
-            labelEnFull: "1. Service",
-          },
-          {
-            num: 2,
-            labelTr: "2. Tarih",
-            labelTrFull: "2. Tarih & Saat",
-            labelEn: "2. Date",
-            labelEnFull: "2. Date & Time",
-          },
-          {
-            num: 3,
-            labelTr: "3. Onay",
-            labelTrFull: "3. Onay & Not",
-            labelEn: "3. Confirm",
-            labelEnFull: "3. Confirm",
-          },
-        ].map((s) => {
+      <div
+        className={`grid gap-1.5 sm:gap-3 p-1 sm:p-1.5 rounded-2xl bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl border border-white/60 dark:border-slate-800/60 shadow-xs ${
+          hasStaffStep ? "grid-cols-4" : "grid-cols-3"
+        }`}
+      >
+        {wizardSteps.map((s) => {
           const isActive = step === s.num;
           const isDone = step > s.num;
           return (
@@ -546,14 +633,15 @@ export default function BookPage() {
               key={s.num}
               onClick={() => {
                 if (s.num === 1) setStep(1);
-                if (s.num === 2 && selectedService) setStep(2);
+                if (s.num === 2 && selectedStaff) setStep(2);
+                if (s.num === 3 && selectedService) setStep(3);
                 if (
-                  s.num === 3 &&
+                  s.num === 4 &&
                   selectedService &&
                   selectedDate &&
                   selectedTime
                 )
-                  setStep(3);
+                  setStep(4);
               }}
               className={`flex items-center justify-center gap-1 sm:gap-1.5 py-2 sm:py-2.5 px-1 sm:px-2 rounded-xl text-[11px] sm:text-xs font-bold transition-all whitespace-nowrap ${
                 isActive
@@ -577,8 +665,108 @@ export default function BookPage() {
         })}
       </div>
 
-      {/* STEP 1: SERVICE SELECTION */}
-      {step === 1 && (
+      {/* STEP 1: STAFF SELECTION — işletme sahibi vurgulu kart */}
+      {step === 1 && hasStaffStep && (
+        <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+              {lang === "tr" ? "Eleman Seçimi" : "Select Staff"}
+            </h2>
+            <p className="text-xs text-gray-500 dark:text-slate-400">
+              {lang === "tr"
+                ? "Randevunuzu kimin vereceğini seçin. Sonraki adımlarda sadece o elemanın hizmetleri ve müsait saatleri gösterilir."
+                : "Choose who will serve you. Next steps show only that person's services and availability."}
+            </p>
+          </div>
+
+          <div className="grid gap-3">
+            {staffList.map((staff) => {
+              const isOwner = staff.role === "owner";
+              const displayName =
+                staff.full_name?.trim() ||
+                (lang === "tr" ? "İsimsiz" : "Unnamed");
+
+              return (
+                <button
+                  key={staff.id}
+                  onClick={() => {
+                    setSelectedStaff(staff);
+                    setSelectedService(null);
+                    setSelectedTime(null);
+                    setStep(2);
+                  }}
+                  className={`group relative flex items-center justify-between gap-4 overflow-hidden p-5 rounded-3xl border text-left transition-all ${
+                    isOwner
+                      ? "border-amber-300/90 bg-gradient-to-br from-amber-50 via-white to-amber-50/40 shadow-lg shadow-amber-500/10 ring-2 ring-amber-400/30 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-amber-500/20 dark:border-amber-400/40 dark:from-amber-950/40 dark:via-slate-900/70 dark:to-slate-900/60"
+                      : "bg-white/80 dark:bg-slate-900/60 border-white/60 dark:border-slate-800/80 hover:border-[var(--brand-border)] hover:shadow-md hover:-translate-y-0.5"
+                  }`}
+                >
+                  {isOwner && (
+                    <div className="pointer-events-none absolute -right-8 -top-10 h-28 w-28 rounded-full bg-amber-300/25 blur-2xl" />
+                  )}
+
+                  <div className="relative flex min-w-0 items-center gap-4">
+                    <div
+                      className={`flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full text-lg font-black ${
+                        isOwner
+                          ? "bg-gradient-to-br from-amber-400 to-amber-600 text-white ring-4 ring-amber-200/70 dark:ring-amber-500/20"
+                          : "bg-[var(--brand-soft)] text-[var(--brand-text)] border-2 border-white dark:border-slate-800"
+                      }`}
+                    >
+                      {staff.avatar_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={staff.avatar_url}
+                          alt={displayName}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        displayName.charAt(0).toUpperCase()
+                      )}
+                    </div>
+
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="truncate text-base font-black text-gray-900 dark:text-white">
+                          {displayName}
+                        </h3>
+                        {isOwner && (
+                          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-gradient-to-r from-amber-500 to-amber-600 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-white shadow-sm">
+                            <Crown size={11} strokeWidth={2.5} />
+                            {lang === "tr" ? "İşletme Sahibi" : "Owner"}
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-0.5 text-xs text-gray-500 dark:text-slate-400">
+                        {isOwner
+                          ? lang === "tr"
+                            ? "İşletmenin sahibi"
+                            : "Business owner"
+                          : lang === "tr"
+                            ? "Ekip elemanı"
+                            : "Team member"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div
+                    className={`relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-all ${
+                      isOwner
+                        ? "bg-gradient-to-br from-amber-500 to-amber-600 text-white shadow-md shadow-amber-500/30 group-hover:scale-110"
+                        : "bg-gray-100 text-gray-400 group-hover:bg-[var(--brand)] group-hover:text-white dark:bg-slate-800"
+                    }`}
+                  >
+                    <ChevronRight size={18} />
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* STEP 2: SERVICE SELECTION */}
+      {step === 2 && (
         <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
@@ -586,9 +774,13 @@ export default function BookPage() {
                 {lang === "tr" ? "Hizmet Seçimi" : "Select Service"}
               </h2>
               <p className="text-xs text-gray-500 dark:text-slate-400">
-                {lang === "tr"
-                  ? "Almak istediğiniz hizmeti seçip devam edin."
-                  : "Choose the service you would like to book."}
+                {selectedStaff
+                  ? lang === "tr"
+                    ? `${selectedStaff.full_name ?? ""} tarafından verilen hizmetler`
+                    : `Services provided by ${selectedStaff.full_name ?? ""}`
+                  : lang === "tr"
+                    ? "Almak istediğiniz hizmeti seçip devam edin."
+                    : "Choose the service you would like to book."}
               </p>
             </div>
 
@@ -620,7 +812,8 @@ export default function BookPage() {
                   key={svc.id}
                   onClick={() => {
                     setSelectedService(svc);
-                    setStep(2);
+                    setSelectedTime(null);
+                    setStep(3);
                   }}
                   className={`group relative flex items-center justify-between p-5 rounded-3xl border transition-all text-left ${
                     isSelected
@@ -665,17 +858,32 @@ export default function BookPage() {
 
             {filteredServices.length === 0 && (
               <div className="p-12 text-center rounded-3xl bg-white/50 dark:bg-slate-900/50 border border-gray-100 dark:border-slate-800 text-gray-400 text-sm">
-                {lang === "tr"
-                  ? "Eşleşen hizmet bulunamadı."
-                  : "No services found."}
+                {selectedStaff && services.length > 0
+                  ? lang === "tr"
+                    ? `${selectedStaff.full_name ?? "Bu eleman"} için tanımlı hizmet bulunmuyor. Lütfen başka bir eleman seçin.`
+                    : `No services for ${selectedStaff.full_name ?? "this staff member"}. Please pick someone else.`
+                  : lang === "tr"
+                    ? "Eşleşen hizmet bulunamadı."
+                    : "No services found."}
               </div>
             )}
           </div>
+
+          {hasStaffStep && (
+            <button
+              type="button"
+              onClick={() => setStep(1)}
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-2xl border border-gray-200 dark:border-slate-700 text-xs font-bold text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors w-fit"
+            >
+              <ChevronLeft size={16} />
+              {lang === "tr" ? "Eleman Seçimine Dön" : "Back to Staff"}
+            </button>
+          )}
         </div>
       )}
 
-      {/* STEP 2: DATE & TIME SELECTION */}
-      {step === 2 && selectedService && (
+      {/* STEP 3: DATE & TIME SELECTION */}
+      {step === 3 && selectedService && (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
           <div className="flex items-center justify-between">
             <div>
@@ -686,10 +894,11 @@ export default function BookPage() {
                 {selectedService.name} • ₺{selectedService.price} (
                 {getServiceDuration(selectedService)}{" "}
                 {lang === "tr" ? "dk" : "min"})
+                {selectedStaff ? ` • ${selectedStaff.full_name ?? ""}` : ""}
               </p>
             </div>
             <button
-              onClick={() => setStep(1)}
+              onClick={() => setStep(2)}
               className="text-xs font-bold text-[var(--brand-text)] hover:underline"
             >
               {lang === "tr" ? "Hizmeti Değiştir" : "Change Service"}
@@ -826,11 +1035,11 @@ export default function BookPage() {
                 )}
               </div>
 
-              {/* Step 2 Bottom Navigation & Continue Action Bar */}
+              {/* Step 3 Bottom Navigation & Continue Action Bar */}
               <div className="mt-8 pt-5 border-t border-gray-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <button
                   type="button"
-                  onClick={() => setStep(1)}
+                  onClick={() => setStep(2)}
                   className="flex items-center gap-1.5 px-4 py-2.5 rounded-2xl border border-gray-200 dark:border-slate-700 text-xs font-bold text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors w-fit"
                 >
                   <ChevronLeft size={16} />
@@ -842,7 +1051,7 @@ export default function BookPage() {
                 <button
                   type="button"
                   disabled={!selectedTime}
-                  onClick={() => setStep(3)}
+                  onClick={() => setStep(4)}
                   className="flex items-center justify-center gap-2 px-6 py-3 rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white font-black text-xs sm:text-sm shadow-md shadow-[color:var(--brand-shadow)] active:scale-95 disabled:opacity-40 disabled:pointer-events-none transition-all"
                 >
                   <span>
@@ -862,8 +1071,8 @@ export default function BookPage() {
         </div>
       )}
 
-      {/* STEP 3: CONFIRMATION & NOTES */}
-      {step === 3 && selectedService && selectedDate && selectedTime && (
+      {/* STEP 4: CONFIRMATION & NOTES */}
+      {step === 4 && selectedService && selectedDate && selectedTime && (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
           <div>
             <h2 className="text-xl font-bold text-gray-900 dark:text-white">
@@ -928,6 +1137,23 @@ export default function BookPage() {
                 </span>
               </div>
 
+              {selectedStaff && (
+                <div>
+                  <span className="text-gray-400 block mb-1">
+                    {lang === "tr" ? "Eleman" : "Staff"}
+                  </span>
+                  <p className="font-bold text-gray-800 dark:text-slate-200">
+                    {selectedStaff.full_name ?? "-"}
+                  </p>
+                  {selectedStaff.role === "owner" && (
+                    <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-600 dark:text-amber-400">
+                      <Crown size={12} strokeWidth={2.5} />
+                      {lang === "tr" ? "İşletme Sahibi" : "Owner"}
+                    </span>
+                  )}
+                </div>
+              )}
+
               <div>
                 <span className="text-gray-400 block mb-1">
                   {lang === "tr" ? "Tarih ve Saat" : "Date & Time"}
@@ -967,7 +1193,7 @@ export default function BookPage() {
             <div className="mt-8 flex items-center gap-3">
               <button
                 type="button"
-                onClick={() => setStep(2)}
+                onClick={() => setStep(3)}
                 className="inline-flex items-center justify-center gap-2 pl-4 pr-5 py-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-700 bg-white/60 dark:bg-slate-800/60 backdrop-blur-md text-sm font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700/80 shadow-xs hover:shadow-sm active:scale-95 transition-all cursor-pointer select-none shrink-0"
               >
                 <ChevronLeft

@@ -18,7 +18,7 @@ import {
   Calendar,
   X,
   AlertCircle,
-  Bell
+  Bell,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useLanguage } from "@/context/LanguageContext";
@@ -47,9 +47,18 @@ export default function DashboardPage() {
     nextAppointment: null,
   });
   const [completedRevenue, setCompletedRevenue] = useState(0);
-  const [todayAppointments, setTodayAppointments] = useState<TodayAppointment[]>([]);
-  const [pendingApprovalAppts, setPendingApprovalAppts] = useState<TodayAppointment[]>([]);
-  const [tenant, setTenant] = useState<{ id: string; name: string; slug: string; sector?: string } | null>(null);
+  const [todayAppointments, setTodayAppointments] = useState<
+    TodayAppointment[]
+  >([]);
+  const [pendingApprovalAppts, setPendingApprovalAppts] = useState<
+    TodayAppointment[]
+  >([]);
+  const [tenant, setTenant] = useState<{
+    id: string;
+    name: string;
+    slug: string;
+    sector?: string;
+  } | null>(null);
   const [services, setServices] = useState<Service[]>([]);
   const [customers, setCustomers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -109,58 +118,73 @@ export default function DashboardPage() {
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
     // Fetch today's appointments with service & profile info
-    const [todayApptsRes, pendingCountRes, newCustRes, nextApptRes, servicesRes, customersRes] =
-      await Promise.all([
-        supabase
-          .from("appointments")
-          .select("*, services(name, price, duration, duration_minutes), profiles!appointments_customer_id_fkey(full_name, phone)")
-          .eq("tenant_id", tId)
-          .neq("status", "cancelled")
-          .gte("start_time", todayStart.toISOString())
-          .lte("start_time", todayEnd.toISOString())
-          .order("start_time", { ascending: true }),
+    const [
+      todayApptsRes,
+      pendingCountRes,
+      newCustRes,
+      nextApptRes,
+      servicesRes,
+      customersRes,
+    ] = await Promise.all([
+      supabase
+        .from("appointments")
+        .select(
+          "*, services(name, price, duration, duration_minutes), profiles!appointments_customer_id_fkey(full_name, phone)",
+        )
+        .eq("tenant_id", tId)
+        .neq("status", "cancelled")
+        .gte("start_time", todayStart.toISOString())
+        .lte("start_time", todayEnd.toISOString())
+        .order("start_time", { ascending: true }),
 
-        supabase
-          .from("appointments")
-          .select("*, services(name, price, duration, duration_minutes), profiles!appointments_customer_id_fkey(full_name, phone)")
-          .eq("tenant_id", tId)
-          .neq("status", "cancelled")
-          .eq("status", "pending")
-          .order("start_time", { ascending: true }),
+      supabase
+        .from("appointments")
+        .select(
+          "*, services(name, price, duration, duration_minutes), profiles!appointments_customer_id_fkey(full_name, phone)",
+        )
+        .eq("tenant_id", tId)
+        .neq("status", "cancelled")
+        .eq("status", "pending")
+        .order("start_time", { ascending: true }),
 
-        supabase
-          .from("profiles")
-          .select("*", { count: "exact", head: true })
-          .eq("tenant_id", tId)
-          .eq("role", "customer")
-          .gte("created_at", thirtyDaysAgo.toISOString()),
+      supabase
+        .from("profiles")
+        .select("*", { count: "exact", head: true })
+        .eq("tenant_id", tId)
+        .eq("role", "customer")
+        .gte("created_at", thirtyDaysAgo.toISOString()),
 
-        supabase
-          .from("appointments")
-          .select("*, services(name), profiles!appointments_customer_id_fkey(full_name)")
-          .eq("tenant_id", tId)
-          .eq("status", "confirmed")
-          .gte("start_time", now.toISOString())
-          .order("start_time", { ascending: true })
-          .limit(1),
+      supabase
+        .from("appointments")
+        .select(
+          "*, services(name), profiles!appointments_customer_id_fkey(full_name)",
+        )
+        .eq("tenant_id", tId)
+        .eq("status", "confirmed")
+        .gte("start_time", now.toISOString())
+        .order("start_time", { ascending: true })
+        .limit(1),
 
-        supabase
-          .from("services")
-          .select("*")
-          .eq("tenant_id", tId)
-          .eq("is_active", true)
-          .order("name"),
+      supabase
+        .from("services")
+        .select("*")
+        .eq("tenant_id", tId)
+        .eq("is_active", true)
+        .order("name"),
 
-        supabase
-          .from("profiles")
-          .select("*")
-          .eq("tenant_id", tId)
-          .eq("role", "customer")
-          .order("full_name"),
-      ]);
+      supabase
+        .from("profiles")
+        .select("*")
+        .eq("tenant_id", tId)
+        .eq("role", "customer")
+        .order("full_name"),
+    ]);
 
     const rawTodayAppts = todayApptsRes.data || [];
-    const dailyRev = rawTodayAppts.reduce((sum, app) => sum + (app.services?.price || 0), 0);
+    const dailyRev = rawTodayAppts.reduce(
+      (sum, app) => sum + (app.services?.price || 0),
+      0,
+    );
     const compRev = rawTodayAppts
       .filter((app) => app.status === "completed")
       .reduce((sum, app) => sum + (app.services?.price || 0), 0);
@@ -178,9 +202,13 @@ export default function DashboardPage() {
         status: app.status as TodayAppointment["status"],
         customer_name: name,
         customer_phone: phone,
-        service_name: app.services?.name || (lang === "tr" ? "Hizmet" : "Service"),
+        service_name:
+          app.services?.name || (lang === "tr" ? "Hizmet" : "Service"),
         service_price: app.services?.price || 0,
-        service_duration: (app.services as any)?.duration || app.services?.duration_minutes || 30,
+        service_duration:
+          (app.services as any)?.duration ||
+          app.services?.duration_minutes ||
+          30,
         note: app.custom_fields?.note || "",
       };
     });
@@ -199,9 +227,13 @@ export default function DashboardPage() {
         status: "pending",
         customer_name: name,
         customer_phone: phone,
-        service_name: app.services?.name || (lang === "tr" ? "Hizmet" : "Service"),
+        service_name:
+          app.services?.name || (lang === "tr" ? "Hizmet" : "Service"),
         service_price: app.services?.price || 0,
-        service_duration: (app.services as any)?.duration || app.services?.duration_minutes || 30,
+        service_duration:
+          (app.services as any)?.duration ||
+          app.services?.duration_minutes ||
+          30,
         note: app.custom_fields?.note || "",
       };
     });
@@ -269,7 +301,9 @@ export default function DashboardPage() {
 
     if (!error) {
       setTodayAppointments((prev) =>
-        prev.map((app) => (app.id === id ? { ...app, status: "completed" } : app))
+        prev.map((app) =>
+          app.id === id ? { ...app, status: "completed" } : app,
+        ),
       );
       // Update completed revenue locally
       const completedApp = todayAppointments.find((a) => a.id === id);
@@ -290,7 +324,9 @@ export default function DashboardPage() {
     if (!error) {
       setPendingApprovalAppts((prev) => prev.filter((a) => a.id !== id));
       setTodayAppointments((prev) =>
-        prev.map((app) => (app.id === id ? { ...app, status: "confirmed" } : app))
+        prev.map((app) =>
+          app.id === id ? { ...app, status: "confirmed" } : app,
+        ),
       );
       setStats((prev) => ({
         ...prev,
@@ -305,7 +341,7 @@ export default function DashboardPage() {
       !confirm(
         lang === "tr"
           ? "Bu randevu talebini reddetmek istediğinize emin misiniz?"
-          : "Are you sure you want to decline this appointment request?"
+          : "Are you sure you want to decline this appointment request?",
       )
     ) {
       return;
@@ -331,7 +367,9 @@ export default function DashboardPage() {
     e.preventDefault();
     if (!tenant) return;
     if (!selectedServiceId) {
-      setFormError(lang === "tr" ? "Lütfen bir hizmet seçin." : "Please select a service.");
+      setFormError(
+        lang === "tr" ? "Lütfen bir hizmet seçin." : "Please select a service.",
+      );
       return;
     }
 
@@ -342,14 +380,20 @@ export default function DashboardPage() {
     if (customerMode === "existing") {
       const existing = customers.find((c) => c.id === selectedCustomerId);
       if (!existing) {
-        setFormError(lang === "tr" ? "Lütfen müşteri seçin." : "Please select a customer.");
+        setFormError(
+          lang === "tr" ? "Lütfen müşteri seçin." : "Please select a customer.",
+        );
         return;
       }
       customerName = existing.full_name || "";
       customerPhone = existing.phone || "";
     } else {
       if (!customerName) {
-        setFormError(lang === "tr" ? "Lütfen müşteri adını girin." : "Please enter customer name.");
+        setFormError(
+          lang === "tr"
+            ? "Lütfen müşteri adını girin."
+            : "Please enter customer name.",
+        );
         return;
       }
       try {
@@ -373,7 +417,10 @@ export default function DashboardPage() {
     }
 
     const selectedService = services.find((s) => s.id === selectedServiceId);
-    const duration = (selectedService as any)?.duration || selectedService?.duration_minutes || 30;
+    const duration =
+      (selectedService as any)?.duration ||
+      selectedService?.duration_minutes ||
+      30;
 
     const [hours, minutes] = appointmentTime.split(":").map(Number);
     const [year, month, day] = appointmentDate.split("-").map(Number);
@@ -400,7 +447,14 @@ export default function DashboardPage() {
       insertPayload.customer_id = customerId;
     }
 
-    const { error: insertError } = await supabase.from("appointments").insert(insertPayload);
+    // Randevu, hizmeti veren elemanın takvimine düşsün (müsaitlik hesabı için)
+    insertPayload.staff_id =
+      (selectedService as { staff_id?: string | null } | undefined)?.staff_id ??
+      null;
+
+    const { error: insertError } = await supabase
+      .from("appointments")
+      .insert(insertPayload);
 
     setFormSubmitting(false);
 
@@ -421,32 +475,46 @@ export default function DashboardPage() {
     const s = new Date(startIso);
     const e = new Date(endIso);
     const locale = lang === "tr" ? "tr-TR" : "en-US";
-    const sStr = s.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
-    const eStr = e.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
+    const sStr = s.toLocaleTimeString(locale, {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    const eStr = e.toLocaleTimeString(locale, {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
     return `${sStr} - ${eStr}`;
   };
 
   const getTimeLeft = (isoString: string) => {
-    const diff = Math.max(0, new Date(isoString).getTime() - new Date().getTime());
+    const diff = Math.max(
+      0,
+      new Date(isoString).getTime() - new Date().getTime(),
+    );
     const days = Math.floor(diff / 86400000);
     const hours = Math.floor((diff % 86400000) / 3600000);
     const minutes = Math.floor(((diff % 86400000) % 3600000) / 60000);
 
     if (days > 0) {
-      return lang === "tr"
-        ? `${days} gün ${hours} sa`
-        : `${days}d ${hours}h`;
+      return lang === "tr" ? `${days} gün ${hours} sa` : `${days}d ${hours}h`;
     }
     if (hours > 0) {
-      return lang === "tr" ? `${hours} sa ${minutes} dk` : `${hours}h ${minutes}m`;
+      return lang === "tr"
+        ? `${hours} sa ${minutes} dk`
+        : `${hours}h ${minutes}m`;
     }
     return lang === "tr" ? `${minutes} dk` : `${minutes}m`;
   };
 
   // Occupancy rate calculation (e.g. today's appointments out of target 8)
-  const completedCount = todayAppointments.filter((a) => a.status === "completed").length;
+  const completedCount = todayAppointments.filter(
+    (a) => a.status === "completed",
+  ).length;
   const totalTodayCount = todayAppointments.length;
-  const occupancyPercentage = Math.min(100, Math.round((totalTodayCount / 8) * 100));
+  const occupancyPercentage = Math.min(
+    100,
+    Math.round((totalTodayCount / 8) * 100),
+  );
 
   if (loading) {
     return <PageSkeleton />;
@@ -461,7 +529,16 @@ export default function DashboardPage() {
             {t("nav.overview")}
           </h1>
           <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">
-            {tenant?.name || "Randera"} • {new Date().toLocaleDateString(lang === "tr" ? "tr-TR" : "en-US", { day: "numeric", month: "long", year: "numeric" })}, {new Date().toLocaleDateString(lang === "tr" ? "tr-TR" : "en-US", { weekday: "long" })}
+            {tenant?.name || "Randera"} •{" "}
+            {new Date().toLocaleDateString(lang === "tr" ? "tr-TR" : "en-US", {
+              day: "numeric",
+              month: "long",
+              year: "numeric",
+            })}
+            ,{" "}
+            {new Date().toLocaleDateString(lang === "tr" ? "tr-TR" : "en-US", {
+              weekday: "long",
+            })}
           </p>
         </div>
 
@@ -484,7 +561,10 @@ export default function DashboardPage() {
                   </>
                 ) : (
                   <>
-                    <Copy size={16} className="text-indigo-600 dark:text-indigo-400" />
+                    <Copy
+                      size={16}
+                      className="text-indigo-600 dark:text-indigo-400"
+                    />
                     <span>{t("dashboard.copy_link")}</span>
                   </>
                 )}
@@ -536,12 +616,18 @@ export default function DashboardPage() {
           </div>
           <div className="mt-2 sm:mt-3">
             <p className="text-xl sm:text-3xl font-black tracking-tight text-gray-900 dark:text-white truncate">
-              ₺{stats.dailyRevenue.toLocaleString(lang === "tr" ? "tr-TR" : "en-US")}
+              ₺
+              {stats.dailyRevenue.toLocaleString(
+                lang === "tr" ? "tr-TR" : "en-US",
+              )}
             </p>
             <div className="mt-1 sm:mt-2 flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs font-medium text-emerald-600 dark:text-emerald-400">
               <span className="inline-block h-1.5 w-1.5 sm:h-2 sm:w-2 rounded-full bg-emerald-500 shrink-0" />
               <span className="truncate">
-                ₺{completedRevenue.toLocaleString(lang === "tr" ? "tr-TR" : "en-US")}{" "}
+                ₺
+                {completedRevenue.toLocaleString(
+                  lang === "tr" ? "tr-TR" : "en-US",
+                )}{" "}
                 {t("dashboard.status.completed").toLowerCase()}
               </span>
             </div>
@@ -563,9 +649,15 @@ export default function DashboardPage() {
               {totalTodayCount}
             </p>
             <div className="mt-1 sm:mt-2 flex items-center gap-1 text-[10px] sm:text-xs font-medium text-gray-500 dark:text-slate-400 truncate">
-              <span className="text-indigo-600 dark:text-indigo-400 font-bold">{completedCount}</span> {t("dashboard.status.completed").toLowerCase()}
+              <span className="text-indigo-600 dark:text-indigo-400 font-bold">
+                {completedCount}
+              </span>{" "}
+              {t("dashboard.status.completed").toLowerCase()}
               <span>•</span>
-              <span className="text-amber-500 font-bold">{totalTodayCount - completedCount}</span> {t("dashboard.pending").toLowerCase()}
+              <span className="text-amber-500 font-bold">
+                {totalTodayCount - completedCount}
+              </span>{" "}
+              {t("dashboard.pending").toLowerCase()}
             </div>
           </div>
         </div>
@@ -629,7 +721,9 @@ export default function DashboardPage() {
               </div>
               <div>
                 <h2 className="text-lg font-black text-gray-900 dark:text-white flex items-center gap-2">
-                  {lang === "tr" ? "Onay Bekleyen Randevular" : "Pending Approval Requests"}
+                  {lang === "tr"
+                    ? "Onay Bekleyen Randevular"
+                    : "Pending Approval Requests"}
                   <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-amber-500 text-white shadow-xs">
                     {pendingApprovalAppts.length}
                   </span>
@@ -648,7 +742,12 @@ export default function DashboardPage() {
               const cleanPhone = app.customer_phone.replace(/\D/g, "");
               const formattedTime = new Date(app.start_time).toLocaleDateString(
                 lang === "tr" ? "tr-TR" : "en-US",
-                { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" }
+                {
+                  day: "numeric",
+                  month: "long",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                },
               );
 
               return (
@@ -658,7 +757,9 @@ export default function DashboardPage() {
                 >
                   <div className="flex items-start sm:items-center gap-3.5 min-w-0">
                     <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 text-white font-black text-lg shadow-sm">
-                      {app.customer_name ? app.customer_name.charAt(0).toUpperCase() : "M"}
+                      {app.customer_name
+                        ? app.customer_name.charAt(0).toUpperCase()
+                        : "M"}
                     </div>
 
                     <div className="min-w-0">
@@ -708,7 +809,7 @@ export default function DashboardPage() {
                         href={`https://wa.me/${cleanPhone.startsWith("90") ? cleanPhone : `90${cleanPhone}`}?text=${encodeURIComponent(
                           lang === "tr"
                             ? `Merhaba ${app.customer_name}, Randera üzerinden oluşturduğunuz randevu talebiniz hakkında iletişime geçiyorum.`
-                            : `Hello ${app.customer_name}, contacting you regarding your booking request on Randera.`
+                            : `Hello ${app.customer_name}, contacting you regarding your booking request on Randera.`,
                         )}`}
                         target="_blank"
                         rel="noopener noreferrer"
@@ -733,7 +834,9 @@ export default function DashboardPage() {
                       className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition-all active:scale-95 disabled:opacity-50"
                     >
                       <Check size={15} strokeWidth={3} />
-                      <span>{lang === "tr" ? "Randevuyu Onayla" : "Approve Booking"}</span>
+                      <span>
+                        {lang === "tr" ? "Randevuyu Onayla" : "Approve Booking"}
+                      </span>
                     </button>
                   </div>
                 </div>
@@ -757,13 +860,16 @@ export default function DashboardPage() {
                     {t("dashboard.recent_appointments")}
                   </span>
                   <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-200/60 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300">
-                    {getTimeLeft(stats.nextAppointment.start_time)} {lang === "tr" ? "kaldı" : "left"}
+                    {getTimeLeft(stats.nextAppointment.start_time)}{" "}
+                    {lang === "tr" ? "kaldı" : "left"}
                   </span>
                 </div>
                 <h3 className="text-lg font-bold text-gray-900 dark:text-white mt-0.5">
                   {stats.nextAppointment.customer_name}
                   <span className="text-sm font-normal text-gray-500 dark:text-slate-400 ml-2">
-                    • {stats.nextAppointment.services?.name || t("dashboard.service")}
+                    •{" "}
+                    {stats.nextAppointment.services?.name ||
+                      t("dashboard.service")}
                   </span>
                 </h3>
               </div>
@@ -772,10 +878,12 @@ export default function DashboardPage() {
             <div className="flex items-center gap-3 self-end sm:self-center">
               <div className="text-right mr-2 hidden sm:block">
                 <p className="text-2xl font-black text-amber-600 dark:text-amber-400">
-                  {new Date(stats.nextAppointment.start_time).toLocaleTimeString(
-                    lang === "tr" ? "tr-TR" : "en-US",
-                    { hour: "2-digit", minute: "2-digit" }
-                  )}
+                  {new Date(
+                    stats.nextAppointment.start_time,
+                  ).toLocaleTimeString(lang === "tr" ? "tr-TR" : "en-US", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
                 </p>
               </div>
               <Link
@@ -825,7 +933,9 @@ export default function DashboardPage() {
             {todayAppointments.map((app) => {
               const isCompleted = app.status === "completed";
               const cleanPhone = app.customer_phone.replace(/\D/g, "");
-              const initial = app.customer_name ? app.customer_name.charAt(0).toUpperCase() : "M";
+              const initial = app.customer_name
+                ? app.customer_name.charAt(0).toUpperCase()
+                : "M";
 
               return (
                 <div
@@ -869,7 +979,9 @@ export default function DashboardPage() {
                             </span>
                           ) : app.status === "pending" ? (
                             <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300">
-                              {lang === "tr" ? "Onay Bekliyor" : "Pending Approval"}
+                              {lang === "tr"
+                                ? "Onay Bekliyor"
+                                : "Pending Approval"}
                             </span>
                           ) : (
                             <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-indigo-100 text-indigo-800 dark:bg-indigo-950/80 dark:text-indigo-300">
@@ -906,7 +1018,7 @@ export default function DashboardPage() {
                           href={`https://wa.me/${cleanPhone.startsWith("90") ? cleanPhone : `90${cleanPhone}`}?text=${encodeURIComponent(
                             lang === "tr"
                               ? `Merhaba ${app.customer_name}, Randera üzerinden saat ${new Date(app.start_time).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })} randevunuz hakkında iletişime geçiyorum.`
-                              : `Hello ${app.customer_name}, contacting you regarding your appointment at ${new Date(app.start_time).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}.`
+                              : `Hello ${app.customer_name}, contacting you regarding your appointment at ${new Date(app.start_time).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}.`,
                           )}`}
                           target="_blank"
                           rel="noopener noreferrer"
@@ -1017,9 +1129,15 @@ export default function DashboardPage() {
                       sublabel: `${dur} ${lang === "tr" ? "dk" : "min"}`,
                     };
                   })}
-                  placeholder={lang === "tr" ? "Hizmet seçin..." : "Select service..."}
+                  placeholder={
+                    lang === "tr" ? "Hizmet seçin..." : "Select service..."
+                  }
                   searchable={true}
-                  searchPlaceholder={lang === "tr" ? "Hizmet ara (örn: Saç Tasarım)..." : "Search service..."}
+                  searchPlaceholder={
+                    lang === "tr"
+                      ? "Hizmet ara (örn: Saç Tasarım)..."
+                      : "Search service..."
+                  }
                 />
               </div>
 
@@ -1059,7 +1177,11 @@ export default function DashboardPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <input
                       type="text"
-                      placeholder={lang === "tr" ? "Müşteri Adı Soyadı" : "Customer Full Name"}
+                      placeholder={
+                        lang === "tr"
+                          ? "Müşteri Adı Soyadı"
+                          : "Customer Full Name"
+                      }
                       value={newCustomerName}
                       onChange={(e) => setNewCustomerName(e.target.value)}
                       className="w-full rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 text-sm text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -1067,7 +1189,9 @@ export default function DashboardPage() {
                     />
                     <input
                       type="tel"
-                      placeholder={lang === "tr" ? "Telefon (05XX...)" : "Phone number"}
+                      placeholder={
+                        lang === "tr" ? "Telefon (05XX...)" : "Phone number"
+                      }
                       value={newCustomerPhone}
                       onChange={(e) => setNewCustomerPhone(e.target.value)}
                       className="w-full rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 text-sm text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -1079,12 +1203,20 @@ export default function DashboardPage() {
                     onChange={(val) => setSelectedCustomerId(val)}
                     options={customers.map((c) => ({
                       value: c.id,
-                      label: c.full_name || (lang === "tr" ? "İsimsiz Müşteri" : "Customer"),
+                      label:
+                        c.full_name ||
+                        (lang === "tr" ? "İsimsiz Müşteri" : "Customer"),
                       sublabel: c.phone || undefined,
                     }))}
-                    placeholder={lang === "tr" ? "Kayıtlı müşteri seçin..." : "Select existing customer..."}
+                    placeholder={
+                      lang === "tr"
+                        ? "Kayıtlı müşteri seçin..."
+                        : "Select existing customer..."
+                    }
                     searchable={true}
-                    searchPlaceholder={lang === "tr" ? "Müşteri ara..." : "Search customer..."}
+                    searchPlaceholder={
+                      lang === "tr" ? "Müşteri ara..." : "Search customer..."
+                    }
                   />
                 )}
               </div>
@@ -1124,7 +1256,11 @@ export default function DashboardPage() {
                 </label>
                 <input
                   type="text"
-                  placeholder={lang === "tr" ? "Örn: Özel istek, vip müşteri..." : "e.g. VIP client..."}
+                  placeholder={
+                    lang === "tr"
+                      ? "Örn: Özel istek, vip müşteri..."
+                      : "e.g. VIP client..."
+                  }
                   value={appointmentNote}
                   onChange={(e) => setAppointmentNote(e.target.value)}
                   className="w-full rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 text-sm text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -1145,7 +1281,11 @@ export default function DashboardPage() {
                   disabled={formSubmitting}
                   className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md transition-all active:scale-95 disabled:opacity-50"
                 >
-                  {formSubmitting ? (lang === "tr" ? "Kaydediliyor..." : "Saving...") : t("btn.save")}
+                  {formSubmitting
+                    ? lang === "tr"
+                      ? "Kaydediliyor..."
+                      : "Saving..."
+                    : t("btn.save")}
                 </button>
               </div>
             </form>
@@ -1155,4 +1295,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-

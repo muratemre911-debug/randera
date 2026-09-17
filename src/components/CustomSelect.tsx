@@ -1,8 +1,14 @@
-'use client';
+"use client";
 
-import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { createPortal } from 'react-dom';
-import { ChevronDown, Check, Search, X } from 'lucide-react';
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useMemo,
+  useCallback,
+} from "react";
+import { createPortal } from "react-dom";
+import { ChevronDown, Check, Search, X } from "lucide-react";
 
 export interface CustomSelectOption {
   value: string | number;
@@ -34,19 +40,19 @@ export default function CustomSelect({
   value,
   onChange,
   options,
-  placeholder = 'Seçiniz...',
+  placeholder = "Seçiniz...",
   disabled = false,
-  className = '',
-  buttonClassName = '',
-  menuClassName = '',
+  className = "",
+  buttonClassName = "",
+  menuClassName = "",
   searchable,
-  searchPlaceholder = 'Ara...',
-  emptyText = 'Sonuç bulunamadı',
+  searchPlaceholder = "Ara...",
+  emptyText = "Sonuç bulunamadı",
   id,
   name,
 }: CustomSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
   const [mounted, setMounted] = useState(false);
   const [coords, setCoords] = useState<{
     top: number;
@@ -66,7 +72,7 @@ export default function CustomSelect({
   // Normalize options to object format
   const normalizedOptions: CustomSelectOption[] = useMemo(() => {
     return options.map((opt) => {
-      if (typeof opt === 'string' || typeof opt === 'number') {
+      if (typeof opt === "string" || typeof opt === "number") {
         return { value: opt, label: String(opt) };
       }
       return opt;
@@ -84,13 +90,13 @@ export default function CustomSelect({
       (opt) =>
         opt.label.toLowerCase().includes(q) ||
         (opt.sublabel && opt.sublabel.toLowerCase().includes(q)) ||
-        (opt.badge && opt.badge.toLowerCase().includes(q))
+        (opt.badge && opt.badge.toLowerCase().includes(q)),
     );
   }, [normalizedOptions, searchQuery]);
 
   // Find currently selected option
   const selectedOption = useMemo(() => {
-    if (value === undefined || value === null || value === '') return null;
+    if (value === undefined || value === null || value === "") return null;
     return (
       normalizedOptions.find((opt) => String(opt.value) === String(value)) ||
       null
@@ -151,12 +157,12 @@ export default function CustomSelect({
       const handleScroll = () => updateCoords();
       const handleResize = () => updateCoords();
 
-      window.addEventListener('scroll', handleScroll, true);
-      window.addEventListener('resize', handleResize);
+      window.addEventListener("scroll", handleScroll, true);
+      window.addEventListener("resize", handleResize);
 
       return () => {
-        window.removeEventListener('scroll', handleScroll, true);
-        window.removeEventListener('resize', handleResize);
+        window.removeEventListener("scroll", handleScroll, true);
+        window.removeEventListener("resize", handleResize);
       };
     }
   }, [isOpen, updateCoords]);
@@ -178,17 +184,17 @@ export default function CustomSelect({
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+      if (e.key === "Escape") {
         setIsOpen(false);
       }
     };
 
-    document.addEventListener('pointerdown', handlePointerDown);
-    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
 
     return () => {
-      document.removeEventListener('pointerdown', handlePointerDown);
-      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
     };
   }, [isOpen]);
 
@@ -196,10 +202,10 @@ export default function CustomSelect({
   useEffect(() => {
     if (isOpen && isSearchEnabled) {
       setTimeout(() => {
-        searchInputRef.current?.focus();
+        searchInputRef.current?.focus({ preventScroll: true });
       }, 50);
     } else {
-      setSearchQuery('');
+      setSearchQuery("");
     }
   }, [isOpen, isSearchEnabled]);
 
@@ -207,7 +213,7 @@ export default function CustomSelect({
     if (option.disabled) return;
     onChange(option.value);
     setIsOpen(false);
-    setSearchQuery('');
+    setSearchQuery("");
   };
 
   return (
@@ -218,7 +224,7 @@ export default function CustomSelect({
           type="hidden"
           name={name}
           id={id}
-          value={value !== undefined && value !== null ? String(value) : ''}
+          value={value !== undefined && value !== null ? String(value) : ""}
         />
       )}
 
@@ -236,8 +242,8 @@ export default function CustomSelect({
           <span
             className={`truncate ${
               !selectedOption
-                ? 'text-slate-400 dark:text-slate-500 font-normal'
-                : 'text-slate-900 dark:text-white font-medium'
+                ? "text-slate-400 dark:text-slate-500 font-normal"
+                : "text-slate-900 dark:text-white font-medium"
             }`}
           >
             {selectedOption ? selectedOption.label : placeholder}
@@ -257,114 +263,118 @@ export default function CustomSelect({
         <ChevronDown
           size={16}
           className={`text-slate-400 shrink-0 transition-transform duration-200 ${
-            isOpen ? 'rotate-180' : ''
+            isOpen ? "rotate-180" : ""
           }`}
         />
       </button>
 
       {/* Dropdown Menu via Portal into document.body to escape any parent stacking contexts */}
-      {mounted && isOpen && coords && typeof document !== 'undefined' && createPortal(
-        <div
-          ref={menuRef}
-          style={{
-            position: 'fixed',
-            top: `${coords.top}px`,
-            left: `${coords.left}px`,
-            width: `${coords.width}px`,
-            transform: coords.placeAbove ? 'translateY(-100%)' : 'none',
-            zIndex: 999999,
-          }}
-          className={
-            menuClassName ||
-            `max-h-64 overflow-y-auto overflow-x-hidden rounded-2xl border border-slate-200/90 bg-white/95 p-1.5 shadow-2xl backdrop-blur-3xl dark:border-slate-700/80 dark:bg-slate-900/95 font-sans custom-scrollbar animate-in fade-in zoom-in-95 duration-150 select-none`
-          }
-        >
-          {/* Search Header */}
-          {isSearchEnabled && (
-            <div className="sticky top-0 z-10 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md pb-1.5 mb-1 border-b border-slate-100 dark:border-slate-800/80 px-1 pt-0.5">
-              <div className="relative flex items-center">
-                <Search
-                  size={14}
-                  className="absolute left-2.5 text-slate-400 pointer-events-none"
-                />
-                <input
-                  ref={searchInputRef}
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder={searchPlaceholder}
-                  className="w-full pl-8 pr-7 py-1.5 text-xs rounded-xl bg-slate-100/80 dark:bg-slate-800 border border-transparent focus:border-indigo-400 focus:bg-white dark:focus:bg-slate-800/90 outline-none text-slate-800 dark:text-slate-200 placeholder:text-slate-400 transition-colors"
-                  onClick={(e) => e.stopPropagation()}
-                />
-                {searchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => setSearchQuery('')}
-                    className="absolute right-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-0.5"
-                  >
-                    <X size={12} />
-                  </button>
-                )}
+      {mounted &&
+        isOpen &&
+        coords &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            ref={menuRef}
+            style={{
+              position: "fixed",
+              top: `${coords.top}px`,
+              left: `${coords.left}px`,
+              width: `${coords.width}px`,
+              transform: coords.placeAbove ? "translateY(-100%)" : "none",
+              zIndex: 999999,
+            }}
+            className={
+              menuClassName ||
+              `max-h-64 overflow-y-auto overflow-x-hidden rounded-2xl border border-slate-200/90 bg-white/95 p-1.5 shadow-2xl backdrop-blur-3xl dark:border-slate-700/80 dark:bg-slate-900/95 font-sans custom-scrollbar animate-in fade-in zoom-in-95 duration-150 select-none`
+            }
+          >
+            {/* Search Header */}
+            {isSearchEnabled && (
+              <div className="sticky top-0 z-10 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md pb-1.5 mb-1 border-b border-slate-100 dark:border-slate-800/80 px-1 pt-0.5">
+                <div className="relative flex items-center">
+                  <Search
+                    size={14}
+                    className="absolute left-2.5 text-slate-400 pointer-events-none"
+                  />
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder={searchPlaceholder}
+                    className="w-full pl-8 pr-7 py-1.5 text-xs rounded-xl bg-slate-100/80 dark:bg-slate-800 border border-transparent focus:border-indigo-400 focus:bg-white dark:focus:bg-slate-800/90 outline-none text-slate-800 dark:text-slate-200 placeholder:text-slate-400 transition-colors"
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery("")}
+                      className="absolute right-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-0.5"
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
-
-          {/* Options List */}
-          <div className="space-y-0.5">
-            {filteredOptions.length === 0 ? (
-              <div className="py-4 text-center text-xs text-slate-400 dark:text-slate-500">
-                {emptyText}
-              </div>
-            ) : (
-              filteredOptions.map((opt) => {
-                const isSelected =
-                  selectedOption &&
-                  String(selectedOption.value) === String(opt.value);
-
-                return (
-                  <button
-                    key={String(opt.value)}
-                    type="button"
-                    disabled={opt.disabled}
-                    onClick={() => handleSelect(opt)}
-                    className={`w-full text-left px-3 py-2 text-sm rounded-xl cursor-pointer transition-colors flex items-center justify-between gap-2 ${
-                      opt.disabled
-                        ? 'opacity-40 cursor-not-allowed'
-                        : isSelected
-                        ? 'bg-indigo-50 text-indigo-700 font-medium dark:bg-indigo-950/60 dark:text-indigo-300'
-                        : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100/80 dark:hover:bg-slate-800/80'
-                    }`}
-                  >
-                    <div className="flex flex-col truncate">
-                      <span className="truncate">{opt.label}</span>
-                      {opt.sublabel && (
-                        <span className="text-[11px] text-slate-400 dark:text-slate-500 truncate">
-                          {opt.sublabel}
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                      {opt.badge && (
-                        <span className="text-xs px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                          {opt.badge}
-                        </span>
-                      )}
-                      {isSelected && (
-                        <Check
-                          size={15}
-                          className="text-indigo-600 dark:text-indigo-400 shrink-0"
-                        />
-                      )}
-                    </div>
-                  </button>
-                );
-              })
             )}
-          </div>
-        </div>,
-        document.body
-      )}
+
+            {/* Options List */}
+            <div className="space-y-0.5">
+              {filteredOptions.length === 0 ? (
+                <div className="py-4 text-center text-xs text-slate-400 dark:text-slate-500">
+                  {emptyText}
+                </div>
+              ) : (
+                filteredOptions.map((opt) => {
+                  const isSelected =
+                    selectedOption &&
+                    String(selectedOption.value) === String(opt.value);
+
+                  return (
+                    <button
+                      key={String(opt.value)}
+                      type="button"
+                      disabled={opt.disabled}
+                      onClick={() => handleSelect(opt)}
+                      className={`w-full text-left px-3 py-2 text-sm rounded-xl cursor-pointer transition-colors flex items-center justify-between gap-2 ${
+                        opt.disabled
+                          ? "opacity-40 cursor-not-allowed"
+                          : isSelected
+                            ? "bg-indigo-50 text-indigo-700 font-medium dark:bg-indigo-950/60 dark:text-indigo-300"
+                            : "text-slate-700 dark:text-slate-200 hover:bg-slate-100/80 dark:hover:bg-slate-800/80"
+                      }`}
+                    >
+                      <div className="flex flex-col truncate">
+                        <span className="truncate">{opt.label}</span>
+                        {opt.sublabel && (
+                          <span className="text-[11px] text-slate-400 dark:text-slate-500 truncate">
+                            {opt.sublabel}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        {opt.badge && (
+                          <span className="text-xs px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                            {opt.badge}
+                          </span>
+                        )}
+                        {isSelected && (
+                          <Check
+                            size={15}
+                            className="text-indigo-600 dark:text-indigo-400 shrink-0"
+                          />
+                        )}
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

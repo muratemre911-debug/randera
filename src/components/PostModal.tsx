@@ -125,7 +125,9 @@ export function PostModal({
       fetchCurrentUser();
       document.body.style.overflow = "hidden";
     } else {
-      document.body.style.overflow = "unset";
+      // "unset" body'nin overflow'unu visible yapıp globals.css'teki
+      // overflow:hidden kilidini bozuyordu (sayfa kayabilir hale geliyordu).
+      document.body.style.overflow = "";
       setComments([]);
       setNewComment("");
       setUser(null);
@@ -135,7 +137,7 @@ export function PostModal({
     /* eslint-enable react-hooks/set-state-in-effect */
 
     return () => {
-      document.body.style.overflow = "unset";
+      document.body.style.overflow = "";
     };
   }, [
     isOpen,

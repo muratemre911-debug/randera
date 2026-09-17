@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import type { Map as LeafletMap, Marker as LeafletMarker } from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { TURKEY_CENTER, TURKEY_ZOOM } from "@/lib/provinceCoords";
+import { preventMapFocusScroll } from "@/lib/preventMapFocusScroll";
 
 interface MapPointProps {
   lat: number | null;
@@ -75,6 +76,10 @@ export default function MapPoint({
         maxZoom: 19,
         attribution: OSM_ATTRIBUTION,
       }).addTo(map);
+
+      // Harita/zoom kontrolüne dokununca sayfa kaymasın (Leaflet focus() verir)
+      preventMapFocusScroll(map.getContainer());
+
       mapRef.current = map;
 
       if (lat != null && lng != null) {

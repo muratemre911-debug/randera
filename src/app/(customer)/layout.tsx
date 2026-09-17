@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
 import {
@@ -21,12 +22,38 @@ import DynamicLogoLink from "@/components/DynamicLogoLink";
 import RequirePhoneModal from "@/components/RequirePhoneModal";
 import { SHELL } from "@/components/layout/shell";
 import UserAvatar, { getDisplayName } from "@/components/layout/UserAvatar";
+import CustomerTabs, {
+  type CustomerTab,
+} from "@/components/customer/CustomerTabs";
+import CustomerBottomNav, {
+  type BottomNavItem,
+} from "@/components/customer/CustomerBottomNav";
+import { preventFocusScroll } from "@/lib/preventFocusScroll";
 
-const customerNavItems = [
-  { href: "/discover", icon: Search, label: "Keşfet" },
-  { href: "/favorites", icon: Heart, label: "Favorilerim" },
-  { href: "/my-appointments", icon: Calendar, label: "Randevularım" },
-  { href: "/profile", icon: User, label: "Profilim" },
+// Sekme sayfaları tembel yüklenir: sadece ekrandaki (ve mobilde yandaki) sekme indirilir
+const DiscoverPage = dynamic(() => import("@/app/(customer)/discover/page"));
+const FavoritesPage = dynamic(() => import("@/app/(customer)/favorites/page"));
+const MyAppointmentsPage = dynamic(
+  () => import("@/app/(customer)/my-appointments/page"),
+);
+const ProfilePage = dynamic(() => import("@/app/(customer)/profile/page"));
+
+// Alt menü öğeleri hem sidebar/bottom nav ikonlarını hem de rayın sayfasını taşır
+const customerNavItems: (CustomerTab & Omit<BottomNavItem, "href">)[] = [
+  { href: "/discover", icon: Search, label: "Keşfet", Page: DiscoverPage },
+  {
+    href: "/favorites",
+    icon: Heart,
+    label: "Favorilerim",
+    Page: FavoritesPage,
+  },
+  {
+    href: "/my-appointments",
+    icon: Calendar,
+    label: "Randevularım",
+    Page: MyAppointmentsPage,
+  },
+  { href: "/profile", icon: User, label: "Profilim", Page: ProfilePage },
 ];
 
 export default function CustomerLayout({
@@ -50,6 +77,10 @@ export default function CustomerLayout({
   // Business owners / staff can also use the customer area; return button is at bottom of sidebar
   const isBusinessAccount = userRole === "owner" || userRole === "staff";
   const navItems = customerNavItems;
+  // Sekme sayfaları yatay rayda (kaydırmalı geçiş) gösterilir; diğer sayfalar (ör. /b/[slug]) normal render edilir
+  const isTabRoute = customerNavItems.some((item) =>
+    pathname.startsWith(item.href),
+  );
 
   useEffect(() => {
     const getUser = async () => {
@@ -95,12 +126,37 @@ export default function CustomerLayout({
       );
   }, []);
 
+  const rootRef = useRef<HTMLDivElement>(null);
+  const columnRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLElement>(null);
+
+  // Dış pencere ve shell konteynerlerinin kaymasını önle (header mobilde yukarı kaçmasın)
+  useEffect(() => {
+    const lockExternalScroll = () => {
+      if (window.scrollY !== 0) window.scrollTo(0, 0);
+      if (document.documentElement.scrollTop !== 0) document.documentElement.scrollTop = 0;
+      if (document.body.scrollTop !== 0) document.body.scrollTop = 0;
+      if (columnRef.current && columnRef.current.scrollTop !== 0) {
+        columnRef.current.scrollTop = 0;
+      }
+      if (rootRef.current && rootRef.current.scrollTop !== 0) {
+        rootRef.current.scrollTop = 0;
+      }
+    };
+    window.addEventListener("scroll", lockExternalScroll, { passive: true });
+    return () => window.removeEventListener("scroll", lockExternalScroll);
+  }, []);
 
   // Sayfa değiştiğinde içeriği en başa kaydır ve pencere kaymasını sıfırla
   useEffect(() => {
     if (mainRef.current) {
       mainRef.current.scrollTop = 0;
+    }
+    if (columnRef.current) {
+      columnRef.current.scrollTop = 0;
+    }
+    if (rootRef.current) {
+      rootRef.current.scrollTop = 0;
     }
     window.scrollTo(0, 0);
   }, [pathname]);
@@ -111,7 +167,7 @@ export default function CustomerLayout({
   };
 
   return (
-    <div className={SHELL.root}>
+    <div ref={rootRef} className={SHELL.root}>
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-purple-400/20 mix-blend-multiply filter blur-3xl opacity-70 animate-blob dark:bg-purple-900/20 dark:mix-blend-screen" />
       <div
         className="absolute top-[20%] right-[-10%] w-[40%] h-[40%] rounded-full bg-indigo-400/20 mix-blend-multiply filter blur-3xl opacity-70 animate-blob dark:bg-indigo-900/20 dark:mix-blend-screen"
@@ -198,7 +254,7 @@ export default function CustomerLayout({
         </div>
       </aside>
 
-      <div className={SHELL.column}>
+      <div ref={columnRef} className={SHELL.column}>
         <header className={SHELL.header}>
           {/* Mobile Brand Logo on left */}
           <div className="flex items-center gap-2 lg:hidden">
@@ -252,37 +308,21 @@ export default function CustomerLayout({
           </div>
         </header>
 
-        <main ref={mainRef} className={SHELL.main}>
-          {children}
-        </main>
+        {isTabRoute ? (
+          <CustomerTabs tabs={customerNavItems} />
+        ) : (
+          <main
+            ref={mainRef}
+            className={SHELL.main}
+            onMouseDown={preventFocusScroll}
+          >
+            {children}
+          </main>
+        )}
       </div>
 
       {/* Mobile Bottom Navigation Bar (Instagram / TikTok / YouTube style) */}
-      {!pathname.includes("/randevu") && (
-        <nav className={SHELL.bottomNav}>
-          <div className={SHELL.bottomNavInner}>
-            {navItems.map((item) => {
-              const isActive = pathname.startsWith(item.href);
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`flex flex-col items-center justify-center flex-1 py-1 transition-all duration-200 active:scale-90 ${
-                    isActive
-                      ? "text-indigo-600 dark:text-indigo-400 font-extrabold"
-                      : "text-gray-400 hover:text-gray-600 dark:text-slate-400 dark:hover:text-slate-200 font-medium"
-                  }`}
-                >
-                  <item.icon size={22} strokeWidth={isActive ? 2.5 : 1.8} />
-                  <span className="text-[10px] mt-1 tracking-tight leading-none">
-                    {item.label}
-                  </span>
-                </Link>
-              );
-            })}
-          </div>
-        </nav>
-      )}
+      {!pathname.includes("/randevu") && <CustomerBottomNav tabs={navItems} />}
 
       {userId && (
         <RequirePhoneModal

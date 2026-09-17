@@ -90,4 +90,29 @@ describe("DiscoverMap", () => {
     expect(pin?.className).toContain("bg-indigo-600");
     expect(container.textContent).toContain(istanbul.name);
   });
+
+  it("haritaya odak verilirken sayfa kaydırılmaz (preventScroll)", async () => {
+    const focusSpy = vi.spyOn(HTMLElement.prototype, "focus");
+    const { container, unmount } = render(
+      <DiscoverMap
+        {...baseProps}
+        tenants={[tenant("a", "İstanbul")]}
+        selectedTenant={null}
+        onSelectTenant={() => {}}
+      />,
+    );
+
+    const mapEl = await waitFor(() => {
+      const el = container.querySelector<HTMLElement>(".leaflet-container");
+      expect(el).toBeTruthy();
+      return el!;
+    });
+
+    // Leaflet, harita/zoom kontrollerine tıklanınca kapsayıcıya focus() verir
+    mapEl.focus();
+    expect(focusSpy).toHaveBeenCalledWith({ preventScroll: true });
+
+    focusSpy.mockRestore();
+    unmount();
+  });
 });
