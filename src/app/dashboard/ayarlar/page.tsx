@@ -128,6 +128,244 @@ const daysTranslationEN: { [key: string]: string } = {
 
 import citiesData from "@/lib/cities.json";
 
+/**
+ * Saatleri kaydetmeden önce düzeltir: açık ama 00:00–00:00 kalmış günleri
+ * (eski kayıtlardan/geçiş halinden) makul 09:00–18:00 varsayılanına çeker.
+ */
+/**
+ * Haftalık saat listesi (iOS gruplu liste stili). Hem işletme sahibinin
+ * "Çalışma Saatleri" sekmesinde hem de elemanın "Çalışma Saatlerim"
+ * sayfasında kullanılır.
+ */
+function WeeklyHoursList({
+ workingHours,
+ daysTranslation,
+ onDayToggle,
+ onTimeChange,
+}: {
+ workingHours: WorkingHours;
+ daysTranslation: Record<string, string>;
+ onDayToggle: (day: string) => void;
+ onTimeChange: (
+  day: string,
+  type: "openTime" | "closeTime",
+  value: string,
+ ) => void;
+}) {
+ return (
+  <div className="overflow-hidden rounded-[20px] bg-white/70 backdrop-blur-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:bg-slate-900/60 dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)]">
+   <div className="divide-y divide-gray-200/50 dark:divide-slate-700/50">
+    {WEEK_DAYS.map((day) => {
+     // Gün eksikse varsayılanla göster: aksi halde o günü açmak mümkün olmaz
+     const info = workingHours[day] ?? defaultWorkingHours[day];
+     return (
+      <div
+       key={day}
+       className="flex flex-col py-3 px-4 min-h-[60px] sm:flex-row sm:items-center justify-between gap-3"
+      >
+       <div className="flex items-center justify-between sm:w-44 shrink-0 select-none">
+        <span className="text-[17px] font-medium text-gray-900 dark:text-white">
+         {daysTranslation[day]}
+        </span>
+        <div className="sm:hidden">
+         <ToggleSwitch
+          checked={info.isOpen}
+          onChange={() => onDayToggle(day)}
+         />
+        </div>
+       </div>
+
+       <div className="flex flex-1 items-center justify-between">
+        {info.isOpen ? (
+         <div className="flex items-center gap-2">
+          <input
+           type="time"
+           value={info.openTime}
+           onChange={(e) => onTimeChange(day, "openTime", e.target.value)}
+           className="rounded-lg bg-gray-100/80 px-3 py-1.5 text-[17px] text-[#007AFF] font-medium focus:outline-none dark:bg-slate-800 dark:text-[#0A84FF]"
+          />
+          <span className="text-gray-400 font-bold px-1">ile</span>
+          <input
+           type="time"
+           value={info.closeTime}
+           onChange={(e) => onTimeChange(day, "closeTime", e.target.value)}
+           className="rounded-lg bg-gray-100/80 px-3 py-1.5 text-[17px] text-[#007AFF] font-medium focus:outline-none dark:bg-slate-800 dark:text-[#0A84FF]"
+          />
+         </div>
+        ) : (
+         <span className="text-[17px] text-gray-400 dark:text-slate-500">
+          Kapalı
+         </span>
+        )}
+
+        <div className="hidden sm:block ml-4">
+         <ToggleSwitch
+          checked={info.isOpen}
+          onChange={() => onDayToggle(day)}
+         />
+        </div>
+       </div>
+      </div>
+     );
+    })}
+   </div>
+  </div>
+ );
+}
+
+/**
+ * Randevu kuralları editörü. Hem işletme sahibinin "Randevu Kuralları"
+ * sekmesinde hem de elemanın "Randevu Kurallarım" bölümünde kullanılır.
+ * Eleman için kaydedilen değerler staff_settings.booking_rules'tır ve yalnızca
+ * o elemanın randevularını etkiler.
+ */
+function BookingRulesEditor({
+ rules,
+ onChange,
+}: {
+ rules: BookingRules;
+ onChange: (patch: Partial<BookingRules>) => void;
+}) {
+ return (
+  <>
+   <div className="overflow-hidden rounded-[20px] bg-white/70 backdrop-blur-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:bg-slate-900/60 dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)]">
+    <div className="divide-y divide-gray-200/50 dark:divide-slate-700/50">
+     <div className="flex items-center justify-between px-4 py-3 min-h-[44px]">
+      <span className="text-[17px] text-gray-900 dark:text-white">
+       Randevu Aralığı
+      </span>
+      <div className="w-40">
+       <CustomSelect
+        value={rules.slotDuration}
+        onChange={(val) => onChange({ slotDuration: val })}
+        options={[
+         { value: 15, label: "15 Dakika" },
+         { value: 30, label: "30 Dakika" },
+         { value: 45, label: "45 Dakika" },
+         { value: 60, label: "60 Dakika" },
+         { value: 90, label: "90 Dakika" },
+        ]}
+        buttonClassName="w-full flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2 text-sm font-medium text-slate-900 transition-all hover:border-slate-300 focus:outline-none dark:border-slate-700 dark:bg-slate-800/60 dark:text-white cursor-pointer"
+       />
+      </div>
+     </div>
+
+     <div className="flex items-center justify-between px-4 py-3 min-h-[44px]">
+      <div className="flex flex-col pr-3">
+       <span className="text-[17px] text-gray-900 dark:text-white">
+        İptal Süresi
+       </span>
+       <span className="text-[13px] text-gray-500 dark:text-slate-400">
+        Müşteri randevuya bu süreden az kala doğrudan iptal edemez, size
+        istek gönderir
+       </span>
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+       <input
+        type="number"
+        min={0}
+        max={168}
+        value={rules.cancelDeadlineHours}
+        onChange={(e) =>
+         onChange({
+          cancelDeadlineHours: Math.max(
+           0,
+           Math.min(168, parseInt(e.target.value) || 0),
+          ),
+         })
+        }
+        className="w-20 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2 text-sm font-bold text-slate-900 text-center focus:outline-none focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-white"
+       />
+       <span className="text-[15px] font-medium text-gray-500 dark:text-slate-400">
+        saat
+       </span>
+      </div>
+     </div>
+
+     <div className="flex items-center justify-between px-4 py-3 min-h-[44px]">
+      <span className="text-[17px] text-gray-900 dark:text-white">
+       Otomatik Onay
+      </span>
+      <ToggleSwitch
+       checked={rules.autoApprove}
+       onChange={() => onChange({ autoApprove: !rules.autoApprove })}
+      />
+     </div>
+    </div>
+   </div>
+   <div className="mt-2 pl-4 flex items-center gap-1.5 text-[13px] text-gray-500 dark:text-slate-400">
+    <Info size={14} />
+    Otomatik onay açıkken yeni randevular direkt olarak kabul edilir.
+   </div>
+
+   <div className="mt-8 mb-2 pl-4">
+    <h2 className="text-[13px] font-semibold uppercase tracking-widest text-gray-500 dark:text-slate-400">
+     Bildirim Kanalları
+    </h2>
+   </div>
+   <div className="overflow-hidden rounded-[20px] bg-white/70 backdrop-blur-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:bg-slate-900/60 dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)]">
+    <div className="divide-y divide-gray-200/50 dark:divide-slate-700/50">
+     <div className="flex items-center justify-between px-4 py-3.5">
+      <div className="flex flex-col">
+       <span className="text-[17px] text-gray-900 dark:text-white">
+        E-posta Bildirimi
+       </span>
+       <span className="text-[13px] text-gray-500 dark:text-slate-400">
+        Yeni randevu ve iptal bildirimleri
+       </span>
+      </div>
+      <ToggleSwitch
+       checked={rules.notifyEmail}
+       onChange={() => onChange({ notifyEmail: !rules.notifyEmail })}
+      />
+     </div>
+
+     <div className="flex items-center justify-between px-4 py-3.5">
+      <div className="flex flex-col">
+       <span className="text-[17px] text-gray-900 dark:text-white">
+        SMS Bildirimi
+       </span>
+       <span className="text-[13px] text-gray-500 dark:text-slate-400">
+        Hatırlatma SMS&apos;i gönderimi (Premium)
+       </span>
+      </div>
+      <ToggleSwitch
+       checked={rules.notifySms}
+       onChange={() => onChange({ notifySms: !rules.notifySms })}
+      />
+     </div>
+
+     <div className="flex items-center justify-between px-4 py-3.5">
+      <div className="flex flex-col">
+       <span className="text-[17px] text-gray-900 dark:text-white">
+        WhatsApp
+       </span>
+       <span className="text-[13px] text-gray-500 dark:text-slate-400">
+        WhatsApp&apos;tan randevu onayı (Premium)
+       </span>
+      </div>
+      <ToggleSwitch
+       checked={rules.notifyWhatsapp}
+       onChange={() => onChange({ notifyWhatsapp: !rules.notifyWhatsapp })}
+      />
+     </div>
+    </div>
+   </div>
+  </>
+ );
+}
+
+function normalizeWorkingHours(hours: WorkingHours): WorkingHours {
+  return Object.fromEntries(
+    Object.entries(hours).map(([day, h]) => [
+      day,
+      h.isOpen && h.openTime === "00:00" && h.closeTime === "00:00"
+        ? { isOpen: true, openTime: "09:00", closeTime: "18:00" }
+        : h,
+    ]),
+  );
+}
+
 export default function AyarlarPage() {
   const supabase = createClient();
   const { t, lang } = useLanguage();
@@ -155,6 +393,10 @@ export default function AyarlarPage() {
   const [bookingRules, setBookingRules] =
     useState<BookingRules>(defaultBookingRules);
   const [tenantId, setTenantId] = useState<string | null>(null);
+  /** Oturum sahibinin rolü: staff ise işletme ayarları yerine yalnızca kendi
+   *  aktif saatleri yönetilir (işletme ayarları sahibin yetkisindedir). */
+  const [role, setRole] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
 
   // Vitrin / Konum states
   const [province, setProvince] = useState("");
@@ -195,15 +437,59 @@ export default function AyarlarPage() {
         if (!user) return;
         const { data: profileData } = await supabase
           .from("profiles")
-          .select("tenant_id")
+          .select("tenant_id, role")
           .eq("id", user.id)
           .single();
         const currentTenantId = profileData?.tenant_id;
+        setRole(profileData?.role ?? null);
+        setUserId(user.id);
         if (!currentTenantId) {
           setLoading(false);
           return;
         }
         setTenantId(currentTenantId);
+
+        // ELEMAN: işletme ayarlarını göremez ve değiştiremez. Yalnızca kendi
+        // çalışma saatlerini ve kendi randevu kurallarını yükler; işletme
+        // satırından sadece varsayılan (başlangıç) değerleri okur.
+        if (profileData?.role !== "owner") {
+          const { data: tenantDefaults } = await supabase
+            .from("tenants")
+            .select("working_hours, booking_rules")
+            .eq("id", currentTenantId)
+            .maybeSingle();
+
+          // Başlangıç noktası işletmenin değerleridir; eleman üzerinde
+          // oynayarak kendi ayarını oluşturur.
+          if (tenantDefaults?.working_hours) {
+            setWorkingHours(tenantDefaults.working_hours);
+          }
+          if (tenantDefaults?.booking_rules) {
+            setBookingRules({
+              ...defaultBookingRules,
+              ...tenantDefaults.booking_rules,
+            });
+          }
+
+          // Elemanın kayıtlı ayarları varsa onlar önceliklidir.
+          // (Tablo henüz migrate edilmemişse sorgu hata verir; sessizce
+          // geçilir, kaydetme denemesinde hata gösterilir.)
+          const { data: mySettings } = await supabase
+            .from("staff_settings")
+            .select("working_hours, booking_rules")
+            .eq("profile_id", user.id)
+            .maybeSingle();
+          if (mySettings?.working_hours) {
+            setWorkingHours(mySettings.working_hours);
+          }
+          if (mySettings?.booking_rules) {
+            setBookingRules({
+              ...defaultBookingRules,
+              ...mySettings.booking_rules,
+            });
+          }
+          return;
+        }
 
         const localProfile = localStorage.getItem(
           `tenant_profile_${currentTenantId}`,
@@ -248,7 +534,10 @@ export default function AyarlarPage() {
           setSectorsList(sectorData);
         }
 
-        const t = locationData as
+        // İşletme kaydı. Değişken adı `t` DEĞİL: bileşen seviyesindeki
+        // çeviri fonksiyonu `t`'yi gölgelemek, bu blokta ileride yazılacak
+        // her `t("...")` çağrısını sessizce bozuyordu.
+        const tenantProfile = locationData as
           | (typeof data & {
               neighborhood?: string | null;
               street?: string | null;
@@ -259,46 +548,50 @@ export default function AyarlarPage() {
             })
           | null;
 
-        if (t) {
+        if (tenantProfile) {
           setProfile((prev) => ({
             ...prev,
-            name: t.name || "",
-            phone: t.phone || "",
-            email: t.email || "",
-            address: t.address || "",
-            description: t.description || "",
+            name: tenantProfile.name || "",
+            phone: tenantProfile.phone || "",
+            email: tenantProfile.email || "",
+            address: tenantProfile.address || "",
+            description: tenantProfile.description || "",
           }));
-          setProvince(t.province || "");
-          setDistrict(t.district || "");
-          setNeighborhood(t.neighborhood || "");
-          setStreet(t.street || "");
-          setBuildingNo(t.building_no || "");
+          setProvince(tenantProfile.province || "");
+          setDistrict(tenantProfile.district || "");
+          setNeighborhood(tenantProfile.neighborhood || "");
+          setStreet(tenantProfile.street || "");
+          setBuildingNo(tenantProfile.building_no || "");
           setCoords(
-            t.latitude != null && t.longitude != null
-              ? { lat: t.latitude, lng: t.longitude }
+            tenantProfile.latitude != null &&
+              tenantProfile.longitude != null
+              ? { lat: tenantProfile.latitude, lng: tenantProfile.longitude }
               : null,
           );
-          setProfileImageUrl(t.profile_image_url || "");
-          setCoverImageUrl(t.cover_image_url || "");
-          setSector(t.sector || "");
-          setThemePalette(t.theme_palette || "indigo");
+          setProfileImageUrl(tenantProfile.profile_image_url || "");
+          setCoverImageUrl(tenantProfile.cover_image_url || "");
+          setSector(tenantProfile.sector || "");
+          setThemePalette(tenantProfile.theme_palette || "indigo");
 
-          if (t.working_hours) {
-            setWorkingHours(t.working_hours);
+          if (tenantProfile.working_hours) {
+            setWorkingHours(tenantProfile.working_hours);
           }
-          if (t.booking_rules) {
-            setBookingRules({ ...defaultBookingRules, ...t.booking_rules });
+          if (tenantProfile.booking_rules) {
+            setBookingRules({
+              ...defaultBookingRules,
+              ...tenantProfile.booking_rules,
+            });
           }
 
           localStorage.setItem(
             `tenant_profile_${currentTenantId}`,
             JSON.stringify({
               ...profile,
-              name: t.name || "",
-              phone: t.phone || "",
-              email: t.email || "",
-              address: t.address || "",
-              description: t.description || "",
+              name: tenantProfile.name || "",
+              phone: tenantProfile.phone || "",
+              email: tenantProfile.email || "",
+              address: tenantProfile.address || "",
+              description: tenantProfile.description || "",
             }),
           );
         }
@@ -458,14 +751,7 @@ export default function AyarlarPage() {
     if (!tenantId) return;
     setSaving(true);
 
-    const normalizedHours = Object.fromEntries(
-      Object.entries(workingHours).map(([day, h]) => [
-        day,
-        h.isOpen && h.openTime === "00:00" && h.closeTime === "00:00"
-          ? { isOpen: true, openTime: "09:00", closeTime: "18:00" }
-          : h,
-      ]),
-    );
+    const normalizedHours = normalizeWorkingHours(workingHours);
 
     try {
       localStorage.setItem(
@@ -525,6 +811,42 @@ export default function AyarlarPage() {
     }
   };
 
+  /**
+   * ELEMAN kaydetme: kendi çalışma saatlerini ve kendi randevu kurallarını
+   * staff_settings tablosuna yazar (RLS: satır yalnızca sahibi tarafından
+   * yazılabilir). İşletme ayarlarına (/api/tenant/update) dokunmaz; o uç
+   * zaten yalnızca sahip ve süper admine açıktır.
+   */
+  const handleStaffSettingsSave = async () => {
+    if (!tenantId || !userId) return;
+    setSaving(true);
+    try {
+      const { error } = await supabase.from("staff_settings").upsert({
+        profile_id: userId,
+        tenant_id: tenantId,
+        working_hours: normalizeWorkingHours(workingHours),
+        booking_rules: bookingRules,
+        updated_at: new Date().toISOString(),
+      });
+      if (error) {
+        console.error("Staff settings save error:", error);
+        showToast("error", error.message);
+      } else {
+        showToast(
+          "success",
+          lang === "tr"
+            ? "Ayarlarınız güncellendi."
+            : "Your settings have been updated.",
+        );
+      }
+    } catch (err) {
+      console.error("Staff settings save error:", err);
+      showToast("error", "Bir hata oluştu, ayarlar kaydedilemedi.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleDayToggle = (day: string) => {
     setWorkingHours((prev) => {
       // Kayıtta gün eksikse varsayılanı temel al (liste 7 günü de gösterir)
@@ -567,6 +889,104 @@ export default function AyarlarPage() {
     return (
       <div className="flex h-[60vh] items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+      </div>
+    );
+  }
+
+  // ELEMAN / SINIRLI GÖRÜNÜM: işletme profili ve konum-vitrin bilgileri bu
+  // ekranda HİÇ görünmez. Yalnızca elemana özel çalışma saatleri ve randevu
+  // kuralları gösterilir. Tam işletme ayarları yalnızca işletme sahibine
+  // (role = "owner") açıktır; bu yüzden kapı "sahip değilse kısıtlı" şeklinde
+  // kurulmuştur.
+  if (role !== "owner") {
+    return (
+      <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 max-w-2xl mx-auto pb-12 space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-gray-900 dark:text-white">
+              {lang === "tr" ? "Ayarlarım" : "My Settings"}
+            </h1>
+            <p className="mt-1 text-sm font-medium text-slate-500 dark:text-slate-400">
+              {lang === "tr"
+                ? "Kendi çalışma saatleriniz ve randevu kurallarınız."
+                : "Your own working hours and booking rules."}
+            </p>
+          </div>
+          <button
+            onClick={handleStaffSettingsSave}
+            disabled={saving}
+            className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-indigo-500/30 hover:bg-indigo-500 active:scale-95 disabled:opacity-50 transition-all"
+          >
+            {saving ? (
+              <>
+                <Loader2 size={18} className="animate-spin" />
+                <span>{lang === "tr" ? "Kaydediliyor..." : "Saving..."}</span>
+              </>
+            ) : (
+              <>
+                <Save size={18} />
+                <span>
+                  {lang === "tr" ? "Ayarları Kaydet" : "Save Settings"}
+                </span>
+              </>
+            )}
+          </button>
+        </div>
+
+        <div className="flex items-start gap-2.5 rounded-2xl border border-indigo-200/70 bg-indigo-50/70 p-3.5 text-xs font-medium leading-relaxed text-indigo-800 dark:border-indigo-500/25 dark:bg-indigo-950/30 dark:text-indigo-200">
+          <Info size={16} className="mt-0.5 shrink-0" />
+          <span>
+            {lang === "tr"
+              ? "Bu ayarlar yalnızca sizin için geçerlidir: müşteri randevu akışında sizi seçtiğinde bu saatler ve kurallar uygulanır. Bir alanı değiştirmezseniz orada işletmenin ayarı geçerli olur. İşletme profilini, konumunu ve vitrinini yalnızca işletme sahibi yönetir; kendi hizmetlerinizi Hizmetler sayfasından düzenleyebilirsiniz."
+              : "These settings apply to you only: when a customer selects you during booking, your hours and rules are used. Any field you leave untouched follows the business setting. The business profile, location and showcase are managed by the owner; manage your own services from the Services page."}
+          </span>
+        </div>
+
+        <div>
+          <div className="mb-2 pl-4">
+            <h2 className="text-[13px] font-semibold uppercase tracking-widest text-gray-500 dark:text-slate-400">
+              {lang === "tr" ? "Çalışma Saatlerim" : "My Working Hours"}
+            </h2>
+          </div>
+          <WeeklyHoursList
+            workingHours={workingHours}
+            daysTranslation={daysTranslation}
+            onDayToggle={handleDayToggle}
+            onTimeChange={handleTimeChange}
+          />
+        </div>
+
+        <div>
+          <div className="mb-2 pl-4">
+            <h2 className="text-[13px] font-semibold uppercase tracking-widest text-gray-500 dark:text-slate-400">
+              {lang === "tr" ? "Randevu Kurallarım" : "My Booking Rules"}
+            </h2>
+          </div>
+          <BookingRulesEditor
+            rules={bookingRules}
+            onChange={(patch) =>
+              setBookingRules((prev) => ({ ...prev, ...patch }))
+            }
+          />
+        </div>
+
+        {/* Toast Notification */}
+        {toast && (
+          <div
+            className={`fixed top-8 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-full border px-5 py-3 shadow-[0_8px_30px_rgb(0,0,0,0.12)] backdrop-blur-3xl transition-all duration-300 animate-in fade-in slide-in-from-top-8 ${
+              toast.type === "success"
+                ? "border-emerald-500/20 bg-emerald-50/90 text-emerald-800 dark:bg-emerald-950/90 dark:text-emerald-300"
+                : "border-red-500/20 bg-red-50/90 text-red-800 dark:bg-red-950/90 dark:text-red-300"
+            }`}
+          >
+            {toast.type === "success" ? (
+              <CheckCircle2 size={20} />
+            ) : (
+              <AlertCircle size={20} />
+            )}
+            <span className="text-[15px] font-semibold">{toast.message}</span>
+          </div>
+        )}
       </div>
     );
   }
@@ -871,78 +1291,12 @@ export default function AyarlarPage() {
                     Haftalık Saatler
                   </h2>
                 </div>
-                <div className="overflow-hidden rounded-[20px] bg-white/70 backdrop-blur-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:bg-slate-900/60 dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)]">
-                  <div className="divide-y divide-gray-200/50 dark:divide-slate-700/50">
-                    {WEEK_DAYS.map((day) => {
-                      // Gün eksikse varsayılanla göster: aksi halde o günü açmak mümkün olmaz
-                      const info =
-                        workingHours[day] ?? defaultWorkingHours[day];
-                      return (
-                        <div
-                          key={day}
-                          className="flex flex-col py-3 px-4 min-h-[60px] sm:flex-row sm:items-center justify-between gap-3"
-                        >
-                          <div className="flex items-center justify-between sm:w-44 shrink-0 select-none">
-                            <span className="text-[17px] font-medium text-gray-900 dark:text-white">
-                              {daysTranslation[day]}
-                            </span>
-                            <div className="sm:hidden">
-                              <ToggleSwitch
-                                checked={info.isOpen}
-                                onChange={() => handleDayToggle(day)}
-                              />
-                            </div>
-                          </div>
-
-                          <div className="flex flex-1 items-center justify-between">
-                            {info.isOpen ? (
-                              <div className="flex items-center gap-2">
-                                <input
-                                  type="time"
-                                  value={info.openTime}
-                                  onChange={(e) =>
-                                    handleTimeChange(
-                                      day,
-                                      "openTime",
-                                      e.target.value,
-                                    )
-                                  }
-                                  className="rounded-lg bg-gray-100/80 px-3 py-1.5 text-[17px] text-[#007AFF] font-medium focus:outline-none dark:bg-slate-800 dark:text-[#0A84FF]"
-                                />
-                                <span className="text-gray-400 font-bold px-1">
-                                  ile
-                                </span>
-                                <input
-                                  type="time"
-                                  value={info.closeTime}
-                                  onChange={(e) =>
-                                    handleTimeChange(
-                                      day,
-                                      "closeTime",
-                                      e.target.value,
-                                    )
-                                  }
-                                  className="rounded-lg bg-gray-100/80 px-3 py-1.5 text-[17px] text-[#007AFF] font-medium focus:outline-none dark:bg-slate-800 dark:text-[#0A84FF]"
-                                />
-                              </div>
-                            ) : (
-                              <span className="text-[17px] text-gray-400 dark:text-slate-500">
-                                Kapalı
-                              </span>
-                            )}
-
-                            <div className="hidden sm:block ml-4">
-                              <ToggleSwitch
-                                checked={info.isOpen}
-                                onChange={() => handleDayToggle(day)}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
+                <WeeklyHoursList
+                  workingHours={workingHours}
+                  daysTranslation={daysTranslation}
+                  onDayToggle={handleDayToggle}
+                  onTimeChange={handleTimeChange}
+                />
               </div>
             )}
 
@@ -954,156 +1308,12 @@ export default function AyarlarPage() {
                     Genel Kurallar
                   </h2>
                 </div>
-                <div className="overflow-hidden rounded-[20px] bg-white/70 backdrop-blur-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:bg-slate-900/60 dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)]">
-                  <div className="divide-y divide-gray-200/50 dark:divide-slate-700/50">
-                    <div className="flex items-center justify-between px-4 py-3 min-h-[44px]">
-                      <span className="text-[17px] text-gray-900 dark:text-white">
-                        Randevu Aralığı
-                      </span>
-                      <div className="w-40">
-                        <CustomSelect
-                          value={bookingRules.slotDuration}
-                          onChange={(val) =>
-                            setBookingRules({
-                              ...bookingRules,
-                              slotDuration: parseInt(val),
-                            })
-                          }
-                          options={[
-                            { value: 15, label: "15 Dakika" },
-                            { value: 30, label: "30 Dakika" },
-                            { value: 45, label: "45 Dakika" },
-                            { value: 60, label: "60 Dakika" },
-                            { value: 90, label: "90 Dakika" },
-                          ]}
-                          buttonClassName="w-full flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2 text-sm font-medium text-slate-900 transition-all hover:border-slate-300 focus:outline-none dark:border-slate-700 dark:bg-slate-800/60 dark:text-white cursor-pointer"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between px-4 py-3 min-h-[44px]">
-                      <div className="flex flex-col pr-3">
-                        <span className="text-[17px] text-gray-900 dark:text-white">
-                          İptal Süresi
-                        </span>
-                        <span className="text-[13px] text-gray-500 dark:text-slate-400">
-                          Müşteri randevuya bu süreden az kala doğrudan iptal
-                          edemez, size istek gönderir
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <input
-                          type="number"
-                          min={0}
-                          max={168}
-                          value={bookingRules.cancelDeadlineHours}
-                          onChange={(e) =>
-                            setBookingRules({
-                              ...bookingRules,
-                              cancelDeadlineHours: Math.max(
-                                0,
-                                Math.min(168, parseInt(e.target.value) || 0),
-                              ),
-                            })
-                          }
-                          className="w-20 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2 text-sm font-bold text-slate-900 text-center focus:outline-none focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-white"
-                        />
-                        <span className="text-[15px] font-medium text-gray-500 dark:text-slate-400">
-                          saat
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between px-4 py-3 min-h-[44px]">
-                      <span className="text-[17px] text-gray-900 dark:text-white">
-                        Otomatik Onay
-                      </span>
-                      <ToggleSwitch
-                        checked={bookingRules.autoApprove}
-                        onChange={() =>
-                          setBookingRules({
-                            ...bookingRules,
-                            autoApprove: !bookingRules.autoApprove,
-                          })
-                        }
-                      />
-                    </div>
-                  </div>
-                </div>
-                <div className="mt-2 pl-4 flex items-center gap-1.5 text-[13px] text-gray-500 dark:text-slate-400">
-                  <Info size={14} />
-                  Otomatik onay açıkken yeni randevular direkt olarak kabul
-                  edilir.
-                </div>
-
-                <div className="mt-8 mb-2 pl-4">
-                  <h2 className="text-[13px] font-semibold uppercase tracking-widest text-gray-500 dark:text-slate-400">
-                    Bildirim Kanalları
-                  </h2>
-                </div>
-                <div className="overflow-hidden rounded-[20px] bg-white/70 backdrop-blur-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:bg-slate-900/60 dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)]">
-                  <div className="divide-y divide-gray-200/50 dark:divide-slate-700/50">
-                    <div className="flex items-center justify-between px-4 py-3.5">
-                      <div className="flex flex-col">
-                        <span className="text-[17px] text-gray-900 dark:text-white">
-                          E-posta Bildirimi
-                        </span>
-                        <span className="text-[13px] text-gray-500 dark:text-slate-400">
-                          Yeni randevu ve iptal bildirimleri
-                        </span>
-                      </div>
-                      <ToggleSwitch
-                        checked={bookingRules.notifyEmail}
-                        onChange={() =>
-                          setBookingRules({
-                            ...bookingRules,
-                            notifyEmail: !bookingRules.notifyEmail,
-                          })
-                        }
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between px-4 py-3.5">
-                      <div className="flex flex-col">
-                        <span className="text-[17px] text-gray-900 dark:text-white">
-                          SMS Bildirimi
-                        </span>
-                        <span className="text-[13px] text-gray-500 dark:text-slate-400">
-                          Hatırlatma SMS&apos;i gönderimi (Premium)
-                        </span>
-                      </div>
-                      <ToggleSwitch
-                        checked={bookingRules.notifySms}
-                        onChange={() =>
-                          setBookingRules({
-                            ...bookingRules,
-                            notifySms: !bookingRules.notifySms,
-                          })
-                        }
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between px-4 py-3.5">
-                      <div className="flex flex-col">
-                        <span className="text-[17px] text-gray-900 dark:text-white">
-                          WhatsApp
-                        </span>
-                        <span className="text-[13px] text-gray-500 dark:text-slate-400">
-                          WhatsApp&apos;tan randevu onayı (Premium)
-                        </span>
-                      </div>
-                      <ToggleSwitch
-                        checked={bookingRules.notifyWhatsapp}
-                        onChange={() =>
-                          setBookingRules({
-                            ...bookingRules,
-                            notifyWhatsapp: !bookingRules.notifyWhatsapp,
-                          })
-                        }
-                      />
-                    </div>
-                  </div>
-                </div>
+                <BookingRulesEditor
+                  rules={bookingRules}
+                  onChange={(patch) =>
+                    setBookingRules((prev) => ({ ...prev, ...patch }))
+                  }
+                />
               </div>
             )}
 

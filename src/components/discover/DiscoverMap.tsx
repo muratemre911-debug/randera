@@ -58,29 +58,55 @@ const OSM_TILES = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
 const OSM_ATTRIBUTION =
   '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a>';
 
-function pinHtml(price: number | null, isSelected: boolean, name: string) {
+/**
+ * Pin balonunu DOM düğümleri olarak üretir.
+ *
+ * Neden HTML string'i değil: Leaflet `divIcon` içeriğini `innerHTML` ile
+ * basar. İşletme adı string içine gömülürse `<img onerror=...>` gibi bir
+ * ad XSS'e dönüşür (adı işletme sahibi kontrol ediyor). Burada metin
+ * `textContent` ile yazıldığı için React'in kaçış davranışı gibi çalışır:
+ * içerik ne olursa olsun HTML olarak yorumlanmaz.
+ */
+function pinElement(price: number | null, isSelected: boolean, name: string) {
   // Fiyatı olmayan işletmenin pininde isim gösterilir (uydurma fiyat yazılmaz)
   const label =
     price != null
       ? `₺${price}`
       : `${name.length > 14 ? `${name.slice(0, 14)}…` : name}`;
 
-  return `
-    <div style="transform: translate(-50%, -100%)" class="relative">
-      <button type="button" class="flex items-center gap-1.5 px-3 py-1.5 rounded-full font-bold text-xs shadow-md border whitespace-nowrap transition-all ${
-        isSelected
-          ? "bg-indigo-600 text-white border-indigo-500 ring-4 ring-indigo-500/25"
-          : "bg-white/95 dark:bg-slate-900/95 text-slate-900 dark:text-white border-slate-200/90 dark:border-slate-700 hover:border-indigo-400"
-      }">
-        <span class="text-[11px]">${label}</span>
-        ${isSelected ? '<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0"></span>' : ""}
-      </button>
-      <div class="w-0 h-0 mx-auto border-x-4 border-x-transparent border-t-4 ${
-        isSelected
-          ? "border-t-indigo-600"
-          : "border-t-white/95 dark:border-t-slate-900/95"
-      }"></div>
-    </div>`;
+  const root = document.createElement("div");
+  root.style.transform = "translate(-50%, -100%)";
+  root.className = "relative";
+
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = `flex items-center gap-1.5 px-3 py-1.5 rounded-full font-bold text-xs shadow-md border whitespace-nowrap transition-all ${
+    isSelected
+      ? "bg-indigo-600 text-white border-indigo-500 ring-4 ring-indigo-500/25"
+      : "bg-white/95 dark:bg-slate-900/95 text-slate-900 dark:text-white border-slate-200/90 dark:border-slate-700 hover:border-indigo-400"
+  }`;
+
+  const labelEl = document.createElement("span");
+  labelEl.className = "text-[11px]";
+  labelEl.textContent = label;
+  button.appendChild(labelEl);
+
+  if (isSelected) {
+    const dot = document.createElement("span");
+    dot.className =
+      "w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0";
+    button.appendChild(dot);
+  }
+
+  root.appendChild(button);
+
+  const arrow = document.createElement("div");
+  arrow.className = `w-0 h-0 mx-auto border-x-4 border-x-transparent border-t-4 ${
+    isSelected ? "border-t-indigo-600" : "border-t-white/95 dark:border-t-slate-900/95"
+  }`;
+  root.appendChild(arrow);
+
+  return root;
 }
 
 export default function DiscoverMap({
@@ -165,7 +191,7 @@ export default function DiscoverMap({
       const marker = L.marker(coords, {
         icon: L.divIcon({
           className: "",
-          html: pinHtml(getTenantPrice(tenant), isSelected, tenant.name),
+          html: pinElement(getTenantPrice(tenant), isSelected, tenant.name),
           iconSize: [0, 0],
           iconAnchor: [0, 0],
         }),
@@ -210,7 +236,10 @@ export default function DiscoverMap({
   };
 
   return (
-    <div data-no-swipe className="relative w-full h-[480px] sm:h-[580px] rounded-3xl overflow-hidden border border-slate-200/80 dark:border-slate-800/80 shadow-sm bg-[#f4f3f0] dark:bg-[#12141c]">
+    <div
+      data-no-swipe
+      className="relative w-full h-[62svh] min-h-[380px] sm:h-[580px] rounded-3xl overflow-hidden border border-slate-200/80 dark:border-slate-800/80 shadow-sm bg-[#f4f3f0] dark:bg-[#12141c]"
+    >
       {/* Gerçek harita (Leaflet + OpenStreetMap) */}
       <div ref={containerRef} className="absolute inset-0 z-0" />
 

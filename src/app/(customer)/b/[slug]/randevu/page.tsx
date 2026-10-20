@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { useParams, useRouter } from "next/navigation";
 import { useLanguage } from "@/context/LanguageContext";
@@ -26,8 +26,11 @@ import RequirePhoneModal from "@/components/RequirePhoneModal";
 import {
   servicesForStaff,
   sortStaffOwnerFirst,
+  effectiveDayHours,
+  effectiveBookingRules,
   type StaffMember,
 } from "@/lib/staff";
+import { isTrMobile } from "@/lib/phone";
 
 /** Hizmetin süresini dakika cinsinden döner (kolon adı iki biçimde olabilir). */
 function getServiceDuration(svc: ServiceItem): number {
@@ -96,7 +99,7 @@ type TimeFilter = "all" | "morning" | "afternoon" | "evening";
 export default function BookPage() {
   const { slug } = useParams();
   const supabase = createClient();
-  const { lang } = useLanguage();
+  const { lang, t } = useLanguage();
   const router = useRouter();
 
   const [tenant, setTenant] = useState<TenantItem | null>(null);
@@ -128,6 +131,28 @@ export default function BookPage() {
   const [showPhoneModal, setShowPhoneModal] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
+  /** Saat seçimi sonrası otomatik ilerleme zamanlayıcısı (temizlenebilir). */
+  const advanceTimerRef = useRef<number | null>(null);
+
+  // Zamanlayıcıyı temizle: bileşen kapanırken ya da adım değişirken
+  // yarım kalan ilerleme tetiklenmesin.
+  useEffect(() => {
+    return () => {
+      if (advanceTimerRef.current !== null) {
+        window.clearTimeout(advanceTimerRef.current);
+        advanceTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  const goToStep = (next: number) => {
+    if (advanceTimerRef.current !== null) {
+      window.clearTimeout(advanceTimerRef.current);
+      advanceTimerRef.current = null;
+    }
+    setStep(next);
+  };
+
   const availableDates = useMemo(
     () => Array.from({ length: 14 }, (_, i) => addDays(new Date(), i)),
     [],
@@ -144,7 +169,9 @@ export default function BookPage() {
         .single();
 
       if (tenantError || !tenantData) {
-        setError(lang === "tr" ? "İşletme bulunamadı" : "Business not found");
+        // Hata metni render anında `lang`'e göre türetilir; burada yalnızca
+        // "işletme bulunamadı" durumunu işaretliyoruz.
+        setError("not_found");
         setLoading(false);
         return;
       }
@@ -178,7 +205,11 @@ export default function BookPage() {
     };
 
     loadTenant();
-  }, [slug, supabase, lang]);
+    // `lang` bilerek bağımlılık DEĞİL: dil değiştirmek randevu akışını
+    // baştan yüklememeli (akış sıfırlanıyordu). Hata mesajı render anında
+    // `lang`'e göre türetilir.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slug, supabase]);
 
   // Seçilen elemanın o günkü dolu saatleri.
   // Not: `appointments` RLS'i müşteriye sadece kendi randevularını gösterir, bu
@@ -257,9 +288,13 @@ export default function BookPage() {
    */
   const getAvailableTimeSlots = useCallback(
     (date: Date) => {
-      const workingHours = tenant?.working_hours;
-      const hoursSource = workingHours || defaultWorkingHours;
-      const slotDuration = tenant?.booking_rules?.slotDuration || 30;
+      // Randevu kuralları elemana özel olabilir: eleman slot aralığı girdiyse
+      // onunki, girmediyse işletmeninki geçerli olur.
+      const rules = effectiveBookingRules(
+        selectedStaff?.booking_rules,
+        tenant?.booking_rules,
+      );
+      const slotDuration = rules.slotDuration;
       // Hizmet seçilmediyse adım süresi kadar varsayılır.
       const serviceDuration = selectedService
         ? getServiceDuration(selectedService)
@@ -271,8 +306,15 @@ export default function BookPage() {
       );
       if (!dayName) return [];
 
-      const hours = hoursSource[dayName];
-      if (!hours || !hours.isOpen) return [];
+      // Seçilen elemanın o güne ait kendi saat ayarı varsa o, yoksa işletmenin
+      // saati uygulanır (eleman hiç ayar yapmamışsa işletme saati geçerlidir).
+      const hours =
+        effectiveDayHours(
+          selectedStaff?.working_hours,
+          tenant?.working_hours,
+          dayName,
+        ) ?? defaultWorkingHours[dayName];
+      if (!hours.isOpen) return [];
 
       const slots: string[] = [];
       const [openH, openM] = hours.openTime.split(":").map(Number);
@@ -296,7 +338,7 @@ export default function BookPage() {
       }
         return slots;
       },
-    [tenant, selectedService],
+    [tenant, selectedService, selectedStaff],
   );
 
   const filteredSlots = useMemo(() => {
@@ -313,6 +355,32 @@ export default function BookPage() {
       return true;
     });
   }, [selectedDate, timeFilter, getAvailableTimeSlots]);
+
+  /**
+   * Seçilen tarihin GEÇERLİ saatleri: elemanın kendi ayarı varsa onlar, yoksa
+   * işletme saati. Saat ızgarasının üstünde müşteriye gösterilir.
+   */
+  const effectiveHours = useMemo(() => {
+    const dayOfWeek = selectedDate.getDay();
+    const dayName = Object.keys(dayMap).find(
+      (k) => dayMap[k] === dayOfWeek,
+    );
+    if (!dayName) return null;
+
+    const staffOwn = selectedStaff?.working_hours?.[dayName];
+    if (staffOwn) {
+      return {
+        source: "staff" as const,
+        name: selectedStaff?.full_name?.trim() || "",
+        hours: staffOwn,
+      };
+    }
+    const tenantHours = tenant?.working_hours?.[dayName];
+    if (tenantHours) {
+      return { source: "tenant" as const, name: "", hours: tenantHours };
+    }
+    return null;
+  }, [selectedDate, selectedStaff, tenant]);
 
   // Seçilen elemanın hizmetleri (staff_id kolonu yoksa tümü gösterilir)
   const staffServices = useMemo(
@@ -396,11 +464,7 @@ export default function BookPage() {
     } = await supabase.auth.getUser();
 
     if (!user) {
-      setBookingError(
-        lang === "tr"
-          ? "Randevu almak için giriş yapmalısınız."
-          : "You must log in to book an appointment.",
-      );
+      setBookingError(t("booking.need_login"));
       router.push(
         `/login?next=${encodeURIComponent(window.location.pathname)}`,
       );
@@ -413,7 +477,7 @@ export default function BookPage() {
       .eq("id", user.id)
       .single();
 
-    if (!profile?.phone) {
+    if (!isTrMobile(profile?.phone)) {
       setCurrentUserId(user.id);
       setShowPhoneModal(true);
       setBookingLoading(false);
@@ -447,12 +511,7 @@ export default function BookPage() {
       // `alert()` yerine satır içi hata: mobilde tarayıcı diyaloğu tüm akışı
       // kesiyordu ve sunucu mesajı (ör. "bu saatte başka randevu var")
       // kullanıcı tarafından fark edilmiyordu.
-      setBookingError(
-        data.error ||
-          (lang === "tr"
-            ? "Randevu oluşturulurken bir hata oluştu."
-            : "An error occurred while booking."),
-      );
+      setBookingError(data.error || t("booking.booking_error"));
     } else {
       setBookingSuccess(true);
     }
@@ -525,20 +584,21 @@ export default function BookPage() {
         {paletteStyle}
         <Loader2 className="animate-spin text-[var(--brand)] h-9 w-9" />
         <p className="text-xs text-gray-400 font-medium">
-          {lang === "tr"
-            ? "Randevu takvimi yükleniyor..."
-            : "Loading booking calendar..."}
+          {t("booking.loading")}
         </p>
       </div>
     );
   }
 
   if (error || !tenant) {
+    // `error` ya sunucudan gelen bir mesaj ya da "not_found" işareti.
+    const errorText =
+      error === "not_found" ? t("booking.not_found") : error;
     return (
       <div className="brand-scope w-full h-64 flex flex-col items-center justify-center text-red-500 dark:text-red-400 font-medium gap-2">
         {paletteStyle}
         <Info size={28} />
-        <span>{error}</span>
+        <span>{errorText}</span>
       </div>
     );
   }
@@ -554,45 +614,39 @@ export default function BookPage() {
 
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300 mb-2">
             <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-            {lang === "tr"
-              ? "İşletme Onayı Bekleniyor"
-              : "Awaiting Business Approval"}
+            {t("booking.awaiting_approval")}
           </span>
 
           <h2 className="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white mb-2">
-            {lang === "tr"
-              ? "Randevu Talebiniz Alındı!"
-              : "Appointment Request Received!"}
+            {t("booking.saved_title")}
           </h2>
 
           <p className="text-sm text-gray-500 dark:text-slate-400 mb-6">
             <strong className="text-gray-900 dark:text-slate-200">
               {tenant.name}
             </strong>{" "}
-            {lang === "tr"
-              ? "randevu talebinizi inceleyip onaylayacaktır. Durumu 'Randevularım' sayfasından takip edebilirsiniz."
-              : "will review and approve your appointment request. You can track status in My Appointments."}
+            {t("booking.saved_desc")}
           </p>
 
           {/* Appointment Ticket / Recap */}
           {selectedService && selectedDate && selectedTime && (
             <div className="bg-gray-50/80 dark:bg-slate-800/50 rounded-2xl p-4 text-left border border-gray-100 dark:border-slate-700/60 mb-6 space-y-2 text-xs sm:text-sm">
               <div className="flex justify-between text-gray-500 dark:text-slate-400">
-                <span>{lang === "tr" ? "Hizmet" : "Service"}:</span>
+                <span>{t("booking.service")}:</span>
                 <span className="font-bold text-gray-900 dark:text-white">
                   {selectedService.name}
                 </span>
               </div>
               {selectedStaff && (
                 <div className="flex justify-between text-gray-500 dark:text-slate-400">
-                  <span>{lang === "tr" ? "Eleman" : "Staff"}:</span>
+                  <span>{t("booking.staff")}:</span>
                   <span className="font-bold text-amber-600 dark:text-amber-400">
                     {selectedStaff.full_name ?? "-"}
                   </span>
                 </div>
               )}
               <div className="flex justify-between text-gray-500 dark:text-slate-400">
-                <span>{lang === "tr" ? "Tarih ve Saat" : "Date & Time"}:</span>
+                <span>{t("booking.date_time")}:</span>
                 <span className="font-bold text-[var(--brand-text)]">
                   {format(selectedDate, "dd MMMM yyyy", {
                     locale: lang === "tr" ? tr : enUS,
@@ -601,7 +655,7 @@ export default function BookPage() {
                 </span>
               </div>
               <div className="flex justify-between text-gray-500 dark:text-slate-400">
-                <span>{lang === "tr" ? "Tutar" : "Price"}:</span>
+                <span>{t("booking.price")}:</span>
                 <span className="font-bold text-emerald-600 dark:text-emerald-400">
                   ₺{selectedService.price}
                 </span>
@@ -618,7 +672,7 @@ export default function BookPage() {
               className="flex items-center justify-center gap-2 py-3 px-3 rounded-2xl bg-white dark:bg-slate-800 border border-gray-200/80 dark:border-slate-700 text-xs font-bold text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 transition-all shadow-xs"
             >
               <CalendarPlus size={16} className="text-blue-500" />
-              <span>Google Takvim</span>
+              <span>{t("booking.add_google")}</span>
             </a>
 
             <button
@@ -626,7 +680,7 @@ export default function BookPage() {
               className="flex items-center justify-center gap-2 py-3 px-3 rounded-2xl bg-white dark:bg-slate-800 border border-gray-200/80 dark:border-slate-700 text-xs font-bold text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 transition-all shadow-xs"
             >
               <Download size={16} className="text-[var(--brand-text)]" />
-              <span>Apple / .ics İndir</span>
+              <span>{t("booking.add_apple")}</span>
             </button>
           </div>
 
@@ -634,9 +688,7 @@ export default function BookPage() {
             onClick={() => router.push("/my-appointments")}
             className="w-full bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white font-bold py-4 rounded-2xl shadow-lg shadow-[color:var(--brand-shadow)] hover:-translate-y-0.5 transition-all text-sm"
           >
-            {lang === "tr"
-              ? "Randevularımı Görüntüle"
-              : "Go to My Appointments"}
+            {t("booking.view_appointments")}
           </button>
         </div>
       </div>
@@ -666,11 +718,11 @@ export default function BookPage() {
               {tenant.name}
             </h1>
             <span className="px-1.5 py-0.5 shrink-0 rounded-full text-[9px] sm:text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200/50 dark:border-emerald-800/50">
-              {lang === "tr" ? "Müsait" : "Open"}
+              {t("booking.open")}
             </span>
           </div>
           <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
-            {lang === "tr" ? "Randevu Alma Sihirbazı" : "Booking Wizard"}
+            {t("booking.wizard")}
           </p>
         </div>
       </div>
@@ -688,18 +740,20 @@ export default function BookPage() {
             <button
               key={s.num}
               onClick={() => {
-                if (s.num === 1) setStep(1);
-                if (s.num === 2 && selectedStaff) setStep(2);
-                if (s.num === 3 && selectedService) setStep(3);
+                if (s.num === 1) goToStep(1);
+                if (s.num === 2 && selectedStaff) goToStep(2);
+                if (s.num === 3 && selectedService) goToStep(3);
                 if (
                   s.num === 4 &&
                   selectedService &&
                   selectedDate &&
                   selectedTime
                 )
-                  setStep(4);
+                  goToStep(4);
               }}
-              className={`flex items-center justify-center gap-1 sm:gap-1.5 py-2 sm:py-2.5 px-1 sm:px-2 rounded-xl text-[11px] sm:text-xs font-bold transition-all whitespace-nowrap ${
+              aria-current={isActive ? "step" : undefined}
+              disabled={!isDone && !isActive}
+              className={`flex items-center justify-center gap-1 sm:gap-1.5 py-2 sm:py-2.5 px-1 sm:px-2 rounded-xl text-[11px] sm:text-xs font-bold transition-all whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed ${
                 isActive
                   ? "bg-[var(--brand)] text-white shadow-md shadow-[color:var(--brand-shadow)]"
                   : isDone
@@ -726,12 +780,10 @@ export default function BookPage() {
         <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
           <div>
             <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-              {lang === "tr" ? "Eleman Seçimi" : "Select Staff"}
+              {t("booking.step_staff")}
             </h2>
             <p className="text-xs text-gray-500 dark:text-slate-400">
-              {lang === "tr"
-                ? "Randevunuzu kimin vereceğini seçin. Sonraki adımlarda sadece o elemanın hizmetleri ve müsait saatleri gösterilir."
-                : "Choose who will serve you. Next steps show only that person's services and availability."}
+              {t("booking.staff_pick_desc")}
             </p>
           </div>
 
@@ -739,8 +791,7 @@ export default function BookPage() {
             {staffList.map((staff) => {
               const isOwner = staff.role === "owner";
               const displayName =
-                staff.full_name?.trim() ||
-                (lang === "tr" ? "İsimsiz" : "Unnamed");
+                staff.full_name?.trim() || t("booking.unnamed");
 
               return (
                 <button
@@ -749,7 +800,7 @@ export default function BookPage() {
                     setSelectedStaff(staff);
                     setSelectedService(null);
                     setSelectedTime(null);
-                    setStep(2);
+                    goToStep(2);
                   }}
                   className={`group relative flex items-center justify-between gap-4 overflow-hidden p-5 rounded-3xl border text-left transition-all ${
                     isOwner
@@ -789,18 +840,14 @@ export default function BookPage() {
                         {isOwner && (
                           <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-gradient-to-r from-amber-500 to-amber-600 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-white shadow-sm">
                             <Crown size={11} strokeWidth={2.5} />
-                            {lang === "tr" ? "İşletme Sahibi" : "Owner"}
+                            {t("booking.owner")}
                           </span>
                         )}
                       </div>
                       <p className="mt-0.5 text-xs text-gray-500 dark:text-slate-400">
                         {isOwner
-                          ? lang === "tr"
-                            ? "İşletmenin sahibi"
-                            : "Business owner"
-                          : lang === "tr"
-                            ? "Ekip elemanı"
-                            : "Team member"}
+                          ? t("booking.owner_sub")
+                          : t("booking.team_member")}
                       </p>
                     </div>
                   </div>
@@ -827,16 +874,14 @@ export default function BookPage() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                {lang === "tr" ? "Hizmet Seçimi" : "Select Service"}
+                {t("booking.step_service")}
               </h2>
               <p className="text-xs text-gray-500 dark:text-slate-400">
                 {selectedStaff
                   ? lang === "tr"
                     ? `${selectedStaff.full_name ?? ""} tarafından verilen hizmetler`
                     : `Services provided by ${selectedStaff.full_name ?? ""}`
-                  : lang === "tr"
-                    ? "Almak istediğiniz hizmeti seçip devam edin."
-                    : "Choose the service you would like to book."}
+                  : t("booking.service_pick_desc")}
               </p>
             </div>
 
@@ -851,7 +896,7 @@ export default function BookPage() {
                 value={serviceSearch}
                 onChange={(e) => setServiceSearch(e.target.value)}
                 placeholder={
-                  lang === "tr" ? "Hizmet ara..." : "Search services..."
+                  t("booking.search_service")
                 }
                 className="w-full pl-9 pr-4 py-2 rounded-xl border border-gray-200 dark:border-slate-700 bg-white/80 dark:bg-slate-800/80 text-xs focus:outline-none focus:ring-2 focus:ring-[var(--brand)] text-gray-800 dark:text-white"
               />
@@ -870,7 +915,7 @@ export default function BookPage() {
                     setSelectedService(svc);
                     setSelectedTime(null);
                     clearBookingError();
-                    setStep(3);
+                    goToStep(3);
                   }}
                   className={`group relative flex items-center justify-between p-5 rounded-3xl border transition-all text-left ${
                     isSelected
@@ -919,9 +964,7 @@ export default function BookPage() {
                   ? lang === "tr"
                     ? `${selectedStaff.full_name ?? "Bu eleman"} için tanımlı hizmet bulunmuyor. Lütfen başka bir eleman seçin.`
                     : `No services for ${selectedStaff.full_name ?? "this staff member"}. Please pick someone else.`
-                  : lang === "tr"
-                    ? "Eşleşen hizmet bulunamadı."
-                    : "No services found."}
+                  : t("booking.no_services")}
               </div>
             )}
           </div>
@@ -929,11 +972,11 @@ export default function BookPage() {
           {hasStaffStep && (
             <button
               type="button"
-              onClick={() => setStep(1)}
+              onClick={() => goToStep(1)}
               className="flex items-center gap-1.5 px-4 py-2.5 rounded-2xl border border-gray-200 dark:border-slate-700 text-xs font-bold text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors w-fit"
             >
               <ChevronLeft size={16} />
-              {lang === "tr" ? "Eleman Seçimine Dön" : "Back to Staff"}
+              {t("booking.back_to_staff")}
             </button>
           )}
         </div>
@@ -945,27 +988,27 @@ export default function BookPage() {
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                {lang === "tr" ? "Tarih ve Saat Seçin" : "Select Date & Time"}
+                {t("booking.step_datetime")}
               </h2>
               <p className="text-xs text-gray-500 dark:text-slate-400">
                 {selectedService.name} • ₺{selectedService.price} (
                 {getServiceDuration(selectedService)}{" "}
-                {lang === "tr" ? "dk" : "min"})
+                {t("booking.min_short")})
                 {selectedStaff ? ` • ${selectedStaff.full_name ?? ""}` : ""}
               </p>
             </div>
             <button
-              onClick={() => setStep(2)}
+              onClick={() => goToStep(2)}
               className="text-xs font-bold text-[var(--brand-text)] hover:underline"
             >
-              {lang === "tr" ? "Hizmeti Değiştir" : "Change Service"}
+              {t("booking.change_service")}
             </button>
           </div>
 
           {/* 14-Day Horizontal Calendar Scroll */}
           <div className="bg-white/70 dark:bg-slate-900/60 backdrop-blur-2xl p-5 rounded-3xl border border-white/60 dark:border-slate-800/80 shadow-xs">
             <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-500 mb-3">
-              {lang === "tr" ? "1. Gün Seçin" : "1. Select Day"}
+              {t("booking.select_day")}
             </h3>
 
             <div className="flex gap-2.5 overflow-x-auto pt-1.5 pb-3.5 px-1 -mx-1 scrollbar-none">
@@ -998,13 +1041,9 @@ export default function BookPage() {
                       }`}
                     >
                       {isToday
-                        ? lang === "tr"
-                          ? "Bugün"
-                          : "Today"
+                        ? t("booking.today")
                         : isTomorrow
-                          ? lang === "tr"
-                            ? "Yarın"
-                            : "Tmrw"
+                          ? t("booking.tomorrow")
                           : format(date, "EEE", { locale })}
                     </span>
                     <span className="text-2xl font-black mt-1 leading-tight">
@@ -1026,34 +1065,53 @@ export default function BookPage() {
             <div className="mt-6 pt-5 border-t border-gray-100 dark:border-slate-800">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-500">
-                  {lang === "tr" ? "2. Saat Seçin" : "2. Select Time"}
+                  {t("booking.select_time")}
                 </h3>
 
                 {/* Time filter pills */}
                 <div className="flex items-center justify-between gap-1 p-1 rounded-xl bg-gray-100 dark:bg-slate-800 text-[11px] font-bold w-full sm:w-auto">
                   {(
                     [
-                      { id: "all", tr: "Tümü", en: "All" },
-                      { id: "morning", tr: "Sabah", en: "Morning" },
-                      { id: "afternoon", tr: "Öğle", en: "Afternoon" },
-                      { id: "evening", tr: "Akşam", en: "Evening" },
+                      { id: "all", key: "booking.all_times" },
+                      { id: "morning", key: "booking.morning" },
+                      { id: "afternoon", key: "booking.afternoon" },
+                      { id: "evening", key: "booking.evening" },
                     ] as const
                   ).map((f) => (
                     <button
                       key={f.id}
                       type="button"
                       onClick={() => setTimeFilter(f.id)}
-                      className={`flex-1 sm:flex-none text-center px-2.5 py-1.5 sm:py-1 rounded-lg transition-all ${
+                      aria-pressed={timeFilter === f.id}
+                      className={`flex-1 sm:flex-none text-center px-2.5 py-2 sm:py-1.5 min-h-[36px] rounded-lg transition-all ${
                         timeFilter === f.id
                           ? "bg-white dark:bg-slate-700 text-[var(--brand-text)] shadow-xs font-black"
                           : "text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-200"
                       }`}
                     >
-                      {lang === "tr" ? f.tr : f.en}
+                      {t(f.key)}
                     </button>
                   ))}
                 </div>
               </div>
+
+              {/* Seçilen tarihin geçerli çalışma saatleri: eleman kendi
+                  saatini seçmişse onlar, yoksa işletme saati */}
+              {effectiveHours && (
+                <div className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-2xl border border-[var(--brand-border)] bg-[var(--brand-soft)] px-4 py-2.5 text-xs font-semibold text-[var(--brand-text)]">
+                  <Clock size={14} className="shrink-0" />
+                  <span>
+                    {effectiveHours.source === "staff"
+                      ? `${effectiveHours.name}${t("booking.working_hours")}: `
+                      : `${t("booking.business_hours")}: `}
+                  </span>
+                  <span>
+                    {effectiveHours.hours.isOpen
+                      ? `${effectiveHours.hours.openTime} – ${effectiveHours.hours.closeTime}`
+                      : t("booking.closed")}
+                  </span>
+                </div>
+              )}
 
               {/* Slots Grid */}
               <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2.5">
@@ -1070,11 +1128,13 @@ export default function BookPage() {
                           clearBookingError();
                           setSelectedTime(time);
                           // Adımlar 1 tabanlıdır: 3 = Tarih & Saat, 4 = Onay & Not.
-                          // Burada 3 yazıyordu, yani kullanıcı zaten 3. adımda
-                          // olduğu için saat seçmek HİÇBİR ŞEY yapmıyordu ve
-                          // akış otomatik ilerlemiyordu. Kısa gecikme, seçim
-                          // animasyonunun görünmesini sağlar.
-                          setTimeout(() => {
+                          // Kısa gecikme, seçim animasyonunun görünmesini sağlar.
+                          //
+                          // Zamanlayıcı SAKLANIR: önceden temizlenmediği için
+                          // kullanıcı 220ms içinde başka bir saate ya da "geri"
+                          // düğmesine basarsa akış yine de 4. adıma atıyordu.
+                          advanceTimerRef.current = window.setTimeout(() => {
+                            advanceTimerRef.current = null;
                             setStep(4);
                           }, 220);
                         }}
@@ -1103,19 +1163,19 @@ export default function BookPage() {
               <div className="mt-8 pt-5 border-t border-gray-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <button
                   type="button"
-                  onClick={() => setStep(2)}
+                  onClick={() => goToStep(2)}
                   className="flex items-center gap-1.5 px-4 py-2.5 rounded-2xl border border-gray-200 dark:border-slate-700 text-xs font-bold text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors w-fit"
                 >
                   <ChevronLeft size={16} />
                   <span>
-                    {lang === "tr" ? "Hizmet Seçimine Dön" : "Back to Services"}
+                    {t("booking.back_to_services")}
                   </span>
                 </button>
 
                 <button
                   type="button"
                   disabled={!selectedTime}
-                  onClick={() => setStep(4)}
+                  onClick={() => goToStep(4)}
                   className="flex items-center justify-center gap-2 px-6 py-3 rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-strong)] text-white font-black text-xs sm:text-sm shadow-md shadow-[color:var(--brand-shadow)] active:scale-95 disabled:opacity-40 disabled:pointer-events-none transition-all"
                 >
                   <span>
@@ -1140,7 +1200,7 @@ export default function BookPage() {
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
           <div>
             <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-              {lang === "tr" ? "Randevu Özeti ve Onay" : "Appointment Summary"}
+              {t("booking.step_summary")}
             </h2>
             <p className="text-xs text-gray-500 dark:text-slate-400">
               {lang === "tr"
@@ -1179,7 +1239,7 @@ export default function BookPage() {
 
               <div className="text-right">
                 <span className="text-xs text-gray-400 block font-medium">
-                  {lang === "tr" ? "Toplam Ücret" : "Total Price"}
+                  {t("booking.total")}
                 </span>
                 <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
                   ₺{selectedService.price}
@@ -1190,7 +1250,7 @@ export default function BookPage() {
             <div className="grid grid-cols-2 gap-4 py-6 border-b border-dashed border-gray-200 dark:border-slate-800 text-xs sm:text-sm">
               <div>
                 <span className="text-gray-400 block mb-1">
-                  {lang === "tr" ? "Seçilen Hizmet" : "Selected Service"}
+                  {t("booking.selected_service")}
                 </span>
                 <p className="font-bold text-gray-800 dark:text-slate-200">
                   {selectedService.name}
@@ -1204,7 +1264,7 @@ export default function BookPage() {
               {selectedStaff && (
                 <div>
                   <span className="text-gray-400 block mb-1">
-                    {lang === "tr" ? "Eleman" : "Staff"}
+                    {t("booking.staff")}
                   </span>
                   <p className="font-bold text-gray-800 dark:text-slate-200">
                     {selectedStaff.full_name ?? "-"}
@@ -1212,7 +1272,7 @@ export default function BookPage() {
                   {selectedStaff.role === "owner" && (
                     <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-600 dark:text-amber-400">
                       <Crown size={12} strokeWidth={2.5} />
-                      {lang === "tr" ? "İşletme Sahibi" : "Owner"}
+                      {t("booking.owner")}
                     </span>
                   )}
                 </div>
@@ -1220,7 +1280,7 @@ export default function BookPage() {
 
               <div>
                 <span className="text-gray-400 block mb-1">
-                  {lang === "tr" ? "Tarih ve Saat" : "Date & Time"}
+                  {t("booking.date_time")}
                 </span>
                 <p className="font-bold text-gray-800 dark:text-slate-200">
                   {format(selectedDate, "dd MMMM yyyy, EEEE", {
@@ -1271,7 +1331,7 @@ export default function BookPage() {
                 <button
                   type="button"
                   onClick={() => setBookingError(null)}
-                  aria-label={lang === "tr" ? "Kapat" : "Dismiss"}
+                  aria-label={t("booking.dismiss")}
                   className="shrink-0 rounded-full px-1.5 text-red-500 active:scale-90 dark:text-red-400"
                 >
                   ×
@@ -1283,14 +1343,14 @@ export default function BookPage() {
             <div className="mt-8 flex items-center gap-3">
               <button
                 type="button"
-                onClick={() => setStep(3)}
+                onClick={() => goToStep(3)}
                 className="inline-flex items-center justify-center gap-2 pl-4 pr-5 py-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-700 bg-white/60 dark:bg-slate-800/60 backdrop-blur-md text-sm font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700/80 shadow-xs hover:shadow-sm active:scale-95 transition-all cursor-pointer select-none shrink-0"
               >
                 <ChevronLeft
                   size={18}
                   className="-ml-0.5 text-slate-500 dark:text-slate-400"
                 />
-                <span>{lang === "tr" ? "Geri" : "Back"}</span>
+                <span>{t("booking.back")}</span>
               </button>
 
               <button
@@ -1321,7 +1381,6 @@ export default function BookPage() {
       {currentUserId && (
         <RequirePhoneModal
           isOpen={showPhoneModal}
-          userId={currentUserId}
           onSuccess={() => {
             setShowPhoneModal(false);
             handleBook();

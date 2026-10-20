@@ -12,6 +12,11 @@ async function getTenantId(userId: string) {
   return profile;
 }
 
+/** Bilinmeyen (unknown) hata değerinden gösterilebilir mesaj çıkarır. */
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : "Sunucu hatası";
+}
+
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
@@ -54,8 +59,8 @@ export async function GET(req: Request) {
     }
 
     return NextResponse.json(posts);
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err) {
+    return NextResponse.json({ error: errorMessage(err) }, { status: 500 });
   }
 }
 
@@ -71,6 +76,15 @@ export async function POST(req: Request) {
     const profile = await getTenantId(user.id);
     if (!profile?.tenant_id) {
       return NextResponse.json({ error: "Bu işlem için bir işletme hesabınız olmalı." }, { status: 403 });
+    }
+
+    // İçerikler (vitrin gönderileri) yalnızca işletme sahibinin yetkisindedir;
+    // eleman gönderi oluşturamaz.
+    if (profile.role !== "owner") {
+      return NextResponse.json(
+        { error: "İçerikleri yalnızca işletme sahibi yönetebilir." },
+        { status: 403 },
+      );
     }
 
     const { image_url, description } = await req.json();
@@ -89,8 +103,8 @@ export async function POST(req: Request) {
     if (error) throw error;
 
     return NextResponse.json({ success: true, post });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err) {
+    return NextResponse.json({ error: errorMessage(err) }, { status: 500 });
   }
 }
 
@@ -106,6 +120,14 @@ export async function DELETE(req: Request) {
     const profile = await getTenantId(user.id);
     if (!profile?.tenant_id) {
       return NextResponse.json({ error: "Bu işlem için bir işletme hesabınız olmalı." }, { status: 403 });
+    }
+
+    // İçerikleri yalnızca işletme sahibi silebilir (eleman içerik yönetemez).
+    if (profile.role !== "owner") {
+      return NextResponse.json(
+        { error: "İçerikleri yalnızca işletme sahibi yönetebilir." },
+        { status: 403 },
+      );
     }
 
     const { searchParams } = new URL(req.url);
@@ -125,7 +147,7 @@ export async function DELETE(req: Request) {
     if (error) throw error;
 
     return NextResponse.json({ success: true });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err) {
+    return NextResponse.json({ error: errorMessage(err) }, { status: 500 });
   }
 }

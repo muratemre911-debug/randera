@@ -215,6 +215,18 @@ html, body {
   }
 }
 
+/*
+ * Hover'a bağlı gizlenen aksiyon butonları.
+ * Dokunmatik cihazda hover YOKTUR; butonlar `opacity-0` ile kalıcı olarak
+ * gizleniyor ve kullanıcı o aksiyona hiç erişemiyordu (ör. işletme içeriğini
+ * silme). Hover desteği olmayan cihazlarda butonlar daima görünür.
+ */
+@media (hover: none) {
+  .hover-only-actions {
+    opacity: 1 !important;
+  }
+}
+
 /* Hareket azaltma tercihinde swipe geçiş animasyonu da kapatılır.
    (Katmansız CSS, Tailwind `utilities` katmanını yendiği için `!important`
    gerekmez.) */

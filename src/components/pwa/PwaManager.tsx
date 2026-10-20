@@ -90,12 +90,34 @@ export default function PwaManager() {
       });
     };
 
+    // Geliştirme ortamında (localhost) eski SW önbelleklerini temizle ki
+    // yapılan kod/tasarım değişiklikleri yenilemede eski sürüme dönmesin.
+    if (
+      typeof window !== "undefined" &&
+      (window.location.hostname === "localhost" ||
+        window.location.hostname === "127.0.0.1") &&
+      "caches" in window
+    ) {
+      window.caches
+        .keys()
+        .then((keys) => Promise.all(keys.map((k) => window.caches.delete(k))))
+        .catch(() => {});
+    }
+
     navigator.serviceWorker
       .register("/sw.js", { scope: "/", updateViaCache: "none" })
       .then((reg) => {
         if (cancelled) return;
         registration = reg;
-        trackUpdates(reg);
+        if (
+          window.location.hostname === "localhost" ||
+          window.location.hostname === "127.0.0.1"
+        ) {
+          reg.update().catch(() => {});
+          reg.waiting?.postMessage({ type: "SKIP_WAITING" });
+        } else {
+          trackUpdates(reg);
+        }
       })
       .catch((err) => {
         if (process.env.NODE_ENV !== "production") {

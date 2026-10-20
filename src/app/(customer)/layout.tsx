@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import {
   Moon,
   Sun,
@@ -26,13 +26,23 @@ import CustomerBottomNav, {
 } from "@/components/customer/CustomerBottomNav";
 import SwipePager from "@/components/layout/SwipePager";
 import { preventFocusScroll } from "@/lib/preventFocusScroll";
+import { isTrMobile } from "@/lib/phone";
 
-const navItems: BottomNavItem[] = [
-  { href: "/discover", icon: Search, label: "Keşfet" },
-  { href: "/favorites", icon: Heart, label: "Favorilerim" },
-  { href: "/my-appointments", icon: Calendar, label: "Randevularım" },
-  { href: "/profile", icon: User, label: "Profilim" },
-];
+/**
+ * Müşteri navigasyonu.
+ *
+ * Etiketler `useMemo` içinde `t()` ile üretilir: dizi modül seviyesinde
+ * tanımlı olsaydı etiketler Türkçe kalırdı ve dil değiştirildiğinde alt
+ * menü/sidebar güncellenmezdi.
+ */
+function buildNavItems(t: (key: string) => string): BottomNavItem[] {
+  return [
+    { href: "/discover", icon: Search, label: t("nav.discover") },
+    { href: "/favorites", icon: Heart, label: t("nav.favorites") },
+    { href: "/my-appointments", icon: Calendar, label: t("nav.my_appointments") },
+    { href: "/profile", icon: User, label: t("nav.profile") },
+  ];
+}
 
 export default function CustomerLayout({
   children,
@@ -44,6 +54,9 @@ export default function CustomerLayout({
   const supabase = createClient();
   const { t, lang, toggleLanguage } = useLanguage();
   const { theme, toggleTheme } = useTheme();
+
+  // Dil değişince etiketler de değişsin.
+  const navItems = useMemo(() => buildNavItems(t), [t]);
 
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [userFullName, setUserFullName] = useState<string | null>(null);
@@ -73,7 +86,9 @@ export default function CustomerLayout({
         setUserAvatarUrl(profile?.avatar_url ?? null);
         setUserRole(profile?.role ?? null);
 
-        if (profile?.role === "customer" && !profile?.phone) {
+        // Numara eksikse ya da geçersizse (örn. eski kayıtlardaki uydurma
+        // numaralar) müşteriden yeniden istenir.
+        if (profile?.role === "customer" && !isTrMobile(profile?.phone)) {
           setShowPhoneModal(true);
         }
       }
@@ -211,9 +226,11 @@ export default function CustomerLayout({
                   {getDisplayName(userFullName, userEmail, t("header.loading"))}
                 </p>
                 <p className="text-[11px] font-medium text-indigo-500 dark:text-indigo-400">
-                  {isBusinessAccount
+                  {userRole === "owner"
                     ? t("nav.business_account")
-                    : t("nav.customer_account")}
+                    : userRole === "staff"
+                      ? t("nav.staff_account")
+                      : t("nav.customer_account")}
                 </p>
               </div>
             </div>
@@ -221,7 +238,7 @@ export default function CustomerLayout({
               onClick={handleLogout}
               className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-red-50 px-4 py-2 text-[13px] font-bold text-red-600 transition-colors hover:bg-red-100 dark:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20"
             >
-              <LogOut size={16} /> Çıkış Yap
+              <LogOut size={16} /> {t("nav.logout")}
             </button>
           </div>
         </div>
@@ -297,7 +314,6 @@ export default function CustomerLayout({
       {userId && (
         <RequirePhoneModal
           isOpen={showPhoneModal}
-          userId={userId}
           onSuccess={() => setShowPhoneModal(false)}
         />
       )}

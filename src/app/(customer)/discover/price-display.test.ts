@@ -30,7 +30,7 @@ describe("fiyat gösterimi", () => {
     expect(map).toContain("Fiyat bilgisi yok");
     // fiyat yokken pinlerde işletme adı gösterilir
     expect(map).toContain(
-      "pinHtml(getTenantPrice(tenant), isSelected, tenant.name)",
+      "pinElement(getTenantPrice(tenant), isSelected, tenant.name)",
     );
   });
 });

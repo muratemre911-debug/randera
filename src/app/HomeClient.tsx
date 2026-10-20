@@ -509,6 +509,7 @@ export default function HomeClient() {
               {[
                 {
                   icon: Building2,
+                  keyPrefix: "biz",
                   title: t("landing.biz_title"),
                   desc: t("landing.biz_desc"),
                   bullets: ["b1", "b2", "b3", "b4"],
@@ -518,9 +519,10 @@ export default function HomeClient() {
                 },
                 {
                   icon: Users,
+                  keyPrefix: "cust",
                   title: t("landing.cust_title"),
                   desc: t("landing.cust_desc"),
-                  bullets: ["c1", "c2", "c3", "c4"],
+                  bullets: ["b1", "b2", "b3", "b4"],
                   cta: t("landing.cust_cta"),
                   href: "/discover",
                   highlight: false,
@@ -553,9 +555,7 @@ export default function HomeClient() {
                           size={17}
                           className="mt-0.5 shrink-0 text-indigo-500 dark:text-indigo-400"
                         />
-                        {t(
-                          `landing.${role.highlight ? "biz" : "cust"}_${bullet}`,
-                        )}
+                        {t(`landing.${role.keyPrefix}_${bullet}`)}
                       </li>
                     ))}
                   </ul>

@@ -24,7 +24,27 @@ export async function GET(
 
     if (error) throw error;
 
-    return NextResponse.json({ staff: data ?? [] });
+    // Elemana özel ayarlar: randevu akışı, seçilen elemanın saat ve kuralları
+    // varsa onları, boş bıraktığı alanlarda işletmenin değerlerini kullanır.
+    const { data: settingsRows } = await supabaseAdmin
+      .from("staff_settings")
+      .select("profile_id, working_hours, booking_rules")
+      .eq("tenant_id", tenantId);
+
+    const settingsMap = new Map(
+      (settingsRows ?? []).map((r) => [
+        r.profile_id,
+        { working_hours: r.working_hours, booking_rules: r.booking_rules },
+      ]),
+    );
+
+    const staff = (data ?? []).map((p) => ({
+      ...p,
+      working_hours: settingsMap.get(p.id)?.working_hours ?? null,
+      booking_rules: settingsMap.get(p.id)?.booking_rules ?? null,
+    }));
+
+    return NextResponse.json({ staff });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Bilinmeyen hata";
     console.error("Fetch tenant staff error:", err);

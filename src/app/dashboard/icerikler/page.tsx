@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { ImagePlus, Loader2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ImagePlus } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useLanguage } from "@/context/LanguageContext";
 import { PostGrid, PostGridSkeleton } from "@/components/PostGrid";
@@ -12,13 +13,25 @@ interface PostWithTenant extends Post {
   tenant?: Pick<Tenant, "id" | "name" | "profile_image_url">;
 }
 
+/** Bilinmeyen (unknown) hata değerinden gösterilebilir mesaj çıkarır. */
+function errorMessage(err: unknown, fallback: string): string {
+  return err instanceof Error && err.message ? err.message : fallback;
+}
+
 export default function IceriklerPage() {
   const supabase = createClient();
   const { lang } = useLanguage();
+  const router = useRouter();
 
   const [posts, setPosts] = useState<PostWithTenant[]>([]);
   const [loading, setLoading] = useState(true);
   const [tenantId, setTenantId] = useState<string | null>(null);
+  /**
+   * İçerikler bölümü yalnızca işletme sahibine aittir. Eleman URL'den
+   * doğrudan gelse bile içerik göremez/yönetemez: yetkisizde sayfa hiç
+   * render edilmez ve panele yönlendirilir.
+   */
+  const [denied, setDenied] = useState(false);
 
   const [description, setDescription] = useState("");
   const [file, setFile] = useState<File | null>(null);
@@ -39,13 +52,21 @@ export default function IceriklerPage() {
     }
     const { data: profile } = await supabase
       .from("profiles")
-      .select("tenant_id")
+      .select("tenant_id, role")
       .eq("id", user.id)
       .single();
     if (!profile?.tenant_id) {
       setLoading(false);
       return;
     }
+
+    // Eleman içerikleri göremez ve yönetemez.
+    if (profile.role !== "owner") {
+      setDenied(true);
+      router.replace("/dashboard");
+      return;
+    }
+
     setTenantId(profile.tenant_id);
 
     const res = await fetch(`/api/posts?tenant_id=${profile.tenant_id}`);
@@ -64,6 +85,9 @@ export default function IceriklerPage() {
   };
 
   useEffect(() => {
+    // Mount'ta içerikleri çekme. fetchPosts async olsa da ilk işi
+    // setLoading(true) olduğu için kural tetikleniyor; burada kasıtlı.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchPosts();
   }, []);
 
@@ -113,8 +137,14 @@ export default function IceriklerPage() {
         setMessage({ type: "success", text: lang === "tr" ? "İçerik başarıyla eklendi." : "Content added successfully." });
         fetchPosts();
       }
-    } catch (err: any) {
-      setMessage({ type: "error", text: err.message });
+    } catch (err) {
+      setMessage({
+        type: "error",
+        text: errorMessage(
+          err,
+          lang === "tr" ? "Beklenmeyen bir hata oluştu." : "Something went wrong.",
+        ),
+      });
     } finally {
       setUploading(false);
     }
@@ -127,6 +157,9 @@ export default function IceriklerPage() {
       const saved = localStorage.getItem(`tenant_featured_posts_${tenantId}`);
       if (saved) {
         try {
+          // localStorage'da saklanan öne çıkarılan gönderi listesi mount'ta
+          // state'e alınıyor; dış sistemden okuma olduğu için kasıtlı.
+          // eslint-disable-next-line react-hooks/set-state-in-effect
           setFeaturedPostIds(JSON.parse(saved));
         } catch (e) {
           console.error(e);
@@ -211,6 +244,9 @@ export default function IceriklerPage() {
     setSelectedPost(post);
     setModalOpen(true);
   };
+
+  // Yetkisiz (eleman): sayfa hiç gösterilmez, panel'e yönlendirme yapılıyor.
+  if (denied) return null;
 
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 max-w-6xl mx-auto space-y-6">

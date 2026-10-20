@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState, useMemo, useRef } from "react";
-import { createPortal } from "react-dom";
 import { createClient } from "@/utils/supabase/client";
 import { format, parseISO, isAfter } from "date-fns";
+import type { Locale } from "date-fns";
 import { tr, enUS } from "date-fns/locale";
 import { useLanguage } from "@/context/LanguageContext";
 import { 
@@ -15,11 +15,9 @@ import {
   CalendarPlus, 
   Download, 
   XCircle, 
-  ArrowRight, 
   CheckCircle2, 
   AlertCircle, 
   Compass, 
-  Sparkles, 
   AlertTriangle, 
   ExternalLink,
   RotateCcw,
@@ -31,6 +29,17 @@ import {
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import ReviewModal from "@/components/ReviewModal";
+import Modal from "@/components/ui/Modal";
+import DropdownMenu from "@/components/ui/DropdownMenu";
+import {
+  effectiveBookingRules,
+  type BookingRulesInput,
+} from "@/lib/staff";
+
+/** Bilinmeyen (unknown) hata değerinden gösterilebilir mesaj çıkarır. */
+function errorMessage(err: unknown, fallback: string): string {
+  return err instanceof Error && err.message ? err.message : fallback;
+}
 
 interface Appointment {
   id: string;
@@ -40,6 +49,13 @@ interface Appointment {
   start_time: string;
   end_time: string;
   status: "pending" | "confirmed" | "completed" | "cancelled";
+  /** Randevuyu verecek ekip üyesi (staff_settings sahibi) */
+  staff_id?: string | null;
+  /**
+   * Elemana özel randevu kuralları — fetch sırasında staff_settings'ten
+   * eklenir. Boş bıraktığı alanlarda işletme kuralları geçerli olur.
+   */
+  staff_booking_rules?: BookingRulesInput | null;
   custom_fields?: {
     customer_name?: string;
     phone?: string;
@@ -114,15 +130,22 @@ export default function MyAppointmentsPage() {
   };
 
   // İptal modu: süre dolmuşsa direkt iptal, dolmuşsa işletmeye istek gönderilir
-  const getCancelMode = (appt: Appointment): "direct" | "request" => {
-    const deadline = appt.tenants?.booking_rules?.cancelDeadlineHours ?? 24;
-    const hoursLeft = (new Date(appt.start_time).getTime() - Date.now()) / 3600000;
+  const getCancelMode = (
+    appt: Appointment,
+    currentTime: number,
+  ): "direct" | "request" => {
+    const deadline = getCancelDeadline(appt);
+    const hoursLeft = (new Date(appt.start_time).getTime() - currentTime) / 3600000;
     return hoursLeft >= deadline ? "direct" : "request";
   };
 
-  const getCancelDeadline = (appt: Appointment): number => {
-    return appt.tenants?.booking_rules?.cancelDeadlineHours ?? 24;
-  };
+  /**
+   * Geçerli iptal süresi: eleman kendi süresini belirlediyse onunki, aksi
+   * halde işletmenin süresi (yoksa 24 saat).
+   */
+  const getCancelDeadline = (appt: Appointment): number =>
+    effectiveBookingRules(appt.staff_booking_rules, appt.tenants?.booking_rules)
+      .cancelDeadlineHours;
 
   const fetchAppointments = async () => {
     setLoading(true);
@@ -148,13 +171,58 @@ export default function MyAppointmentsPage() {
     }
 
     if (appts && !error) {
-      setAppointments(appts as unknown as Appointment[]);
+      // SAFETY: Supabase'in iç içe select sonucu derinlemesine tiplenmiyor;
+      // dönen satırlar appointments şemasına birebir karşılık gelir (mevcut
+      // kullanım da bu şekildeydi).
+      const rows = appts as unknown as Appointment[];
+
+      // Elemana özel kurallar: staff_settings doğrudan randevuya bağlı olmadığı
+      // için (appointments.staff_id → profiles.id) ilgili elemanların
+      // ayarları tek sorguda çekilip randevulara iliştirilir.
+      const staffIds = [
+        ...new Set(
+          rows
+            .map((a) => a.staff_id)
+            .filter((id): id is string => Boolean(id)),
+        ),
+      ];
+
+      const rulesByStaff = new Map<string, BookingRulesInput>();
+      if (staffIds.length > 0) {
+        const { data: settingsRows } = await supabase
+          .from("staff_settings")
+          .select("profile_id, booking_rules")
+          .in("profile_id", staffIds);
+        for (const row of settingsRows ?? []) {
+          if (row.booking_rules) {
+            // SAFETY: booking_rules JSONB içeriği bizim yazdığımız
+            // BookingRulesInput biçimindedir (ayarlar ekranı).
+            rulesByStaff.set(
+              row.profile_id,
+              row.booking_rules as BookingRulesInput,
+            );
+          }
+        }
+      }
+
+      setAppointments(
+        rows.map((a) => ({
+          ...a,
+          staff_booking_rules: a.staff_id
+            ? (rulesByStaff.get(a.staff_id) ?? null)
+            : null,
+        })),
+      );
     }
 
     setLoading(false);
   };
 
   useEffect(() => {
+    // Mount'ta veri çekme. fetchAppointments async olsa da ilk işi
+    // setLoading(true) olduğu için kural tetikleniyor; burada kasıtlı ve
+    // tek seferlik bir yükleme.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchAppointments();
   }, []);
 
@@ -183,9 +251,12 @@ export default function MyAppointmentsPage() {
       setCancellingAppt(null);
 
       setTimeout(() => setNotification(null), 4000);
-    } catch (err: any) {
+    } catch (err) {
       setNotification({
-        message: err.message || (lang === "tr" ? "İptal sırasında bir hata oluştu." : "Failed to cancel appointment."),
+        message: errorMessage(
+          err,
+          lang === "tr" ? "İptal sırasında bir hata oluştu." : "Failed to cancel appointment.",
+        ),
         type: "error",
       });
     } finally {
@@ -231,9 +302,12 @@ export default function MyAppointmentsPage() {
       setCancelReason("");
 
       setTimeout(() => setNotification(null), 4000);
-    } catch (err: any) {
+    } catch (err) {
       setNotification({
-        message: err.message || (lang === "tr" ? "İstek gönderilirken bir hata oluştu." : "Failed to send request."),
+        message: errorMessage(
+          err,
+          lang === "tr" ? "İstek gönderilirken bir hata oluştu." : "Failed to send request.",
+        ),
         type: "error",
       });
     } finally {
@@ -256,7 +330,12 @@ export default function MyAppointmentsPage() {
       setAppointments((prev) =>
         prev.map((a) => {
           if (a.id !== withdrawingAppt.id) return a;
-          const { cancel_requested, cancel_reason, cancel_requested_at, ...rest } = a.custom_fields || {};
+          // İptal isteği alanları temizlenir; kalan custom_fields korunur.
+          // (Destructure yerine delete: kullanılmayan değişken üretmez.)
+          const rest = { ...(a.custom_fields || {}) };
+          delete rest.cancel_requested;
+          delete rest.cancel_reason;
+          delete rest.cancel_requested_at;
           return { ...a, custom_fields: rest };
         })
       );
@@ -268,9 +347,12 @@ export default function MyAppointmentsPage() {
       setWithdrawingAppt(null);
 
       setTimeout(() => setNotification(null), 4000);
-    } catch (err: any) {
+    } catch (err) {
       setNotification({
-        message: err.message || (lang === "tr" ? "İşlem sırasında bir hata oluştu." : "Something went wrong."),
+        message: errorMessage(
+          err,
+          lang === "tr" ? "İşlem sırasında bir hata oluştu." : "Something went wrong.",
+        ),
         type: "error",
       });
     } finally {
@@ -343,9 +425,11 @@ export default function MyAppointmentsPage() {
   };
 
   // Kalan Süre Metni (Countdown)
-  const getCountdownText = (startTime: string) => {
+  // Anlık zaman dışarıdan verilir: bileşen gövdesinde doğrudan saat okumak
+  // (Date.now) render'ı düzensiz kılar. Çağıran, render'daki "now" değerini geçer.
+  const getCountdownText = (startTime: string, currentTime: number) => {
     const target = new Date(startTime);
-    const diffMs = target.getTime() - Date.now();
+    const diffMs = target.getTime() - currentTime;
     if (diffMs <= 0) return lang === "tr" ? "Randevu vakti geldi" : "Appointment time";
 
     const diffMins = Math.floor(diffMs / (1000 * 60));
@@ -454,7 +538,7 @@ export default function MyAppointmentsPage() {
             <div className="space-y-1 sm:space-y-2">
               <div className="inline-flex items-center gap-1.5 sm:gap-2 px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full bg-white/15 backdrop-blur-md text-[11px] sm:text-xs font-black uppercase tracking-wider text-indigo-100">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-                <span>{lang === "tr" ? "Sıradaki Randevunuz" : "Next Upcoming Appointment"} • {getCountdownText(nearestUpcoming.start_time)}</span>
+                <span>{lang === "tr" ? "Sıradaki Randevunuz" : "Next Upcoming Appointment"} • {getCountdownText(nearestUpcoming.start_time, now.getTime())}</span>
               </div>
               <h2 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tight">
                 {nearestUpcoming.services?.name || (lang === "tr" ? "Hizmet" : "Service")}
@@ -581,7 +665,7 @@ export default function MyAppointmentsPage() {
                       isPast={false}
                       lang={lang}
                       locale={locale}
-                      cancelMode={getCancelMode(appt)}
+                      cancelMode={getCancelMode(appt, now.getTime())}
                       onDownloadIcs={downloadIcsFile}
                       onGoogleCal={createGoogleCalendarUrl}
                       onCancelPrompt={() => setCancellingAppt(appt)}
@@ -616,7 +700,7 @@ export default function MyAppointmentsPage() {
                       isPast={false}
                       lang={lang}
                       locale={locale}
-                      cancelMode={getCancelMode(appt)}
+                      cancelMode={getCancelMode(appt, now.getTime())}
                       onDownloadIcs={downloadIcsFile}
                       onGoogleCal={createGoogleCalendarUrl}
                       onCancelPrompt={() => setCancellingAppt(appt)}
@@ -660,13 +744,43 @@ export default function MyAppointmentsPage() {
 
       {/* İptal Onay Modalı */}
       {cancellingAppt && (() => {
-        const isRequest = getCancelMode(cancellingAppt) === "request";
-        return createPortal(
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div
-            className="w-full max-w-md bg-white dark:bg-slate-900 rounded-[32px] p-6 shadow-2xl border border-white/60 dark:border-slate-800 space-y-5 animate-in zoom-in-95 duration-200"
-            onClick={(e) => e.stopPropagation()}
-          >
+        const isRequest = getCancelMode(cancellingAppt, now.getTime()) === "request";
+        return (
+        <Modal
+          open={Boolean(cancellingAppt)}
+          onClose={() => { setCancellingAppt(null); setCancelReason(""); }}
+          title={
+            isRequest
+              ? lang === "tr" ? "İptal İsteği Gönder" : "Request Cancellation"
+              : lang === "tr" ? "Randevuyu İptal Et" : "Cancel Appointment"
+          }
+          showTitle={false}
+          sheetOnMobile
+          footer={
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => { setCancellingAppt(null); setCancelReason(""); }}
+                disabled={cancelLoading}
+                className="flex-1 py-3 rounded-xl border border-gray-200 dark:border-slate-700 text-gray-700 dark:text-slate-300 font-bold text-xs hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
+              >
+                {lang === "tr" ? "Vazgeç" : "Keep Appointment"}
+              </button>
+              <button
+                type="button"
+                onClick={isRequest ? handleSendCancelRequest : handleCancelAppointment}
+                disabled={cancelLoading}
+                className="flex-1 py-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-md shadow-rose-600/20 transition-all flex items-center justify-center gap-1.5"
+              >
+                {cancelLoading && <Loader2 size={14} className="animate-spin" />}
+                {isRequest
+                  ? lang === "tr" ? "İsteği Gönder" : "Send Request"
+                  : lang === "tr" ? "Evet, İptal Et" : "Yes, Cancel"}
+              </button>
+            </div>
+          }
+        >
+          <div className="space-y-5">
             <div className="flex items-center gap-3.5">
               <div className="w-12 h-12 rounded-2xl bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
                 <AlertTriangle size={24} />
@@ -703,10 +817,14 @@ export default function MyAppointmentsPage() {
 
             {isRequest ? (
               <div>
-                <label className="block text-xs font-bold text-gray-700 dark:text-slate-300 mb-1.5">
+                <label
+                  htmlFor="cancel-reason"
+                  className="block text-xs font-bold text-gray-700 dark:text-slate-300 mb-1.5"
+                >
                   {lang === "tr" ? "İptal Sebebiniz (opsiyonel)" : "Reason (optional)"}
                 </label>
                 <textarea
+                  id="cancel-reason"
                   value={cancelReason}
                   onChange={(e) => setCancelReason(e.target.value)}
                   rows={3}
@@ -722,85 +840,64 @@ export default function MyAppointmentsPage() {
                   : "Cancelling will release this time slot for other customers."}
               </p>
             )}
-
-            <div className="flex items-center gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => { setCancellingAppt(null); setCancelReason(""); }}
-                disabled={cancelLoading}
-                className="flex-1 py-3 rounded-xl border border-gray-200 dark:border-slate-700 text-gray-700 dark:text-slate-300 font-bold text-xs hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
-              >
-                {lang === "tr" ? "Vazgeç" : "Keep Appointment"}
-              </button>
-              <button
-                type="button"
-                onClick={isRequest ? handleSendCancelRequest : handleCancelAppointment}
-                disabled={cancelLoading}
-                className="flex-1 py-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-md shadow-rose-600/20 transition-all flex items-center justify-center gap-1.5"
-              >
-                {cancelLoading && <Loader2 size={14} className="animate-spin" />}
-                {isRequest
-                  ? lang === "tr" ? "İsteği Gönder" : "Send Request"
-                  : lang === "tr" ? "Evet, İptal Et" : "Yes, Cancel"}
-              </button>
-            </div>
           </div>
-        </div>,
-        document.body
+        </Modal>
         );
       })()}
 
       {/* Talebi Geri Çek Onay Modalı */}
-      {withdrawingAppt &&
-        createPortal(
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-            <div
-              className="w-full max-w-sm bg-white dark:bg-slate-900 rounded-[28px] p-6 shadow-2xl border border-white/60 dark:border-slate-800 space-y-4 animate-in zoom-in-95 duration-200"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-2xl bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
-                  <Undo2 size={22} />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-gray-900 dark:text-white">
-                    {lang === "tr" ? "Talebi Geri Çek" : "Withdraw Request"}
-                  </h3>
-                  <p className="text-xs text-gray-500 dark:text-slate-400">
-                    {withdrawingAppt.services?.name} • {withdrawingAppt.tenants?.name}
-                  </p>
-                </div>
+      {withdrawingAppt && (
+        <Modal
+          open={Boolean(withdrawingAppt)}
+          onClose={() => setWithdrawingAppt(null)}
+          title={lang === "tr" ? "Talebi Geri Çek" : "Withdraw Request"}
+          showTitle={false}
+          sheetOnMobile
+          footer={
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setWithdrawingAppt(null)}
+                disabled={withdrawLoading}
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-slate-700 text-gray-700 dark:text-slate-300 font-bold text-xs hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
+              >
+                {lang === "tr" ? "Vazgeç" : "Keep Request"}
+              </button>
+              <button
+                type="button"
+                onClick={handleWithdrawCancelRequest}
+                disabled={withdrawLoading}
+                className="flex-1 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-700 dark:bg-white dark:hover:bg-slate-200 text-white dark:text-slate-900 font-bold text-xs shadow-md transition-all flex items-center justify-center gap-1.5"
+              >
+                {withdrawLoading && <Loader2 size={14} className="animate-spin" />}
+                {lang === "tr" ? "Evet, Geri Çek" : "Yes, Withdraw"}
+              </button>
+            </div>
+          }
+        >
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-2xl bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                <Undo2 size={22} />
               </div>
-
-              <p className="text-xs text-gray-500 dark:text-slate-400 leading-relaxed">
-                {lang === "tr"
-                  ? "İptal isteğiniz geri çekilecek ve randevunuz eskisi gibi geçerli olmaya devam edecek."
-                  : "Your cancellation request will be withdrawn and your appointment will remain valid."}
-              </p>
-
-              <div className="flex items-center gap-3 pt-1">
-                <button
-                  type="button"
-                  onClick={() => setWithdrawingAppt(null)}
-                  disabled={withdrawLoading}
-                  className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-slate-700 text-gray-700 dark:text-slate-300 font-bold text-xs hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
-                >
-                  {lang === "tr" ? "Vazgeç" : "Keep Request"}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleWithdrawCancelRequest}
-                  disabled={withdrawLoading}
-                  className="flex-1 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-700 dark:bg-white dark:hover:bg-slate-200 text-white dark:text-slate-900 font-bold text-xs shadow-md transition-all flex items-center justify-center gap-1.5"
-                >
-                  {withdrawLoading && <Loader2 size={14} className="animate-spin" />}
-                  {lang === "tr" ? "Evet, Geri Çek" : "Yes, Withdraw"}
-                </button>
+              <div>
+                <h3 className="text-base font-bold text-gray-900 dark:text-white">
+                  {lang === "tr" ? "Talebi Geri Çek" : "Withdraw Request"}
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-slate-400">
+                  {withdrawingAppt.services?.name} • {withdrawingAppt.tenants?.name}
+                </p>
               </div>
             </div>
-          </div>,
-          document.body
-        )}
+
+            <p className="text-xs text-gray-500 dark:text-slate-400 leading-relaxed">
+              {lang === "tr"
+                ? "İptal isteğiniz geri çekilecek ve randevunuz eskisi gibi geçerli olmaya devam edecek."
+                : "Your cancellation request will be withdrawn and your appointment will remain valid."}
+            </p>
+          </div>
+        </Modal>
+      )}
 
       {/* Değerlendirme Modalı */}
       {reviewAppt && (
@@ -835,7 +932,7 @@ function BoardingPassCard({
   appt: Appointment;
   isPast: boolean;
   lang: string;
-  locale: any;
+  locale: Locale;
   cancelMode?: "direct" | "request";
   onDownloadIcs: (a: Appointment) => void;
   onGoogleCal: (a: Appointment) => string;
@@ -853,21 +950,6 @@ function BoardingPassCard({
 
   const bookingSlug = appt.tenants?.slug || appt.tenant_id;
   const [calendarMenuOpen, setCalendarMenuOpen] = useState(false);
-  const calendarMenuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (calendarMenuRef.current && !calendarMenuRef.current.contains(event.target as Node)) {
-        setCalendarMenuOpen(false);
-      }
-    }
-    if (calendarMenuOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [calendarMenuOpen]);
 
   return (
     <div
@@ -1018,59 +1100,64 @@ function BoardingPassCard({
 
           {/* Sağ Alt: Aksiyon Butonları (Yaklaşan randevularda zengin aksiyonlar) */}
           {!isPast && !isCancelled && (
-            <div className="flex items-center justify-between gap-2 pt-3 border-t border-gray-100 dark:border-slate-800">
-              {/* Sol: Şık Takvime Ekle Açılır Menüsü */}
-              <div className="relative" ref={calendarMenuRef}>
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-gray-100 dark:border-slate-800">
+              {/* Sol: Şık Takvime Ekle Açılır Menüsü.
+                  Portal ile açılır: eski hâli sayfa kaydırma kabının içinde
+                  konumlandığı için yukarı açıldığında kırpılıyordu. */}
+              <DropdownMenu
+                open={calendarMenuOpen}
+                onOpenChange={setCalendarMenuOpen}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gray-100 hover:bg-gray-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-gray-700 dark:text-slate-300 font-bold text-xs transition-all active:scale-95 border border-transparent dark:border-slate-700/50"
+                trigger={
+                  <>
+                    <CalendarPlus size={13} className="text-indigo-500" />
+                    <span>
+                      {lang === "tr" ? "Takvime Ekle" : "Add to Calendar"}
+                    </span>
+                    <ChevronDown
+                      size={12}
+                      className={`text-gray-400 transition-transform duration-200 ${
+                        calendarMenuOpen ? "rotate-180" : ""
+                      }`}
+                    />
+                  </>
+                }
+              >
+                <a
+                  href={onGoogleCal(appt)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => setCalendarMenuOpen(false)}
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold text-gray-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                >
+                  <CalendarPlus size={14} className="text-blue-500 shrink-0" />
+                  <span>{lang === "tr" ? "Google Takvim" : "Google Calendar"}</span>
+                </a>
                 <button
                   type="button"
-                  onClick={() => setCalendarMenuOpen((prev) => !prev)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gray-100 hover:bg-gray-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-gray-700 dark:text-slate-300 font-bold text-xs transition-all active:scale-95 border border-transparent dark:border-slate-700/50"
+                  onClick={() => {
+                    onDownloadIcs(appt);
+                    setCalendarMenuOpen(false);
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold text-gray-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors text-left"
                 >
-                  <CalendarPlus size={13} className="text-indigo-500" />
-                  <span>{lang === "tr" ? "Takvime Ekle" : "Add to Calendar"}</span>
-                  <ChevronDown
-                    size={12}
-                    className={`text-gray-400 transition-transform duration-200 ${
-                      calendarMenuOpen ? "rotate-180" : ""
-                    }`}
-                  />
+                  <Download size={14} className="text-indigo-500 shrink-0" />
+                  <span>
+                    {lang === "tr" ? "Apple Takvim (.ics)" : "Apple Calendar (.ics)"}
+                  </span>
                 </button>
+              </DropdownMenu>
 
-                {calendarMenuOpen && (
-                  <div className="absolute left-0 bottom-full mb-2 w-48 rounded-2xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-gray-200/90 dark:border-slate-800 shadow-2xl p-1.5 z-30 animate-in fade-in zoom-in-95 duration-150">
-                    <a
-                      href={onGoogleCal(appt)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={() => setCalendarMenuOpen(false)}
-                      className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold text-gray-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
-                    >
-                      <CalendarPlus size={14} className="text-blue-500 shrink-0" />
-                      <span>Google Takvim</span>
-                    </a>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onDownloadIcs(appt);
-                        setCalendarMenuOpen(false);
-                      }}
-                      className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold text-gray-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors text-left"
-                    >
-                      <Download size={14} className="text-indigo-500 shrink-0" />
-                      <span>Apple Takvim (.ics)</span>
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* Sağ: Yol Tarifi ve İptal / Vazgeç Butonları */}
-              <div className="flex items-center gap-2 ml-auto">
+              {/* Sağ: Yol Tarifi ve İptal / Vazgeç Butonları.
+                  360px'te üç buton yan yana sığmadığı için satır kaydırma
+                  (flex-wrap) açık; aksi halde yatay taşma oluyordu. */}
+              <div className="flex flex-wrap items-center justify-end gap-2 ml-auto">
                 {appt.tenants?.address && (
                   <a
                     href={mapsUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-500/10 dark:text-blue-400 font-bold text-xs transition-colors shrink-0"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-500/10 dark:text-blue-400 font-bold text-xs transition-colors"
                   >
                     <MapPin size={13} />
                     <span>{lang === "tr" ? "Yol Tarifi" : "Directions"}</span>

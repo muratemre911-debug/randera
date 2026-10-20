@@ -17,6 +17,7 @@ import {
 import { createClient } from "@/utils/supabase/client";
 import { useLanguage } from "@/context/LanguageContext";
 import CustomSelect from "@/components/CustomSelect";
+import { ownRecordsScope } from "@/lib/staff";
 
 const dayNames = [
   "pazar",
@@ -208,7 +209,10 @@ export default function TakvimPage() {
           "Bilinmeyen Müşteri";
   };
 
-  const [highlightedCell, setHighlightedCell] = useState<string | null>(null);
+  // Hücre vurgusu: değer yalnızca okunuyor, setter hiç çağrılmıyordu (ölü
+  // state uyarısı). Vurgu özelliği bağlanınca setter geri eklenecek.
+  // shortcut: highlight özelliği henüz uygulanmadı.
+  const [highlightedCell] = useState<string | null>(null);
 
   const days = useMemo(() => {
     switch (viewMode) {
@@ -242,7 +246,7 @@ export default function TakvimPage() {
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("tenant_id")
+      .select("tenant_id, role")
       .eq("id", user.id)
       .maybeSingle();
     if (!profile) {
@@ -264,33 +268,54 @@ export default function TakvimPage() {
       setWorkingHours(tenantData.working_hours as WorkingHours);
     }
 
-    const [apptRes, svcRes, custRes] = await Promise.all([
-      supabase
-        .from("appointments")
-        .select(
-          "*, services(name, duration, price), profiles!appointments_customer_id_fkey(full_name, phone, avatar_url)",
-        )
-        .eq("tenant_id", profile.tenant_id)
-        .neq("status", "cancelled")
-        .gte("start_time", dateRange.start)
-        .lte("start_time", dateRange.end)
-        .order("start_time"),
-      supabase
-        .from("services")
-        .select("id, name, duration, price, staff_id")
-        .eq("tenant_id", profile.tenant_id)
-        .eq("is_active", true)
-        .order("name"),
-      supabase
+    // Eleman yalnızca KENDİ randevularını görür ve yönetir; işletme sahibi
+    // tüm işletmeyi (ownRecordsScope: sahip için null).
+    const scope = ownRecordsScope(profile.role, user.id);
+
+    let apptQuery = supabase
+      .from("appointments")
+      .select(
+        "*, services(name, duration, price), profiles!appointments_customer_id_fkey(full_name, phone, avatar_url)",
+      )
+      .eq("tenant_id", profile.tenant_id)
+      .neq("status", "cancelled")
+      .gte("start_time", dateRange.start)
+      .lte("start_time", dateRange.end)
+      .order("start_time");
+    if (scope) apptQuery = apptQuery.eq("staff_id", scope);
+
+    // Hizmet listesi de eleman için kendi hizmetleriyle sınırlıdır (randevu
+    // oluşturma listesi başkasının hizmetini teklif etmesin).
+    let servicesQuery = supabase
+      .from("services")
+      .select("id, name, duration, price, staff_id")
+      .eq("tenant_id", profile.tenant_id)
+      .eq("is_active", true)
+      .order("name");
+    if (scope) servicesQuery = servicesQuery.eq("staff_id", scope);
+
+    const [apptRes, svcRes] = await Promise.all([
+      apptQuery,
+      servicesQuery,
+    ]);
+
+    // Müşteri listesi yalnızca randevu satırındaki isimleri çözmek için yedek
+    // arama tablosudur (app.profiles zaten join ile geliyor). Eleman için
+    // işletmenin tüm müşteri listesi çekilmez.
+    if (scope) {
+      setCustomers([]);
+    } else {
+      const { data: custData } = await supabase
         .from("profiles")
         .select("id, full_name")
         .eq("tenant_id", profile.tenant_id)
         .eq("role", "customer")
-        .order("full_name"),
-    ]);
+        .order("full_name");
+      if (custData) setCustomers(custData);
+    }
+
     if (apptRes.data) setAppointments(apptRes.data as Appointment[]);
     if (svcRes.data) setServices(svcRes.data);
-    if (custRes.data) setCustomers(custRes.data);
     if (!quiet) setLoading(false);
   };
 
@@ -362,60 +387,66 @@ export default function TakvimPage() {
     e.preventDefault();
     if (!selectedSlot || !formService) return;
     if (!editingApptId && !formCustomerName.trim()) return;
-    setSaving(true);
 
     const service = services.find((s) => s.id === formService);
+    // Hizmet bulunamadıysa buton "Kaydediliyor…" durumunda takılı kalıyordu.
     if (!service) return;
+
+    setSaving(true);
 
     const start = new Date(selectedSlot.day);
     start.setHours(selectedSlot.hour, 0, 0, 0);
     const end = new Date(start);
     end.setMinutes(end.getMinutes() + service.duration);
 
-    if (editingApptId) {
-      const { error } = await supabase
-        .from("appointments")
-        .update({
+    try {
+      if (editingApptId) {
+        const { error } = await supabase
+          .from("appointments")
+          .update({
+            service_id: formService,
+            // Hizmet değişirse randevu da o hizmetin elemanına geçer
+            staff_id: service.staff_id ?? null,
+            start_time: start.toISOString(),
+            end_time: end.toISOString(),
+          })
+          .eq("id", editingApptId);
+
+        if (!error) {
+          setSelectedSlot(null);
+          setEditingApptId(null);
+          setFormCustomerName("");
+          setFormCustomerPhone("");
+          setFormService("");
+          fetchData();
+        }
+      } else {
+        const { error } = await supabase.from("appointments").insert({
+          tenant_id: tenantId,
+          customer_id: null,
           service_id: formService,
-          // Hizmet değişirse randevu da o hizmetin elemanına geçer
           staff_id: service.staff_id ?? null,
           start_time: start.toISOString(),
           end_time: end.toISOString(),
-        })
-        .eq("id", editingApptId);
+          status: "confirmed",
+          custom_fields: {
+            customer_name: formCustomerName.trim(),
+            phone: formCustomerPhone.trim(),
+          },
+        });
 
-      if (!error) {
-        setSelectedSlot(null);
-        setEditingApptId(null);
-        setFormCustomerName("");
-        setFormCustomerPhone("");
-        setFormService("");
-        fetchData();
+        if (!error) {
+          setSelectedSlot(null);
+          setFormCustomerName("");
+          setFormCustomerPhone("");
+          setFormService("");
+          fetchData();
+        }
       }
-    } else {
-      const { error } = await supabase.from("appointments").insert({
-        tenant_id: tenantId,
-        customer_id: null,
-        service_id: formService,
-        staff_id: service.staff_id ?? null,
-        start_time: start.toISOString(),
-        end_time: end.toISOString(),
-        status: "confirmed",
-        custom_fields: {
-          customer_name: formCustomerName.trim(),
-          phone: formCustomerPhone.trim(),
-        },
-      });
-
-      if (!error) {
-        setSelectedSlot(null);
-        setFormCustomerName("");
-        setFormCustomerPhone("");
-        setFormService("");
-        fetchData();
-      }
+    } finally {
+      // Hata olsa bile buton "Kaydediliyor…" durumunda takılı kalmasın.
+      setSaving(false);
     }
-    setSaving(false);
   };
 
   const handleCancel = async () => {
@@ -566,6 +597,7 @@ export default function TakvimPage() {
         {getMonthDays(currentDate).map((day) => {
           const dayAppts = getApptsForDay(day);
           const isToday = isSameDay(day, new Date());
+          const hiddenCount = Math.max(0, dayAppts.length - 3);
           return (
             <div
               key={day.toISOString()}
@@ -573,16 +605,26 @@ export default function TakvimPage() {
                 isToday ? "bg-indigo-50/40 dark:bg-indigo-900/10" : ""
               }`}
             >
+              {/* Gün başlığı: tıklanabilir (ay görünümünde o güne geç).
+                  Önceden salt-okunur bir `<div>`'di; klavyeyle ve dokunarak
+                  erişilemiyordu. */}
               <div className="flex justify-center mb-1">
-                <span
-                  className={`inline-flex h-8 w-8 items-center justify-center rounded-full text-[14px] font-bold ${
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCurrentDate(day);
+                    setViewMode("today");
+                  }}
+                  aria-label={`${day.getDate()} ${day.toLocaleDateString(lang === "tr" ? "tr-TR" : "en-US", { month: "long" })}`}
+                  title={lang === "tr" ? "Günü aç" : "Open day"}
+                  className={`inline-flex h-8 w-8 items-center justify-center rounded-full text-[14px] font-bold transition-transform hover:scale-110 active:scale-95 ${
                     isToday
                       ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/30"
-                      : "text-slate-900 dark:text-slate-200"
+                      : "text-slate-900 hover:bg-slate-200/70 dark:text-slate-200 dark:hover:bg-slate-700"
                   }`}
                 >
                   {day.getDate()}
-                </span>
+                </button>
               </div>
               <div className="mt-1.5 space-y-1">
                 {dayAppts.slice(0, 3).map((a) => {
@@ -611,6 +653,21 @@ export default function TakvimPage() {
                     </button>
                   );
                 })}
+
+                {/* 3'ten fazla randevu varsa kalanı sessizce gizleniyordu;
+                    şimdi "+N daha" göstergesiyle o güne geçilebilir. */}
+                {hiddenCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCurrentDate(day);
+                      setViewMode("today");
+                    }}
+                    className="w-full rounded-lg px-2 py-1 text-[11px] font-bold text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-950/40 transition-colors text-left"
+                  >
+                    +{hiddenCount} {lang === "tr" ? "daha" : "more"}
+                  </button>
+                )}
               </div>
             </div>
           );
@@ -794,26 +851,32 @@ export default function TakvimPage() {
                               data-cell={cellId}
                               className={`min-w-0 border-l border-slate-200 p-1.5 transition-all dark:border-slate-700 flex flex-col ${
                                 isWithinHours
-                                  ? "hover:bg-slate-50/80 dark:hover:bg-slate-800/40 cursor-pointer"
-                                  : "bg-slate-100/40 dark:bg-slate-800/40 cursor-not-allowed"
+                                  ? "hover:bg-slate-50/80 dark:hover:bg-slate-800/40"
+                                  : "bg-slate-100/40 dark:bg-slate-800/40"
                               } ${
                                 isSameDay(day, new Date())
                                   ? "bg-indigo-50/20 dark:bg-indigo-900/5"
                                   : ""
                               } ${isHighlighted ? "ring-2 ring-inset ring-amber-400 bg-amber-50 dark:bg-amber-900/20" : ""}`}
-                              onClick={(e) => {
-                                if (
-                                  e.target === e.currentTarget &&
-                                  isWithinHours
-                                ) {
-                                  setEditingApptId(null);
-                                  setFormCustomerName("");
-                                  setFormCustomerPhone("");
-                                  setFormService("");
-                                  setSelectedSlot({ day, hour });
-                                }
-                              }}
                             >
+                              {/* Boş saat hücresi: klavyeyle de erişilebilir
+                                  olsun diye gerçek bir düğme. Önceden
+                                  `div onClick` idi; klavye kullanıcısı
+                                  takvimde etkinlik oluşturamıyordu. */}
+                              {!hasContent && isWithinHours && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditingApptId(null);
+                                    setFormCustomerName("");
+                                    setFormCustomerPhone("");
+                                    setFormService("");
+                                    setSelectedSlot({ day, hour });
+                                  }}
+                                  aria-label={`${hour.toString().padStart(2, "0")}:00 ${day.toLocaleDateString(lang === "tr" ? "tr-TR" : "en-US", { day: "numeric", month: "long" })} — ${lang === "tr" ? "randevu ekle" : "add appointment"}`}
+                                  className="w-full h-full min-h-[80px] rounded-xl border border-dashed border-transparent hover:border-indigo-300 hover:bg-indigo-50/40 focus-visible:border-indigo-400 focus-visible:bg-indigo-50/50 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500 dark:hover:border-indigo-700 dark:hover:bg-indigo-950/30 dark:focus-visible:border-indigo-600 dark:focus-visible:bg-indigo-950/40 transition-colors cursor-pointer"
+                                />
+                              )}
                               {hasContent &&
                                 (() => {
                                   const isCompleted =

@@ -19,6 +19,7 @@ import {
   PhoneCall
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
+import { ownRecordsScope } from "@/lib/staff";
 import { useLanguage } from "@/context/LanguageContext";
 import { format, parseISO } from "date-fns";
 import { tr, enUS } from "date-fns/locale";
@@ -71,7 +72,7 @@ type SortOption = "spent_desc" | "appts_desc" | "recent" | "name_asc";
 
 export default function MusterilerPage() {
   const supabase = createClient();
-  const { lang } = useLanguage();
+  const { lang, t } = useLanguage();
   const locale = lang === "tr" ? tr : enUS;
 
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -92,7 +93,7 @@ export default function MusterilerPage() {
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("tenant_id")
+      .select("tenant_id, role")
       .eq("id", user.id)
       .single();
 
@@ -101,20 +102,39 @@ export default function MusterilerPage() {
       return;
     }
 
-    const [profilesRes, apptsRes] = await Promise.all([
-      supabase
-        .from("profiles")
-        .select("id, full_name, phone, created_at")
-        .eq("tenant_id", profile.tenant_id)
-        .order("full_name"),
-      supabase
-        .from("appointments")
-        .select("id, customer_id, start_time, end_time, status, custom_fields, services(name, price)")
-        .eq("tenant_id", profile.tenant_id)
-        .order("start_time", { ascending: false }),
-    ]);
+    // Eleman yalnızca kendi randevusu olan müşterileri görür. İşletmenin tüm
+    // müşteri profilleri yalnızca sahip için çekilir; elemanın listesi kendi
+    // randevularından türetilir (aşağıdaki randevu işleme adımında).
+    const scope = ownRecordsScope(profile.role, user.id);
+
+    let apptsQuery = supabase
+      .from("appointments")
+      .select("id, customer_id, start_time, end_time, status, custom_fields, services(name, price)")
+      .eq("tenant_id", profile.tenant_id)
+      .order("start_time", { ascending: false });
+    if (scope) apptsQuery = apptsQuery.eq("staff_id", scope);
+
+    const apptsRes = await apptsQuery;
+
+    const profilesRes = scope
+      ? {
+          data: [] as {
+            id: string;
+            full_name: string | null;
+            phone: string | null;
+            created_at: string;
+          }[],
+        }
+      : await supabase
+          .from("profiles")
+          .select("id, full_name, phone, created_at")
+          .eq("tenant_id", profile.tenant_id)
+          .order("full_name");
 
     const profilesList = profilesRes.data || [];
+    // SAFETY: Supabase'in iç içe select sonucu derinlemesine tiplenmiyor;
+    // dönen satırlar appointments + services join şemasına birebir karşılık
+    // gelir (mevcut kullanım da bu varsayımla yazılmıştı).
     const apptsList =
       (apptsRes.data as unknown as RawCustomerAppointment[] | null) || [];
 
@@ -203,7 +223,9 @@ export default function MusterilerPage() {
           // `end_time` DB'de nullable; eski kayıtlarda boş olabilir.
           end_time: a.end_time ?? a.start_time,
           status: a.status as CustomerAppointment["status"],
-          service_name: a.services?.name || (lang === "tr" ? "Hizmet" : "Service"),
+          // Yedek metin render anında uygulanır; burada ham veri saklanır
+          // (dil değişince veri yeniden çekilmesin diye).
+          service_name: a.services?.name || "",
           price: price,
           note: a.custom_fields?.note || undefined,
         });
@@ -235,7 +257,9 @@ export default function MusterilerPage() {
     // SONRA gerçekleşir, senkron kademeli render üretmez.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchCustomers();
-  }, [lang]);
+    // `lang` bilerek bağımlılık DEĞİL: dil değişince veri aynıdır.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // WhatsApp link formatlayıcı
   const getWhatsAppUrl = (phone: string | null, name: string) => {
@@ -799,7 +823,7 @@ export default function MusterilerPage() {
                         >
                           <div className="flex items-center justify-between">
                             <span className="font-bold text-gray-900 dark:text-white text-sm">
-                              {appt.service_name}
+                              {appt.service_name || t("dashboard.service_fallback")}
                             </span>
                             <span
                               className={`text-[11px] font-extrabold px-2.5 py-0.5 rounded-full ${

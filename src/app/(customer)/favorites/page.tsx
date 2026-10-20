@@ -63,6 +63,10 @@ export default function FavoritesPage() {
   const [ratingSummary, setRatingSummary] = useState<
     Record<string, { average_rating: number | null; total_reviews: number }>
   >({});
+  /** İşletme id → bugünkü müsaitlik durumu (gerçek veri). */
+  const [availability, setAvailability] = useState<
+    Record<string, { hasFreeSlot: boolean; nextSlot: string | null }>
+  >({});
   const [loading, setLoading] = useState(true);
 
   // Fetch favorited businesses and their real ratings
@@ -103,6 +107,22 @@ export default function FavoritesPage() {
         const revData = await revRes.json();
         if (revData && !revData.error) {
           setRatingSummary(revData);
+        }
+
+        // Gerçek müsaitlik (bugün boş slot var mı) — tek toplu istek.
+        if (tenantData && tenantData.length > 0) {
+          try {
+            const ids = tenantData.map((t) => t.id).join(",");
+            const availRes = await fetch(`/api/availability?ids=${ids}`);
+            if (availRes.ok) {
+              const availData = await availRes.json();
+              if (availData && !availData.error) {
+                setAvailability(availData);
+              }
+            }
+          } catch (err) {
+            console.error("Availability fetch error:", err);
+          }
         }
       } catch (err) {
         console.error("Failed to load favorites data:", err);
@@ -232,13 +252,22 @@ export default function FavoritesPage() {
                   />
                   {/* Aspect Video Cover Image */}
                   <div className="relative aspect-video w-full overflow-hidden bg-slate-100 dark:bg-slate-800">
-                    {/* 'Bugün Müsait' Rozeti */}
-                    <div className="absolute top-3 left-3 z-10 flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/45 dark:bg-black/60 backdrop-blur-md text-white text-[11px] font-bold border border-white/20 shadow-xs">
-                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                      <span>
-                        {lang === "tr" ? "Bugün Müsait" : "Available Today"}
-                      </span>
-                    </div>
+                    {/* Müsaitlik Rozeti — yalnızca gerçekten boş slot varsa.
+                        Önceden her kartta sabit basılıyordu. */}
+                    {availability[tenant.id]?.hasFreeSlot && (
+                      <div className="pointer-events-none absolute top-3 left-3 z-10 flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/45 dark:bg-black/60 backdrop-blur-md text-white text-[11px] font-bold border border-white/20 shadow-xs">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                        <span>
+                          {availability[tenant.id].nextSlot
+                            ? lang === "tr"
+                              ? `Bugün ${availability[tenant.id].nextSlot} müsait`
+                              : `Today ${availability[tenant.id].nextSlot}`
+                            : lang === "tr"
+                              ? "Bugün Müsait"
+                              : "Available Today"}
+                        </span>
+                      </div>
+                    )}
 
                     {/* Favoriden Kaldır Butonu (Kırmızı Kalp) */}
                     <button
@@ -332,7 +361,7 @@ export default function FavoritesPage() {
                     </div>
 
                     {/* Fiyat & Hızlı Randevu Al */}
-                    <div className="mt-auto pt-4 border-t border-slate-200/60 dark:border-slate-800/60 flex items-center justify-between">
+                    <div className="mt-auto pt-4 flex items-center justify-between">
                       <div>
                         <p className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
                           {lang === "tr" ? "Başlangıç" : "Starts at"}

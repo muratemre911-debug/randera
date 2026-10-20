@@ -36,6 +36,19 @@ interface Sector {
   value: string;
 }
 
+/**
+ * Bir işletmenin bugünkü müsaitlik durumu (sunucu tarafında hesaplanır).
+ * `hasFreeSlot` false ise kartta "Bugün Müsait" rozeti GÖSTERİLMEZ — eskiden
+ * rozet her kartta sabit basılıyordu ve kullanıcıya gerçek olmayan bilgi
+ * veriyordu.
+ */
+interface Availability {
+  isOpen: boolean;
+  hasFreeSlot: boolean;
+  nextSlot: string | null;
+  reason: string;
+}
+
 // Curated high-res sector images for fallback
 const SECTOR_IMAGES: Record<string, string> = {
   berber:
@@ -65,6 +78,10 @@ export default function DiscoverPage() {
   >({});
   const [sectors, setSectors] = useState<Sector[]>([]);
   const [loading, setLoading] = useState(true);
+  /** İşletme id → bugünkü müsaitlik durumu. */
+  const [availability, setAvailability] = useState<
+    Record<string, Availability>
+  >({});
 
   // View Mode: 'list' or 'map' (Apple Maps style segmented control)
   const [viewMode, setViewMode] = useState<"list" | "map">("list");
@@ -127,6 +144,8 @@ export default function DiscoverPage() {
         { cols: COLS, activeOnly: false },
       ];
 
+      let discovered: TenantWithDetails[] = [];
+
       for (const attempt of attempts) {
         const query = supabase.from("tenants").select(attempt.cols);
         const { data, error } = await (attempt.activeOnly
@@ -141,7 +160,8 @@ export default function DiscoverPage() {
             membership_ends_at?: string | null;
           })[];
           // Üyeliği kapatılmış/süresi dolmuş işletmeler keşfette gösterilmez
-          setTenants(rows.filter((t) => isDiscoverable(t)));
+          discovered = rows.filter((t) => isDiscoverable(t));
+          setTenants(discovered);
           break;
         }
       }
@@ -177,6 +197,23 @@ export default function DiscoverPage() {
       const sectorRes = await fetch("/api/admin/sectors");
       const sectorData = await sectorRes.json();
       if (Array.isArray(sectorData)) setSectors(sectorData as Sector[]);
+
+      // 5. Gerçek müsaitlik bilgisi (bugün açık mı, boş slot var mı).
+      //    Tek toplu istek — her işletme için ayrı istek atılmasın.
+      if (discovered.length > 0) {
+        try {
+          const ids = discovered.map((t) => t.id).join(",");
+          const availRes = await fetch(`/api/availability?ids=${ids}`);
+          if (availRes.ok) {
+            const availData = await availRes.json();
+            if (availData && !availData.error) {
+              setAvailability(availData as Record<string, Availability>);
+            }
+          }
+        } catch (err) {
+          console.error("Availability fetch error:", err);
+        }
+      }
     } catch (error) {
       console.error("Discover fetch error:", error);
     } finally {
@@ -332,12 +369,19 @@ export default function DiscoverPage() {
         (tenantPrice != null &&
           matchesPriceRange(tenantPrice, priceMin, priceMax));
 
+      // Müsaitlik filtresi: "bugün müsait" seçildiyse yalnızca bugün gerçekten
+      // boş slotu olan işletmeler kalsın. (Bu filtre daha önce hiç uygulanmıyordu:
+      // sayaç 1 gösteriyor, liste değişmiyordu.)
+      const matchAvailability =
+        filterAvailability !== "today" || availability[t.id]?.hasFreeSlot === true;
+
       return (
         matchSector &&
         matchProvince &&
         matchDistrict &&
         matchSearch &&
-        matchPrice
+        matchPrice &&
+        matchAvailability
       );
     });
   }, [
@@ -348,6 +392,8 @@ export default function DiscoverPage() {
     search,
     minPrice,
     maxPrice,
+    filterAvailability,
+    availability,
   ]);
 
   return (
@@ -367,11 +413,11 @@ export default function DiscoverPage() {
           </div>
 
           {/* Segmented Control (Apple Maps Style) */}
-          <div className="inline-flex p-1 bg-slate-200/70 dark:bg-slate-800/80 backdrop-blur-2xl rounded-2xl border border-slate-300/40 dark:border-slate-700/50 shadow-inner self-start sm:self-auto">
+          <div className="inline-flex w-full sm:w-auto p-1 bg-slate-200/70 dark:bg-slate-800/80 backdrop-blur-2xl rounded-2xl border border-slate-300/40 dark:border-slate-700/50 shadow-inner self-stretch sm:self-auto">
             <button
               type="button"
               onClick={() => setViewMode("list")}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 cursor-pointer ${
+              className={`flex flex-1 sm:flex-none items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 cursor-pointer ${
                 viewMode === "list"
                   ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm"
                   : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
@@ -383,7 +429,7 @@ export default function DiscoverPage() {
             <button
               type="button"
               onClick={() => setViewMode("map")}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 cursor-pointer ${
+              className={`flex flex-1 sm:flex-none items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 cursor-pointer ${
                 viewMode === "map"
                   ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm"
                   : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
@@ -435,7 +481,9 @@ export default function DiscoverPage() {
             }`}
           >
             <SlidersHorizontal size={17} strokeWidth={2.2} />
-            <span className="hidden xs:inline">
+            {/* `xs` breakpoint'i Tailwind v4'te TANIMLI DEĞİL; `hidden xs:inline`
+                yüzünden etiket hiçbir genişlikte görünmüyordu. `sm` kullanılır. */}
+            <span className="hidden sm:inline">
               {lang === "tr" ? "Filtrele" : "Filters"}
             </span>
             {activeFilterCount > 0 && (
@@ -607,6 +655,7 @@ export default function DiscoverPage() {
                   const rating = getTenantRating(tenant);
                   const coverImage = getCoverImage(tenant);
                   const isFavorited = favorites.includes(tenant.id);
+                  const tenantAvailability = availability[tenant.id];
 
                   return (
                     <div
@@ -628,13 +677,24 @@ export default function DiscoverPage() {
                       />
                       {/* Kapak Görseli (Airbnb Tarzı aspect-video) */}
                       <div className="relative aspect-video w-full overflow-hidden bg-slate-100 dark:bg-slate-800">
-                        {/* Sol Üst: 'Bugün Müsait' Rozeti */}
-                        <div className="pointer-events-none absolute top-3 left-3 z-10 flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/45 dark:bg-black/60 backdrop-blur-md text-white text-[11px] font-bold border border-white/20 shadow-xs">
-                          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                          <span>
-                            {lang === "tr" ? "Bugün Müsait" : "Available Today"}
-                          </span>
-                        </div>
+                        {/* Sol Üst: Müsaitlik Rozeti.
+                            Yalnızca GERÇEKTEN bugün boş slotu varsa görünür;
+                            kapalı/dolu işletmede rozet gösterilmez (önceden
+                            her kartta sabit basılıyordu ve yanlış bilgi veriyordu). */}
+                        {tenantAvailability?.hasFreeSlot && (
+                          <div className="pointer-events-none absolute top-3 left-3 z-10 flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/45 dark:bg-black/60 backdrop-blur-md text-white text-[11px] font-bold border border-white/20 shadow-xs">
+                            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                            <span>
+                              {tenantAvailability.nextSlot
+                                ? lang === "tr"
+                                  ? `Bugün ${tenantAvailability.nextSlot} müsait`
+                                  : `Today ${tenantAvailability.nextSlot}`
+                                : lang === "tr"
+                                  ? "Bugün Müsait"
+                                  : "Available Today"}
+                            </span>
+                          </div>
+                        )}
 
                         {/* Sağ Üst: Yarı Saydam Kalp (Favori) Butonu */}
                         <button
@@ -745,7 +805,7 @@ export default function DiscoverPage() {
                         </div>
 
                         {/* Fiyat Bilgisi & Randevu Al Butonu */}
-                        <div className="mt-auto pt-4 border-t border-slate-200/60 dark:border-slate-800/60 flex items-center justify-between">
+                        <div className="mt-auto pt-4 flex items-center justify-between">
                           <div>
                             {price != null ? (
                               <>

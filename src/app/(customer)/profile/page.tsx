@@ -5,9 +5,16 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { Camera, LogOut, LayoutDashboard } from "lucide-react";
+import { useLanguage } from "@/context/LanguageContext";
+import {
+  inspectTrMobile,
+  trMobileErrorMessage,
+  TR_MOBILE_PLACEHOLDER,
+} from "@/lib/phone";
 
 export default function ProfilePage() {
   const router = useRouter();
+  const { t, lang } = useLanguage();
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
@@ -78,6 +85,44 @@ export default function ProfilePage() {
       return;
     }
 
+    // Telefon, fotoğraftan önce doğrulanır: numara reddedilirse boşuna
+    // fotoğraf yüklenmesin. Biçim + "bir numara yalnızca bir hesapta"
+    // kontrolü sunucuda yapılır (başka profilleri okumak gerekir, /api/phone).
+    let normalizedPhone: string | null = null;
+
+    if (!phone.trim()) {
+      if (role === "customer") {
+        setMessage({ type: "error", text: t("profile.phone_required") });
+        setSaving(false);
+        return;
+      }
+    } else {
+      const check = inspectTrMobile(phone);
+      if (!check.ok) {
+        setMessage({ type: "error", text: trMobileErrorMessage(check.issue, lang) });
+        setSaving(false);
+        return;
+      }
+
+      const phoneRes = await fetch("/api/phone", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone }),
+      });
+      const phoneData = await phoneRes.json().catch(() => ({}));
+
+      if (!phoneRes.ok) {
+        setMessage({
+          type: "error",
+          text: phoneData?.error || "Telefon numarası kaydedilemedi.",
+        });
+        setSaving(false);
+        return;
+      }
+
+      normalizedPhone = phoneData?.phone || check.phone;
+    }
+
     let finalAvatarUrl = avatarUrl;
 
     if (avatarFile) {
@@ -95,7 +140,7 @@ export default function ProfilePage() {
         console.error("Avatar upload error:", uploadError);
         setMessage({
           type: "error",
-          text: "Fotoğraf yüklenirken bir hata oluştu.",
+          text: t("profile.photo_failed"),
         });
         setSaving(false);
         return;
@@ -107,14 +152,14 @@ export default function ProfilePage() {
 
     const { error } = await supabase
       .from("profiles")
-      .update({ full_name: fullName, phone, avatar_url: finalAvatarUrl })
+      .update({ full_name: fullName, phone: normalizedPhone, avatar_url: finalAvatarUrl })
       .eq("id", user.id);
 
     if (error) {
       console.error("Profile update error:", error);
       setMessage({
         type: "error",
-        text: "Profil güncellenirken bir hata oluştu.",
+        text: t("profile.phone_failed"),
       });
     } else {
       setAvatarUrl(finalAvatarUrl);
@@ -122,7 +167,7 @@ export default function ProfilePage() {
       setAvatarPreview("");
       setMessage({
         type: "success",
-        text: "Profiliniz başarıyla güncellendi.",
+        text: t("profile.saved"),
       });
 
       // Sidebar'daki isim + profil fotoğrafı anında güncellensin
@@ -139,7 +184,7 @@ export default function ProfilePage() {
   return (
     <div className="max-w-2xl mx-auto py-10 px-4 md:px-0">
       <h1 className="text-3xl font-bold mb-6 text-gray-900 dark:text-white">
-        Profilim
+        {t("profile.title")}
       </h1>
 
       <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 shadow-sm">
@@ -151,6 +196,7 @@ export default function ProfilePage() {
           <form onSubmit={handleSubmit} className="space-y-5">
             {message.text && (
               <div
+                role="alert"
                 className={`p-4 rounded-xl ${
                   message.type === "success"
                     ? "bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800"
@@ -169,7 +215,7 @@ export default function ProfilePage() {
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={avatarPreview || avatarUrl}
-                      alt="Profil fotoğrafı"
+                      alt={t("profile.photo_alt")}
                       className="h-full w-full object-cover"
                     />
                   ) : (
@@ -178,9 +224,10 @@ export default function ProfilePage() {
                 </div>
                 <label
                   htmlFor="avatar"
-                  className="absolute bottom-0 right-0 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-blue-600 text-white shadow-md hover:bg-blue-700 transition-colors"
+                  aria-label={t("profile.photo_add")}
+                  className="absolute bottom-0 right-0 flex h-11 w-11 cursor-pointer items-center justify-center rounded-full bg-blue-600 text-white shadow-md hover:bg-blue-700 transition-colors"
                 >
-                  <Camera size={16} />
+                  <Camera size={18} />
                 </label>
                 <input
                   id="avatar"
@@ -191,7 +238,7 @@ export default function ProfilePage() {
                 />
               </div>
               <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
-                Profil fotoğrafı ekle
+                {t("profile.photo_add")}
               </p>
             </div>
 
@@ -200,14 +247,16 @@ export default function ProfilePage() {
                 htmlFor="fullName"
                 className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
               >
-                Ad Soyad
+                {t("profile.name")}
               </label>
               <input
                 id="fullName"
+                name="name"
+                autoComplete="name"
                 type="text"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                placeholder="Adınız ve Soyadınız"
+                placeholder={t("profile.name_placeholder")}
                 className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-slate-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
                 required
               />
@@ -218,16 +267,22 @@ export default function ProfilePage() {
                 htmlFor="phone"
                 className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
               >
-                Telefon Numarası
+                {t("profile.phone")}
               </label>
               <input
                 id="phone"
+                name="phone"
                 type="tel"
+                inputMode="tel"
+                autoComplete="tel"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                placeholder="05XX XXX XX XX"
+                placeholder={TR_MOBILE_PLACEHOLDER}
                 className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-slate-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
               />
+              <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                {t("profile.phone_note")}
+              </p>
             </div>
 
             <button
@@ -238,10 +293,10 @@ export default function ProfilePage() {
               {saving ? (
                 <>
                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                  Kaydediliyor...
+                  {t("profile.saving")}
                 </>
               ) : (
-                "Değişiklikleri Kaydet"
+                t("profile.save")
               )}
             </button>
           </form>
@@ -256,7 +311,7 @@ export default function ProfilePage() {
             className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-md shadow-indigo-200 hover:from-indigo-600 hover:to-purple-700 dark:shadow-indigo-950/40 py-3.5 px-4 text-sm font-bold transition-all active:scale-[0.98]"
           >
             <LayoutDashboard size={18} strokeWidth={2.2} />
-            <span>İşletme Paneline Dön</span>
+            <span>{t("profile.back_to_business")}</span>
           </Link>
         )}
 
@@ -267,7 +322,9 @@ export default function ProfilePage() {
           className="w-full flex items-center justify-center gap-2.5 rounded-2xl bg-red-50 hover:bg-red-100 text-red-600 dark:bg-red-500/10 dark:hover:bg-red-500/20 dark:text-red-400 border border-red-200/70 dark:border-red-500/20 py-3.5 px-4 text-sm font-bold transition-all active:scale-[0.98] shadow-xs cursor-pointer disabled:opacity-60"
         >
           <LogOut size={18} strokeWidth={2.2} />
-          <span>{loggingOut ? "Çıkış Yapılıyor..." : "Çıkış Yap"}</span>
+          <span>
+            {loggingOut ? t("profile.logging_out") : t("nav.logout")}
+          </span>
         </button>
       </div>
     </div>

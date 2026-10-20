@@ -115,4 +115,32 @@ describe("DiscoverMap", () => {
     focusSpy.mockRestore();
     unmount();
   });
+
+  it("işletme adı HTML olarak yorumlanmaz (XSS koruması)", async () => {
+    const malicious = {
+      ...tenant("x", "İstanbul"),
+      // Fiyat yok, böylece ad doğrudan pin metnine giriyor.
+      name: '<img src=x onerror="window.__pwned=1">',
+    };
+    const { container } = render(
+      <DiscoverMap
+        {...baseProps}
+        getTenantPrice={() => null}
+        tenants={[malicious]}
+        selectedTenant={null}
+        onSelectTenant={() => {}}
+      />,
+    );
+
+    const pin = await waitFor(() => {
+      const el = container.querySelector(".leaflet-marker-icon button");
+      expect(el).toBeTruthy();
+      return el as HTMLElement;
+    });
+
+    // Etiket metin olarak basılır, DOM'a <img> enjekte edilmez.
+    expect(pin.querySelector("img")).toBeNull();
+    expect(pin.textContent).toContain("<img src=x");
+    expect((window as unknown as { __pwned?: number }).__pwned).toBeUndefined();
+  });
 });

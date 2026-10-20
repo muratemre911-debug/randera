@@ -5,6 +5,7 @@ import webpush from "web-push";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
 import { bookAppointmentSchema, validateRequest } from "@/lib/validations";
+import { isTrMobile } from "@/lib/phone";
 
 const DAY_NAME_TO_SLOT: Record<string, string> = {
   Mon: "pazartesi",
@@ -157,6 +158,9 @@ export async function POST(req: Request) {
     }
 
     // Çalışma saatleri doğrulama
+    // Önce elemanın kendi aktif saatleri bakılır (staff_settings):
+    // seçilen eleman o gün için saat ayarladıysa onlar, yoksa işletmenin
+    // saatleri (tenants.working_hours) uygulanır.
     const { data: tenant } = await supabaseAdmin
       .from("tenants")
       .select("working_hours")
@@ -168,18 +172,40 @@ export async function POST(req: Request) {
       WorkingDay
     > | null;
 
-    if (workingHours) {
-      const dayName = getWeekdayInTr(start);
-      const day = workingHours[dayName];
+    let staffHours: Record<string, WorkingDay> | null = null;
+    let staffRules: { autoApprove?: boolean } | null = null;
+    if (requestedStaffId) {
+      const { data: staffSettings } = await supabaseAdmin
+        .from("staff_settings")
+        .select("working_hours, booking_rules")
+        .eq("profile_id", requestedStaffId)
+        .maybeSingle();
+      staffHours =
+        (staffSettings?.working_hours as Record<string, WorkingDay> | null) ??
+        null;
+      staffRules =
+        (staffSettings?.booking_rules as { autoApprove?: boolean } | null) ??
+        null;
+    }
 
-      if (day && day.isOpen === false) {
+    const dayName = getWeekdayInTr(start);
+    // Elemanın o güne ait ayarı varsa o, yoksa işletmeninki geçerli olur.
+    const day = staffHours?.[dayName] ?? workingHours?.[dayName] ?? null;
+
+    if (day) {
+      if (day.isOpen === false) {
         return NextResponse.json(
-          { error: "Bu gün işletme kapalı." },
+          {
+            error:
+              staffHours?.[dayName] != null
+                ? "Bu gün seçilen eleman çalışmıyor."
+                : "Bu gün işletme kapalı.",
+          },
           { status: 409 },
         );
       }
 
-      if (day && day.isOpen === true) {
+      if (day.isOpen === true) {
         const openMin = toMinutes(day.openTime);
         const closeMin = toMinutes(day.closeTime);
         const startMin = getTimeOfDay(start).h * 60 + getTimeOfDay(start).m;
@@ -235,7 +261,9 @@ export async function POST(req: Request) {
       .eq("id", user.id)
       .single();
 
-    if (!profile?.phone) {
+    // Numara kayıtlı olsa bile geçersiz olabilir (eski, uydurma kayıtlar);
+    // randevu yalnızca geçerli bir numarayla oluşturulur.
+    if (!isTrMobile(profile?.phone)) {
       return NextResponse.json(
         {
           error:
@@ -259,8 +287,10 @@ export async function POST(req: Request) {
       .maybeSingle();
 
     const autoApprove =
+      staffRules?.autoApprove ??
       (tenantRules?.booking_rules as { autoApprove?: boolean } | null)
-        ?.autoApprove === true;
+        ?.autoApprove ??
+      false;
     const appointmentStatus = autoApprove ? "confirmed" : "pending";
 
     // 1. Randevuyu kaydet (otomatik onay kapalıysa onay bekliyor)

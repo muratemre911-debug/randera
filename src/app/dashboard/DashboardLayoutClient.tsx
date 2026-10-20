@@ -57,6 +57,18 @@ const DASHBOARD_SWIPE_TABS = [
   { href: "/dashboard/musteriler" },
 ];
 
+/**
+ * Mobil "Menü" çekmecesinde listelenen sayfalar (alt çubukta sekmesi
+ * olmayanlar). Görünürlük kuralı burada tekrarlanmaz: liste navItems'ten
+ * süzülür, böylece "yalnızca sahip" işaretli bir sayfa (ör. İçerikler)
+ * çekmecede de otomatik olarak gizlenir.
+ */
+const DRAWER_HREFS = [
+  "/dashboard/icerikler",
+  "/dashboard/gecmis-randevular",
+  "/dashboard/ayarlar",
+];
+
 const navItems: {
   i18nKey: string;
   href: string;
@@ -77,7 +89,7 @@ const navItems: {
     icon: UserCog,
     ownerOnly: true,
   },
-  { i18nKey: "nav.posts", href: "/dashboard/icerikler", icon: ImageIcon },
+  { i18nKey: "nav.posts", href: "/dashboard/icerikler", icon: ImageIcon, ownerOnly: true },
   { i18nKey: "nav.customers", href: "/dashboard/musteriler", icon: Users },
   { i18nKey: "nav.settings", href: "/dashboard/ayarlar", icon: Settings },
 ];
@@ -231,6 +243,18 @@ export default function DashboardLayoutClient({
   const visibleNavItems = navItems.filter(
     (item) => !item.ownerOnly || userRole === "owner",
   );
+
+  /**
+   * Hesap türü etiketi. İşletme sahibinde "İşletme Hesabı", ekip üyesinde
+   * "Eleman Hesabı" görünür; profil okunana kadar (null) etiket gizlenir ki
+   * yanlış etiket bir anlık da olsa görünmesin.
+   */
+  const accountLabelKey =
+    userRole === null
+      ? null
+      : userRole === "owner"
+        ? "nav.business_account"
+        : "nav.staff_account";
 
   const isSuperAdminUser = Boolean(
     userEmail && SUPER_ADMIN_EMAILS.includes(userEmail.toLowerCase()),
@@ -421,9 +445,11 @@ export default function DashboardLayoutClient({
                 >
                   {getDisplayName(userFullName, userEmail, t("header.loading"))}
                 </p>
-                <p className="text-[11px] font-medium text-indigo-500 dark:text-indigo-400">
-                  {t("nav.business_account")}
-                </p>
+                {accountLabelKey && (
+                  <p className="text-[11px] font-medium text-indigo-500 dark:text-indigo-400">
+                    {t(accountLabelKey)}
+                  </p>
+                )}
               </div>
             </div>
             <button
@@ -480,8 +506,8 @@ export default function DashboardLayoutClient({
           </button>
 
           <div className="flex items-center gap-1.5 sm:gap-4">
-            {/* Kalan deneme/üyelik süresi */}
-            {membership && (
+            {/* Kalan deneme/üyelik süresi (yalnızca işletme sahibine görünür) */}
+            {membership && userRole === "owner" && (
               <span
                 title={formatRemaining(membership, lang === "tr" ? "tr" : "en")}
                 className={`hidden items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold sm:inline-flex ${membershipBadgeClass(
@@ -703,9 +729,11 @@ export default function DashboardLayoutClient({
                       lang === "tr" ? "İşletme Hesabı" : "Business Account",
                     )}
                   </p>
-                  <p className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400">
-                    {t("nav.business_account")}
-                  </p>
+                  {accountLabelKey && (
+                    <p className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400">
+                      {t(accountLabelKey)}
+                    </p>
+                  )}
                 </div>
               </div>
               <button
@@ -718,23 +746,10 @@ export default function DashboardLayoutClient({
 
             {/* Navigation links inside drawer */}
             <div className="space-y-1.5">
-              {[
-                {
-                  href: "/dashboard/icerikler",
-                  icon: ImageIcon,
-                  label: t("nav.posts"),
-                },
-                {
-                  href: "/dashboard/gecmis-randevular",
-                  icon: History,
-                  label: t("nav.past_appointments"),
-                },
-                {
-                  href: "/dashboard/ayarlar",
-                  icon: Settings,
-                  label: t("nav.settings"),
-                },
-              ].map((item) => {
+              {DRAWER_HREFS.flatMap((href) => {
+                const item = visibleNavItems.find((i) => i.href === href);
+                return item ? [item] : [];
+              }).map((item) => {
                 const isActive = pathname.startsWith(item.href);
                 return (
                   <Link
@@ -756,7 +771,7 @@ export default function DashboardLayoutClient({
                             : "text-gray-400"
                         }
                       />
-                      <span>{item.label}</span>
+                      <span>{t(item.i18nKey)}</span>
                     </div>
                     {isActive && (
                       <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-600 text-white font-bold">

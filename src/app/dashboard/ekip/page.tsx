@@ -129,10 +129,6 @@ export default function EkipPage() {
   }, [supabase]);
 
   const sortedMembers = useMemo(() => sortStaffOwnerFirst(members), [members]);
-  const ownerId = useMemo(
-    () => members.find((m) => m.role === "owner")?.id ?? null,
-    [members],
-  );
 
   const handleCreateInvite = async () => {
     if (!tenantId) return;
@@ -188,33 +184,43 @@ export default function EkipPage() {
     }
   };
 
+  /**
+   * Ekipten çıkarma SUNUCUDA yapılır: istemciden `profiles.update` denemesi
+   * RLS yüzünden sessizce 0 satır etkileyebiliyor, bu da üyeyi listeden
+   * düşürüp veritabanında bırakıyordu (eleman işletmede kalıyordu).
+   * Uç service-role ile yazar, sonucu doğrular; biz de listeyi gerçeğe göre
+   * yeniden okuyoruz — optimistik silme yok.
+   */
   const handleRemoveMember = async (member: StaffMember) => {
     setPendingRemove(null);
     setBusyId(member.id);
+    setPageError(null);
 
-    // Hizmetler sahipsiz kalmasın: işletme sahibine devret
-    if (ownerId && ownerId !== member.id) {
-      await supabase
-        .from("services")
-        .update({ staff_id: ownerId })
-        .eq("staff_id", member.id);
-    }
+    try {
+      const res = await fetch(`/api/tenant/${tenantId}/staff/remove`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ memberId: member.id }),
+      });
+      const data = await res.json().catch(() => ({}));
 
-    const { error } = await supabase
-      .from("profiles")
-      .update({ role: "customer", tenant_id: null })
-      .eq("id", member.id);
+      if (!res.ok || data.error) {
+        setPageError(
+          (lang === "tr" ? "Çıkarılamadı: " : "Could not remove: ") +
+            (data.error || `HTTP ${res.status}`),
+        );
+        return;
+      }
 
-    if (error) {
+      if (tenantId) await loadRoster(tenantId);
+    } catch (err) {
       setPageError(
         (lang === "tr" ? "Çıkarılamadı: " : "Could not remove: ") +
-          error.message,
+          (err instanceof Error ? err.message : "Bilinmeyen hata"),
       );
-    } else {
-      setMembers((prev) => prev.filter((m) => m.id !== member.id));
+    } finally {
+      setBusyId(null);
     }
-
-    setBusyId(null);
   };
 
   if (loading) {

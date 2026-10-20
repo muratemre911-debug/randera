@@ -136,9 +136,12 @@ export default function NotificationBell() {
 
   return (
     <div className="relative">
-      <button 
+      <button
         onClick={() => { setOpen(!open); if (!open) fetchNotifications(); }}
-        className="relative rounded-full p-2 sm:p-2.5 text-gray-500 transition-all hover:bg-black/5 active:scale-90 dark:text-slate-400 dark:hover:bg-white/10"
+        aria-label={t("notifications.title")}
+        aria-expanded={open}
+        aria-haspopup="dialog"
+        className="relative rounded-full p-2.5 sm:p-2.5 text-gray-500 transition-all hover:bg-black/5 active:scale-90 dark:text-slate-400 dark:hover:bg-white/10"
       >
         <Bell size={18} strokeWidth={2.5} />
         {unreadCount > 0 && (
@@ -188,17 +191,40 @@ export default function NotificationBell() {
                 <div className="py-8 text-center text-sm text-gray-500">{t("notifications.empty")}</div>
               ) : (
                 notifications.map(n => (
-                  <div 
-                    key={n.id} 
+                  <button
+                    key={n.id}
+                    type="button"
                     onClick={() => !n.is_read && markAsRead(n.id)}
-                    className={`rounded-2xl p-3 transition-colors cursor-pointer ${n.is_read ? "opacity-70 bg-gray-50/50 hover:bg-gray-100 dark:bg-slate-800/40 dark:hover:bg-slate-800/70" : "bg-indigo-50 hover:bg-indigo-100/80 dark:bg-indigo-500/10 dark:hover:bg-indigo-500/20"}`}
+                    className={`w-full text-left rounded-2xl p-3 transition-colors cursor-pointer ${
+                      n.is_read
+                        ? "opacity-70 bg-gray-50/50 hover:bg-gray-100 dark:bg-slate-800/40 dark:hover:bg-slate-800/70"
+                        : "bg-indigo-50 hover:bg-indigo-100/80 dark:bg-indigo-500/10 dark:hover:bg-indigo-500/20"
+                    }`}
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <p className={`text-sm font-semibold ${n.is_read ? "text-gray-700 dark:text-slate-300" : "text-indigo-900 dark:text-indigo-300"}`}>{n.title}</p>
-                      {!n.is_read && <div className="mt-1 h-2 w-2 rounded-full bg-indigo-500 shrink-0" />}
+                      <p
+                        className={`text-sm font-semibold ${
+                          n.is_read
+                            ? "text-gray-700 dark:text-slate-300"
+                            : "text-indigo-900 dark:text-indigo-300"
+                        }`}
+                      >
+                        {n.title}
+                      </p>
+                      {!n.is_read && (
+                        <div className="mt-1 h-2 w-2 rounded-full bg-indigo-500 shrink-0" />
+                      )}
                     </div>
-                    <p className={`mt-1 text-xs ${n.is_read ? "text-gray-500 dark:text-slate-400" : "text-indigo-700/80 dark:text-indigo-300/80"} leading-relaxed`}>{n.message}</p>
-                  </div>
+                    <p
+                      className={`mt-1 text-xs ${
+                        n.is_read
+                          ? "text-gray-500 dark:text-slate-400"
+                          : "text-indigo-700/80 dark:text-indigo-300/80"
+                      } leading-relaxed`}
+                    >
+                      {n.message}
+                    </p>
+                  </button>
                 ))
               )}
             </div>

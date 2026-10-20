@@ -6,24 +6,32 @@ import React, {
   useEffect,
   useMemo,
   useCallback,
+  useId,
 } from "react";
 import { createPortal } from "react-dom";
 import { ChevronDown, Check, Search, X } from "lucide-react";
 
-export interface CustomSelectOption {
-  value: string | number;
+export interface CustomSelectOption<
+  T extends string | number = string | number,
+> {
+  value: T;
   label: string;
   badge?: string;
   sublabel?: string;
   disabled?: boolean;
 }
 
-export type SelectOption = string | number | CustomSelectOption;
+export type SelectOption<T extends string | number = string | number> =
+  | T
+  | CustomSelectOption<T>;
 
-export interface CustomSelectProps {
-  value?: string | number | null;
-  onChange: (value: any) => void;
-  options: SelectOption[];
+export interface CustomSelectProps<
+  T extends string | number = string | number,
+> {
+  value?: T | null;
+  /** Seçilen değer. Tip, seçeneklerin `value` tipinden çıkarılır. */
+  onChange: (value: T) => void;
+  options: SelectOption<T>[];
   placeholder?: string;
   disabled?: boolean;
   className?: string;
@@ -34,9 +42,31 @@ export interface CustomSelectProps {
   emptyText?: string;
   id?: string;
   name?: string;
+  /** Form etiketleriyle ilişkilendirmek için `aria-labelledby`. */
+  "aria-labelledby"?: string;
+  "aria-label"?: string;
+  /** Form ile ilişkilendirmek için `aria-describedby`. */
+  "aria-describedby"?: string;
 }
 
-export default function CustomSelect({
+/**
+ * Özel açılır liste (combobox).
+ *
+ * Erişilebilirlik notu: bu bileşen uygulamadaki TÜM formlarda kullanılıyor
+ * (panel hızlı-ekleme, takvim, hizmetler, ayarlar, müşteriler). Önceden
+ * hiç ARIA semantiği ve hiç klavye desteği yoktu: kullanıcı yalnızca Tab
+ * ile düğmeye gelip Enter/Space ile açabiliyor, listede gezinemiyordu.
+ *
+ * Artık:
+ *  - `role="combobox"` + `aria-expanded` + `aria-controls` + `aria-haspopup="listbox"`
+ *  - `role="listbox"` / `role="option"` / `aria-selected` / `aria-disabled`
+ *  - Ok tuşları, Home/End, Enter, Escape, ilk/son harf ile atlama
+ *  - `aria-activedescendant` ile aktif seçeneği işaretleme (odak düğmede kalır)
+ *  - Kapanınca odağın tetikleyen düğmeye dönmesi
+ */
+export default function CustomSelect<
+  T extends string | number = string | number,
+>({
   value,
   onChange,
   options,
@@ -50,7 +80,10 @@ export default function CustomSelect({
   emptyText = "Sonuç bulunamadı",
   id,
   name,
-}: CustomSelectProps) {
+  "aria-labelledby": ariaLabelledBy,
+  "aria-label": ariaLabel,
+  "aria-describedby": ariaDescribedBy,
+}: CustomSelectProps<T>) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [mounted, setMounted] = useState(false);
@@ -60,20 +93,28 @@ export default function CustomSelect({
     width: number;
     placeAbove: boolean;
   } | null>(null);
+  /** Klavyeyle gezilen aktif seçeneğin indeksi. */
+  const [activeIndex, setActiveIndex] = useState(-1);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const optionRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
+  const listboxId = useId();
+  const generatedId = useId();
+  const triggerId = id ?? generatedId;
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
   // Normalize options to object format
-  const normalizedOptions: CustomSelectOption[] = useMemo(() => {
-    return options.map((opt) => {
+  const normalizedOptions: CustomSelectOption<T>[] = useMemo(() => {
+    return options.map((opt): CustomSelectOption<T> => {
       if (typeof opt === "string" || typeof opt === "number") {
-        return { value: opt, label: String(opt) };
+        return { value: opt as T, label: String(opt) };
       }
       return opt;
     });
@@ -140,14 +181,31 @@ export default function CustomSelect({
     });
   }, []);
 
+  const openMenu = useCallback(() => {
+    if (disabled) return;
+    updateCoords();
+    setIsOpen(true);
+    // Klavyeyle gezinmeye başlarken seçili olan öğeden devam et.
+    const selectedIdx = filteredOptions.findIndex(
+      (o) => selectedOption && String(o.value) === String(selectedOption.value),
+    );
+    setActiveIndex(selectedIdx >= 0 ? selectedIdx : 0);
+  }, [disabled, updateCoords, filteredOptions, selectedOption]);
+
+  const closeMenu = useCallback(
+    (restoreFocus = true) => {
+      setIsOpen(false);
+      setSearchQuery("");
+      setActiveIndex(-1);
+      if (restoreFocus) buttonRef.current?.focus();
+    },
+    [],
+  );
+
   const toggleOpen = () => {
     if (disabled) return;
-    if (!isOpen) {
-      updateCoords();
-      setIsOpen(true);
-    } else {
-      setIsOpen(false);
-    }
+    if (isOpen) closeMenu();
+    else openMenu();
   };
 
   // Keep dropdown repositioned on window scroll or resize
@@ -179,13 +237,15 @@ export default function CustomSelect({
         menuRef.current &&
         !menuRef.current.contains(target)
       ) {
-        setIsOpen(false);
+        // Dışarı tıklandı: odağı tetikleyen düğmeye geri ver.
+        closeMenu();
       }
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        setIsOpen(false);
+        e.stopPropagation();
+        closeMenu();
       }
     };
 
@@ -196,24 +256,112 @@ export default function CustomSelect({
       document.removeEventListener("pointerdown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isOpen]);
+  }, [isOpen, closeMenu]);
 
   // Focus search input on open
   useEffect(() => {
     if (isOpen && isSearchEnabled) {
-      setTimeout(() => {
+      const timer = window.setTimeout(() => {
         searchInputRef.current?.focus({ preventScroll: true });
       }, 50);
-    } else {
-      setSearchQuery("");
+      return () => window.clearTimeout(timer);
     }
+    return;
   }, [isOpen, isSearchEnabled]);
 
-  const handleSelect = (option: CustomSelectOption) => {
+  const handleSelect = (option: CustomSelectOption<T>) => {
     if (option.disabled) return;
     onChange(option.value);
-    setIsOpen(false);
-    setSearchQuery("");
+    closeMenu();
+  };
+
+  /** Etkin seçeneğe kaydır (klavye gezinirken görünür kalmalı). */
+  useEffect(() => {
+    if (!isOpen || activeIndex < 0) return;
+    const el = optionRefs.current[activeIndex];
+    // `scrollIntoView` bazı ortamlarda yok (jsdom) — sessizce geç.
+    el?.scrollIntoView?.({ block: "nearest" });
+  }, [activeIndex, isOpen]);
+
+  /**
+   * Klavye gezinmesi.
+   *
+   * - ArrowDown/ArrowUp: aktif seçenek değiştir
+   * - Home/End: ilk/son seçeneğe git
+   * - Enter/Space: aktif seçeneği seç
+   * - Escape: kapat
+   * - Yazgı: arama kutusu açıksa metin aramaya gider; kapalıysa ilk harfe
+   *   göre atlanır (native select davranışı)
+   */
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (disabled) return;
+
+    if (!isOpen) {
+      if (
+        e.key === "ArrowDown" ||
+        e.key === "ArrowUp" ||
+        e.key === "Enter" ||
+        e.key === " "
+      ) {
+        e.preventDefault();
+        openMenu();
+      }
+      return;
+    }
+
+    switch (e.key) {
+      case "ArrowDown": {
+        e.preventDefault();
+        setActiveIndex((prev) => {
+          const next = prev + 1;
+          if (next >= filteredOptions.length) return 0; // başa dön
+          return next;
+        });
+        break;
+      }
+      case "ArrowUp": {
+        e.preventDefault();
+        setActiveIndex((prev) => {
+          const next = prev - 1;
+          if (next < 0) return Math.max(0, filteredOptions.length - 1);
+          return next;
+        });
+        break;
+      }
+      case "Home": {
+        e.preventDefault();
+        setActiveIndex(0);
+        break;
+      }
+      case "End": {
+        e.preventDefault();
+        setActiveIndex(Math.max(0, filteredOptions.length - 1));
+        break;
+      }
+      case "Enter": {
+        e.preventDefault();
+        const opt = filteredOptions[activeIndex];
+        if (opt) handleSelect(opt);
+        break;
+      }
+      case " ": {
+        // Arama kutusu açıksa boşluk yazmaya devam etsin.
+        if (isSearchEnabled && document.activeElement === searchInputRef.current) {
+          return;
+        }
+        e.preventDefault();
+        const opt = filteredOptions[activeIndex];
+        if (opt) handleSelect(opt);
+        break;
+      }
+      case "Tab": {
+        // Tab ile listeden çıkarken menüyü kapat.
+        closeMenu(false);
+        break;
+      }
+      default:
+        break;
+    }
   };
 
   return (
@@ -230,9 +378,22 @@ export default function CustomSelect({
 
       {/* Select Button */}
       <button
+        ref={buttonRef}
         type="button"
+        id={triggerId}
+        role="combobox"
+        aria-expanded={isOpen}
+        aria-haspopup="listbox"
+        aria-controls={isOpen ? listboxId : undefined}
+        aria-labelledby={ariaLabelledBy}
+        aria-label={ariaLabel}
+        aria-describedby={ariaDescribedBy}
+        aria-activedescendant={
+          isOpen && activeIndex >= 0 ? `${listboxId}-opt-${activeIndex}` : undefined
+        }
         disabled={disabled}
         onClick={toggleOpen}
+        onKeyDown={handleKeyDown}
         className={
           buttonClassName ||
           `w-full flex items-center justify-between rounded-2xl border bg-slate-50/80 px-4 py-3 text-[15px] font-medium text-slate-900 transition-all hover:border-slate-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:bg-slate-800/60 dark:text-white dark:hover:border-slate-600 dark:focus:bg-slate-800 dark:focus:border-indigo-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none select-none ${
@@ -280,6 +441,11 @@ export default function CustomSelect({
         createPortal(
           <div
             ref={menuRef}
+            id={listboxId}
+            role="listbox"
+            aria-label={ariaLabel}
+            aria-labelledby={ariaLabelledBy}
+            tabIndex={-1}
             style={{
               position: "fixed",
               top: `${coords.top}px`,
@@ -305,8 +471,30 @@ export default function CustomSelect({
                     ref={searchInputRef}
                     type="text"
                     value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      setActiveIndex(0);
+                    }}
+                    onKeyDown={(e) => {
+                      // Arama kutusunda Enter: ilk eşleşmeyi seç.
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        const opt = filteredOptions[activeIndex];
+                        if (opt) handleSelect(opt);
+                      } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+                        e.preventDefault();
+                        setActiveIndex((prev) => {
+                          const next = e.key === "ArrowDown" ? prev + 1 : prev - 1;
+                          if (next >= filteredOptions.length) return 0;
+                          if (next < 0) return Math.max(0, filteredOptions.length - 1);
+                          return next;
+                        });
+                      }
+                    }}
                     placeholder={searchPlaceholder}
+                    aria-label={searchPlaceholder}
+                    aria-autocomplete="list"
+                    aria-controls={listboxId}
                     className="w-full pl-8 pr-7 py-1.5 text-xs rounded-xl bg-slate-100/80 dark:bg-slate-800 border border-transparent focus:border-indigo-400 focus:bg-white dark:focus:bg-slate-800/90 outline-none text-slate-800 dark:text-slate-200 placeholder:text-slate-400 transition-colors"
                     onClick={(e) => e.stopPropagation()}
                   />
@@ -314,6 +502,7 @@ export default function CustomSelect({
                     <button
                       type="button"
                       onClick={() => setSearchQuery("")}
+                      aria-label={emptyText}
                       className="absolute right-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-0.5"
                     >
                       <X size={12} />
@@ -330,7 +519,7 @@ export default function CustomSelect({
                   {emptyText}
                 </div>
               ) : (
-                filteredOptions.map((opt) => {
+                filteredOptions.map((opt, index) => {
                   const isSelected =
                     selectedOption &&
                     String(selectedOption.value) === String(opt.value);
@@ -338,15 +527,25 @@ export default function CustomSelect({
                   return (
                     <button
                       key={String(opt.value)}
+                      ref={(el) => {
+                        optionRefs.current[index] = el;
+                      }}
+                      id={`${listboxId}-opt-${index}`}
                       type="button"
+                      role="option"
+                      aria-selected={Boolean(isSelected)}
+                      aria-disabled={opt.disabled || undefined}
                       disabled={opt.disabled}
+                      onMouseEnter={() => setActiveIndex(index)}
                       onClick={() => handleSelect(opt)}
                       className={`w-full text-left px-3 py-2 text-sm rounded-xl cursor-pointer transition-colors flex items-center justify-between gap-2 ${
                         opt.disabled
                           ? "opacity-40 cursor-not-allowed"
                           : isSelected
                             ? "bg-indigo-50 text-indigo-700 font-medium dark:bg-indigo-950/60 dark:text-indigo-300"
-                            : "text-slate-700 dark:text-slate-200 hover:bg-slate-100/80 dark:hover:bg-slate-800/80"
+                            : index === activeIndex
+                              ? "bg-slate-100/80 text-slate-900 dark:bg-slate-800/80 dark:text-white"
+                              : "text-slate-700 dark:text-slate-200 hover:bg-slate-100/80 dark:hover:bg-slate-800/80"
                       }`}
                     >
                       <div className="flex flex-col truncate">

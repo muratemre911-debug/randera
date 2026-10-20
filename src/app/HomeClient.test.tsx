@@ -3,8 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import HomeClient from "./HomeClient";
 import { LanguageProvider } from "@/context/LanguageContext";
 import { ThemeProvider } from "@/context/ThemeContext";
-import { tr } from "@/locales/tr";
-import { en } from "@/locales/en";
+import { tr, en } from "@/locales";
 
 // DynamicLogoLink oturum sorgusunu Supabase üzerinden yapar; testte ağ gerekmesin.
 vi.mock("@/utils/supabase/client", () => ({

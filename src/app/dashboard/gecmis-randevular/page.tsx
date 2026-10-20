@@ -5,6 +5,8 @@ import { CalendarDays, X } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useLanguage } from "@/context/LanguageContext";
 import CustomSelect from "@/components/CustomSelect";
+import StatusBadge from "@/components/ui/StatusBadge";
+import { ownRecordsScope } from "@/lib/staff";
 
 interface Service {
   id: string;
@@ -47,7 +49,7 @@ export default function GecmisRandevularPage() {
 
       const { data: profile } = await supabase
         .from("profiles")
-        .select("tenant_id")
+        .select("tenant_id, role")
         .eq("id", user.id)
         .single();
       if (!profile) {
@@ -55,22 +57,28 @@ export default function GecmisRandevularPage() {
         return;
       }
 
+      // Eleman yalnızca kendi randevularını görür (sahip tüm işletmeyi).
+      const scope = ownRecordsScope(profile.role, user.id);
+
       const now = new Date().toISOString();
 
-      const [apptRes, svcRes] = await Promise.all([
-        supabase
-          .from("appointments")
-          .select("*, services(name, price), profiles!appointments_customer_id_fkey(full_name, phone)")
-          .eq("tenant_id", profile.tenant_id)
-          .neq("status", "cancelled")
-          .lt("start_time", now)
-          .order("start_time", { ascending: false }),
-        supabase
-          .from("services")
-          .select("id, name, price")
-          .eq("tenant_id", profile.tenant_id)
-          .order("name"),
-      ]);
+      let apptQuery = supabase
+        .from("appointments")
+        .select("*, services(name, price), profiles!appointments_customer_id_fkey(full_name, phone)")
+        .eq("tenant_id", profile.tenant_id)
+        .neq("status", "cancelled")
+        .lt("start_time", now)
+        .order("start_time", { ascending: false });
+      if (scope) apptQuery = apptQuery.eq("staff_id", scope);
+
+      let svcQuery = supabase
+        .from("services")
+        .select("id, name, price")
+        .eq("tenant_id", profile.tenant_id)
+        .order("name");
+      if (scope) svcQuery = svcQuery.eq("staff_id", scope);
+
+      const [apptRes, svcRes] = await Promise.all([apptQuery, svcQuery]);
 
       if (apptRes.data) setAppointments(apptRes.data as PastAppointment[]);
       if (svcRes.data) setServices(svcRes.data as Service[]);
@@ -189,8 +197,8 @@ export default function GecmisRandevularPage() {
         </div>
       </div>
 
-      {/* Table */}
-      <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white/80 backdrop-blur-2xl shadow-sm dark:border-slate-700 dark:bg-slate-900/70">
+      {/* Table — yalnızca md ve üstü (mobilde kart listesi kullanılır) */}
+      <div className="hidden md:block overflow-hidden rounded-3xl border border-slate-200 bg-white/80 backdrop-blur-2xl shadow-sm dark:border-slate-700 dark:bg-slate-900/70">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             {/* Sabit Hafif Gri Başlık Satırı */}
@@ -280,11 +288,10 @@ export default function GecmisRandevularPage() {
                         ₺{a.services?.price ?? 0}
                       </span>
                     </td>
-                    {/* Durum */}
+                    {/* Durum — gerçek randevu durumundan türetilir.
+                        Önceden her satırda sabit "Tamamlandı" yazıyordu. */}
                     <td className="py-4 px-5 text-center whitespace-nowrap">
-                      <span className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800/50">
-                        {lang === "tr" ? "Tamamlandı" : "Completed"}
-                      </span>
+                      <StatusBadge status={a.status} isPast />
                     </td>
                   </tr>
                 ))
@@ -292,6 +299,75 @@ export default function GecmisRandevularPage() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* Mobil: tablo yerine kart listesi.
+          Tablo 5 sütunlu ve her hücre `whitespace-nowrap` olduğu için 360px'te
+          yatay kaydırma gerektiriyordu; mobilde kart düzeni kullanılıyor. */}
+      <div className="space-y-3 md:hidden">
+        {loading ? (
+          <div className="flex items-center justify-center gap-2 py-16 text-sm font-medium text-slate-500 dark:text-slate-400">
+            <div className="h-5 w-5 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
+            <span>{lang === "tr" ? "Yükleniyor..." : "Loading..."}</span>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="rounded-3xl border border-slate-200 bg-white/80 px-4 py-14 text-center backdrop-blur-2xl dark:border-slate-700 dark:bg-slate-900/70">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400">
+              <CalendarDays className="h-8 w-8 stroke-[1.75]" />
+            </div>
+            <h3 className="text-base font-bold text-slate-900 dark:text-white">
+              {hasFilter
+                ? (lang === "tr"
+                    ? "Filtrelere uygun randevu bulunamadı"
+                    : "No appointments match filters")
+                : (lang === "tr"
+                    ? "Henüz geçmiş randevunuz yok"
+                    : "No past appointments yet")}
+            </h3>
+            {hasFilter && (
+              <button
+                onClick={clearFilters}
+                className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-slate-100 px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+              >
+                <X size={14} />
+                {lang === "tr" ? "Filtreleri Sıfırla" : "Reset Filters"}
+              </button>
+            )}
+          </div>
+        ) : (
+          filtered.map((a) => (
+            <div
+              key={a.id}
+              className="rounded-3xl border border-slate-200 bg-white/80 p-4 backdrop-blur-2xl shadow-sm dark:border-slate-700 dark:bg-slate-900/70"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="font-bold text-slate-900 dark:text-white text-sm">
+                    {getCustomerName(a)}
+                  </div>
+                  {a.profiles?.phone && (
+                    <div className="text-xs text-slate-500 dark:text-slate-400">
+                      {a.profiles.phone}
+                    </div>
+                  )}
+                </div>
+                <StatusBadge status={a.status} isPast className="shrink-0" />
+              </div>
+
+              <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                <span className="inline-flex items-center rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                  {a.services?.name || (lang === "tr" ? "Hizmet" : "Service")}
+                </span>
+                <span className="font-semibold text-slate-900 dark:text-white">
+                  {formatDate(a.start_time)} · {formatTime(a.start_time)}
+                </span>
+                <span className="ml-auto font-bold text-emerald-600 dark:text-emerald-400">
+                  ₺{a.services?.price ?? 0}
+                </span>
+              </div>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );

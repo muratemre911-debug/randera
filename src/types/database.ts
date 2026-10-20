@@ -463,6 +463,45 @@ export type Database = {
           },
         ];
       };
+      staff_settings: {
+        Row: {
+          booking_rules: Json;
+          profile_id: string;
+          tenant_id: string;
+          updated_at: string;
+          working_hours: Json;
+        };
+        Insert: {
+          booking_rules?: Json;
+          profile_id: string;
+          tenant_id: string;
+          updated_at?: string;
+          working_hours?: Json;
+        };
+        Update: {
+          booking_rules?: Json;
+          profile_id?: string;
+          tenant_id?: string;
+          updated_at?: string;
+          working_hours?: Json;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "staff_settings_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: true;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "staff_settings_tenant_id_fkey";
+            columns: ["tenant_id"];
+            isOneToOne: false;
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       tenants: {
         Row: {
           address: string | null;

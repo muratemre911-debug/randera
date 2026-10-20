@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Geliştirme rozetini (sağ alt "N Issues") gizler; derleme/runtime hataları yine konsola düşer.
+  devIndicators: false,
 };
 
 export default nextConfig;

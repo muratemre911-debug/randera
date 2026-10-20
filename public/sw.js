@@ -13,7 +13,7 @@
  *  - farklı köken (Supabase, harita karoları) → dokunulmaz
  */
 
-const VERSION = "v2";
+const VERSION = "v4";
 const STATIC_CACHE = `randera-static-${VERSION}`;
 const PAGE_CACHE = `randera-pages-${VERSION}`;
 
@@ -32,23 +32,27 @@ const PRECACHE = [
 /** Gezinme isteklerinde ağ için beklenecek en uzun süre. */
 const NAV_TIMEOUT = 4000;
 
+const isDevHost = () =>
+  self.location.hostname === "localhost" ||
+  self.location.hostname === "127.0.0.1";
+
 self.addEventListener("install", (event) => {
   event.waitUntil(
     (async () => {
-      const cache = await caches.open(PAGE_CACHE);
-      // Tek tek ekle: biri 404 olursa kurulum tümden düşmesin.
-      await Promise.all(
-        PRECACHE.map((url) =>
-          cache.add(new Request(url, { cache: "reload" })).catch(() => {}),
-        ),
-      );
-      const staticCache = await caches.open(STATIC_CACHE);
-      await staticCache.add(
-        new Request("/icon-192.png", { cache: "reload" }),
-      ).catch(() => {});
-      // Aktif bir sürüm yoksa (ilk kurulum) hemen devreye gir; varsa
-      // sayfa "Yeni sürüm hazır" deyip SKIP_WAITING mesajı gönderene kadar bekle.
-      if (!self.registration.active) await self.skipWaiting();
+      if (!isDevHost()) {
+        const cache = await caches.open(PAGE_CACHE);
+        // Tek tek ekle: biri 404 olursa kurulum tümden düşmesin.
+        await Promise.all(
+          PRECACHE.map((url) =>
+            cache.add(new Request(url, { cache: "reload" })).catch(() => {}),
+          ),
+        );
+        const staticCache = await caches.open(STATIC_CACHE);
+        await staticCache.add(
+          new Request("/icon-192.png", { cache: "reload" }),
+        ).catch(() => {});
+      }
+      await self.skipWaiting();
     })(),
   );
 });
@@ -59,7 +63,7 @@ self.addEventListener("activate", (event) => {
       const keys = await caches.keys();
       await Promise.all(
         keys
-          .filter((key) => !key.endsWith(`-${VERSION}`))
+          .filter((key) => isDevHost() || !key.endsWith(`-${VERSION}`))
           .map((key) => caches.delete(key)),
       );
       if (self.registration.navigationPreload) {
@@ -94,6 +98,9 @@ self.addEventListener("fetch", (event) => {
 
   // Yalnızca GET; ayrıca yalnızca aynı köken.
   if (request.method !== "GET") return;
+
+  // Geliştirme ortamında (localhost) hiçbir JS/CSS/sayfa önbellekten dönmemeli.
+  if (isDevHost()) return;
 
   let url;
   try {

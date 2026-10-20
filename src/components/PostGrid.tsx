@@ -134,7 +134,9 @@ function PostGridItem({ post, onClick, onDelete, onToggleFeature, isFeatured = f
       )}
 
       {(onDelete || onToggleFeature) && (
-        <div className="absolute top-2 right-2 flex items-center gap-1.5 z-20 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+        <div
+          className="hover-only-actions absolute top-2 right-2 flex items-center gap-1.5 z-20 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-200"
+        >
           {onToggleFeature && (
             <button
               type="button"

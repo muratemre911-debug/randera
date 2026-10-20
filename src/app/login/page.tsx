@@ -6,6 +6,11 @@ import Link from "next/link";
 import { LogIn, Loader2 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useLanguage } from "@/context/LanguageContext";
+import {
+  inspectTrMobile,
+  trMobileErrorMessage,
+  TR_MOBILE_PLACEHOLDER,
+} from "@/lib/phone";
 
 function GoogleIcon({ className = "h-5 w-5" }: { className?: string }) {
   return (
@@ -102,16 +107,17 @@ function LoginForm() {
       const next = searchParams.get("next");
 
       if (isRegister) {
-        const cleanPhone = phone.replace(/\D/g, "");
-        if (cleanPhone.length < 10) {
-          throw new Error(lang === "tr" ? "Lütfen geçerli bir telefon numarası girin (Örn: 05XX XXX XX XX)." : "Please enter a valid phone number.");
+        // Numara biçim + uydurma desen kontrolü (bkz. src/lib/phone.ts)
+        const phoneCheck = inspectTrMobile(phone);
+        if (!phoneCheck.ok) {
+          throw new Error(trMobileErrorMessage(phoneCheck.issue, lang));
         }
 
         // 1. Sunucu tarafında kullanıcıyı ve profili oluştur
         const res = await fetch("/api/auth/register", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, password, fullName, nickname, phone: cleanPhone }),
+          body: JSON.stringify({ email, password, fullName, nickname, phone: phoneCheck.phone }),
         });
 
         const resData = await res.json();
@@ -275,9 +281,14 @@ function LoginForm() {
                   required
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  placeholder="05XX XXX XX XX"
+                  placeholder={TR_MOBILE_PLACEHOLDER}
                   className="mt-1 block w-full rounded-lg border border-white/40 bg-white/60 px-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 backdrop-blur-xl focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/30"
                 />
+                <p className="mt-1 text-[11px] text-gray-500">
+                  {lang === "tr"
+                    ? "Aynı numara yalnızca bir hesapta kullanılabilir."
+                    : "A number can only be used by one account."}
+                </p>
               </div>
             )}
 

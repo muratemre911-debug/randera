@@ -106,39 +106,10 @@ export default function BusinessPage() {
   // Favorites state
   const [isFavorited, setIsFavorited] = useState(false);
 
-  // Sticky Mobile Bar State & Ref
-  const [showStickyBar, setShowStickyBar] = useState(false);
-  const mainButtonRef = useRef<HTMLDivElement>(null);
   const tabsBarRef = useRef<HTMLDivElement>(null);
 
   const minPrice =
     services.length > 0 ? Math.min(...services.map((s) => s.price)) : null;
-
-  // Ana randevu butonu yukarı kayıp ekrandan çıktığında üst yapışkan barı tetikle
-  useEffect(() => {
-    if (!mainButtonRef.current) return;
-    const target = mainButtonRef.current;
-    const scrollContainer = document.querySelector("main");
-
-    const checkVisibility = () => {
-      if (!target) return;
-      const targetRect = target.getBoundingClientRect();
-      const containerRect = scrollContainer
-        ? scrollContainer.getBoundingClientRect()
-        : { top: 0 };
-      // Ana buton kaydırma alanının üstünden yukarı çıktığında barı göster
-      setShowStickyBar(targetRect.bottom < containerRect.top);
-    };
-
-    if (scrollContainer) {
-      scrollContainer.addEventListener("scroll", checkVisibility, {
-        passive: true,
-      });
-      checkVisibility();
-      return () =>
-        scrollContainer.removeEventListener("scroll", checkVisibility);
-    }
-  }, [loading]);
 
   // Mobilde sekme şeridi dar kalınca aktif sekme kırpılmasın: yatay olarak ortala
   useEffect(() => {
@@ -151,7 +122,7 @@ export default function BusinessPage() {
       left: bar.scrollLeft + delta - (bar.clientWidth - tab.clientWidth) / 2,
       behavior: "smooth",
     });
-  }, [activeTab, showStickyBar]);
+  }, [activeTab]);
 
   const fetchTenantData = async () => {
     setLoading(true);
@@ -352,7 +323,7 @@ export default function BusinessPage() {
       <style>{paletteCss(getPalette(tenant.theme_palette))}</style>
 
       {/* Banner & Profile Container */}
-      <div className="relative">
+      <div className="relative !mb-0">
         {/* Cover Image Banner */}
         <div
           className="w-full h-48 sm:h-56 md:h-64 bg-cover bg-center relative rounded-[32px] overflow-hidden shadow-sm"
@@ -403,9 +374,21 @@ export default function BusinessPage() {
           </div>
 
           <div className="pb-2">
-            <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
-              {tenant.name}
-            </h1>
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
+                {tenant.name}
+              </h1>
+              {/* Mobilde sektör rozeti başlığın yanında */}
+              {tenant.sector && (
+                <span className="lg:hidden inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-[var(--brand-soft)] text-[var(--brand-text)] border border-[var(--brand-border)] shadow-xs capitalize">
+                  <Tag
+                    size={12}
+                    className="text-[var(--brand-text)] shrink-0"
+                  />
+                  <span>{tenant.sector}</span>
+                </span>
+              )}
+            </div>
 
             {/* Gerçek Puan & Sektör & Konum Barı */}
             <div className="flex flex-wrap items-center gap-3 text-slate-500 dark:text-slate-400 mt-3 text-xs sm:text-sm font-medium">
@@ -449,7 +432,7 @@ export default function BusinessPage() {
               </button>
 
               {tenant.sector && (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-[var(--brand-soft)] bg-[var(--brand-soft)] text-[var(--brand-text)] text-[var(--brand-text)] border border-[var(--brand-border)] border-[var(--brand-border)] shadow-xs capitalize">
+                <span className="max-lg:hidden inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-[var(--brand-soft)] bg-[var(--brand-soft)] text-[var(--brand-text)] text-[var(--brand-text)] border border-[var(--brand-border)] border-[var(--brand-border)] shadow-xs capitalize">
                   <Tag
                     size={12}
                     className="text-[var(--brand-text)] text-[var(--brand-text)] shrink-0"
@@ -469,20 +452,8 @@ export default function BusinessPage() {
               )}
             </div>
 
-            {/* Randevu Al & Yorum Butonları */}
-            <div
-              ref={mainButtonRef}
-              className="mt-5 flex items-center gap-2.5 sm:gap-3 flex-wrap"
-            >
-              <button
-                type="button"
-                onClick={() => router.push(`/b/${slug}/randevu`)}
-                className="inline-flex items-center justify-center gap-2 rounded-full bg-[var(--brand)] hover:bg-[var(--brand-strong)] px-5 sm:px-8 py-3 sm:py-3.5 text-xs sm:text-base font-extrabold text-white shadow-lg shadow-[color:var(--brand-shadow)] active:scale-95 transition-all cursor-pointer whitespace-nowrap"
-              >
-                <CalendarIcon size={17} />
-                <span>{lang === "tr" ? "Randevu Al" : "Book Appointment"}</span>
-              </button>
-
+            {/* Yorum Butonları */}
+            <div className="mt-3 flex items-center gap-2.5 sm:gap-3 flex-wrap">
               {/* Yorum Hakkı Kuralı: Sadece bu işletmede tamamlanmış ve henüz yorumlanmamış randevusu varsa 'Yeni Yorum Yap' */}
               {reviewsData.can_review && (
                 <button
@@ -516,21 +487,43 @@ export default function BusinessPage() {
       </div>
 
       {/* APPLE / AIRBNB TARZI YATAY SEKME (SEGMENTED CONTROL) ÇUBUĞU */}
+      {/* Masaüstünde tam genişliktedir ve "Randevu Al" sağa entegre her zaman
+          görünür. Mobil/tablette ana buton ekrandan çıkınca CTA belirir. */}
       <div
         id="business-tabs"
-        className="sticky top-0 z-30 -mx-3 sm:-mx-6 md:-mx-8 px-3 sm:px-6 md:px-8 py-2.5 bg-white/80 dark:bg-slate-900/80 backdrop-blur-2xl border-b border-slate-200/60 dark:border-slate-800/60 transition-all scroll-mt-4 flex items-center justify-between gap-3 select-none"
+        className="sticky top-2 z-30 p-1.5 w-full rounded-2xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200/70 dark:border-slate-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.06)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] scroll-mt-4 flex flex-col lg:flex-row lg:items-center gap-2 lg:justify-between select-none"
       >
+        {/* Mobil: kartın üst yarısı — solda Randevu Al, sağda Değerlendirmeler */}
+        <div className="grid grid-cols-2 gap-2 lg:hidden">
+          <button
+            type="button"
+            onClick={() => router.push(`/b/${slug}/randevu`)}
+            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-strong)] px-4 py-2.5 text-sm font-bold text-white shadow-sm active:scale-95 transition-all cursor-pointer whitespace-nowrap"
+          >
+            <CalendarIcon size={16} strokeWidth={2.4} />
+            <span>{lang === "tr" ? "Randevu Al" : "Book"}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("reviews")}
+            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 px-4 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-200 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
+          >
+            <Star size={15} className="fill-amber-400 text-amber-400 shrink-0" />
+            <span>{lang === "tr" ? "Değerlendirmeler" : "Reviews"}</span>
+          </button>
+        </div>
+
         <div
           ref={tabsBarRef}
-          className="flex min-w-0 flex-1 items-center p-1 sm:p-1.5 sm:flex-none rounded-2xl bg-slate-100/90 dark:bg-slate-800/70 border border-slate-200/60 dark:border-slate-700/60 backdrop-blur-md gap-1 overflow-x-auto scrollbar-none snap-x"
+          className="flex min-w-0 items-center gap-1 overflow-x-auto scrollbar-none snap-x lg:flex-1"
         >
           <button
             type="button"
             data-tab="services"
             onClick={() => setActiveTab("services")}
-            className={`flex-1 sm:flex-none shrink-0 snap-start flex items-center justify-center gap-1.5 px-2 sm:px-5 py-2 rounded-xl text-[10px] min-[400px]:text-[11px] sm:text-sm font-bold whitespace-nowrap transition-all cursor-pointer ${
+            className={`flex-1 sm:flex-none shrink-0 snap-start flex items-center justify-center gap-1.5 px-2.5 sm:px-5 py-2 rounded-xl text-[10px] min-[400px]:text-[11px] sm:text-sm font-bold whitespace-nowrap transition-all cursor-pointer ${
               activeTab === "services"
-                ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm"
+                ? "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs"
                 : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
             }`}
           >
@@ -546,9 +539,9 @@ export default function BusinessPage() {
             type="button"
             data-tab="reviews"
             onClick={() => setActiveTab("reviews")}
-            className={`flex-1 sm:flex-none shrink-0 snap-start flex items-center justify-center gap-1.5 px-2 sm:px-5 py-2 rounded-xl text-[10px] min-[400px]:text-[11px] sm:text-sm font-bold whitespace-nowrap transition-all cursor-pointer ${
+            className={`flex-1 sm:flex-none shrink-0 snap-start flex items-center justify-center gap-1.5 px-2.5 sm:px-5 py-2 rounded-xl text-[10px] min-[400px]:text-[11px] sm:text-sm font-bold whitespace-nowrap transition-all cursor-pointer ${
               activeTab === "reviews"
-                ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm"
+                ? "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs"
                 : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
             }`}
           >
@@ -562,9 +555,9 @@ export default function BusinessPage() {
             type="button"
             data-tab="posts"
             onClick={() => setActiveTab("posts")}
-            className={`flex-1 sm:flex-none shrink-0 snap-start flex items-center justify-center gap-1.5 px-2 sm:px-5 py-2 rounded-xl text-[10px] min-[400px]:text-[11px] sm:text-sm font-bold whitespace-nowrap transition-all cursor-pointer ${
+            className={`flex-1 sm:flex-none shrink-0 snap-start flex items-center justify-center gap-1.5 px-2.5 sm:px-5 py-2 rounded-xl text-[10px] min-[400px]:text-[11px] sm:text-sm font-bold whitespace-nowrap transition-all cursor-pointer ${
               activeTab === "posts"
-                ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm"
+                ? "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs"
                 : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
             }`}
           >
@@ -581,9 +574,9 @@ export default function BusinessPage() {
               type="button"
               data-tab="location"
               onClick={() => setActiveTab("location")}
-              className={`flex-1 sm:flex-none shrink-0 snap-start flex items-center justify-center gap-1.5 px-2 sm:px-5 py-2 rounded-xl text-[10px] min-[400px]:text-[11px] sm:text-sm font-bold whitespace-nowrap transition-all cursor-pointer ${
+              className={`flex-1 sm:flex-none shrink-0 snap-start flex items-center justify-center gap-1.5 px-2.5 sm:px-5 py-2 rounded-xl text-[10px] min-[400px]:text-[11px] sm:text-sm font-bold whitespace-nowrap transition-all cursor-pointer ${
                 activeTab === "location"
-                  ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm"
+                  ? "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs"
                   : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
               }`}
             >
@@ -592,11 +585,11 @@ export default function BusinessPage() {
           )}
         </div>
 
-        {/* Sağ: Değerlendirmeler, Paylaşımlar ve Konum'da ana buton kaybolunca beliren Randevu Al butonu */}
-        {showStickyBar && activeTab !== "services" && (
-          <div className="flex items-center gap-3 shrink-0 ml-auto animate-in fade-in slide-in-from-right-3 duration-200">
+        {/* Masaüstü: sağa entegre Randevu Al */}
+        <div className="hidden lg:flex items-center shrink-0">
+          <div className="flex items-center gap-2.5 pl-2 border-l border-slate-200/70 dark:border-slate-700/60">
             {minPrice !== null && (
-              <div className="hidden md:flex flex-col items-end text-right leading-tight">
+              <div className="hidden md:flex flex-col items-end text-right leading-tight px-1">
                 <span className="text-[10px] text-slate-400 font-medium">
                   {lang === "tr" ? "Başlangıç Fiyatı" : "Starting from"}
                 </span>
@@ -608,15 +601,15 @@ export default function BusinessPage() {
             <button
               type="button"
               onClick={() => router.push(`/b/${slug}/randevu`)}
-              className="inline-flex items-center gap-1.5 rounded-full bg-[var(--brand)] hover:bg-[var(--brand-strong)] px-4 sm:px-5 py-2 text-xs sm:text-sm font-bold text-white shadow-md shadow-[color:var(--brand-shadow)] active:scale-95 transition-all cursor-pointer whitespace-nowrap"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-strong)] px-5 sm:px-6 py-2 sm:py-2.5 text-sm font-bold text-white shadow-xs active:scale-95 transition-all cursor-pointer whitespace-nowrap"
             >
-              <CalendarIcon size={14} strokeWidth={2.4} />
-              <span className="hidden min-[400px]:inline">
+              <CalendarIcon size={16} strokeWidth={2.4} />
+              <span>
                 {lang === "tr" ? "Randevu Al" : "Book"}
               </span>
             </button>
           </div>
-        )}
+        </div>
       </div>
 
       {/* 1. SEKME: HİZMETLER MENÜSÜ */}

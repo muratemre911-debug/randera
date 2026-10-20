@@ -11,16 +11,20 @@ import {
 import { createClient } from "@/utils/supabase/client";
 import { useLanguage } from "@/context/LanguageContext";
 import { useRouter } from "next/navigation";
+import Modal from "@/components/ui/Modal";
+import {
+  inspectTrMobile,
+  trMobileErrorMessage,
+  TR_MOBILE_PLACEHOLDER,
+} from "@/lib/phone";
 
 interface RequirePhoneModalProps {
   isOpen: boolean;
-  userId: string;
   onSuccess: (phone: string) => void;
 }
 
 export default function RequirePhoneModal({
   isOpen,
-  userId,
   onSuccess,
 }: RequirePhoneModalProps) {
   const supabase = createClient();
@@ -37,26 +41,34 @@ export default function RequirePhoneModal({
     e.preventDefault();
     setError(null);
 
-    const clean = phone.replace(/\D/g, "");
-    if (clean.length < 10 || clean.length > 13) {
-      setError(
-        lang === "tr"
-          ? "Lütfen geçerli bir telefon numarası girin (Örn: 05XX XXX XX XX)."
-          : "Please enter a valid phone number (e.g. 05XX XXX XX XX).",
-      );
+    // Biçim + uydurma desen kontrolü (sunucu da aynı kontrolü yeniden yapar)
+    const check = inspectTrMobile(phone);
+    if (!check.ok) {
+      setError(trMobileErrorMessage(check.issue, lang));
       return;
     }
 
     setLoading(true);
     try {
-      const { error: updateError } = await supabase
-        .from("profiles")
-        .update({ phone: clean })
-        .eq("id", userId);
+      // Kaydetme sunucu üzerinden yapılır: "bir numara yalnızca bir hesapta"
+      // kuralı başka profilleri okumayı gerektirir, istemciden kontrol edilemez.
+      const res = await fetch("/api/phone", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: check.phone }),
+      });
+      const data = await res.json().catch(() => ({}));
 
-      if (updateError) throw updateError;
+      if (!res.ok) {
+        throw new Error(
+          data?.error ||
+            (lang === "tr"
+              ? "Telefon kaydedilirken bir hata oluştu."
+              : "Failed to save phone number."),
+        );
+      }
 
-      onSuccess(clean);
+      onSuccess(data?.phone || check.phone);
     } catch (err) {
       setError(
         (err instanceof Error && err.message) ||
@@ -75,11 +87,18 @@ export default function RequirePhoneModal({
   };
 
   return (
-    <div data-no-swipe className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-300">
-      <div
-        className="w-full max-w-md bg-white dark:bg-slate-900 rounded-[32px] p-6 sm:p-8 shadow-2xl border border-white/60 dark:border-slate-800 text-center space-y-5 animate-in zoom-in-95 duration-200"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <Modal
+      open={isOpen}
+      onClose={() => {}}
+      title={
+        lang === "tr" ? "Telefon Numaranızı Ekleyin" : "Add Your Phone Number"
+      }
+      showTitle={false}
+      dismissible={false}
+      hideCloseButton
+      zIndex={9999}
+    >
+      <div className="space-y-5 text-center">
         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--brand-soft)] text-[var(--brand-text)] ring-8 ring-[var(--brand-soft)]">
           <Phone size={32} />
         </div>
@@ -96,30 +115,39 @@ export default function RequirePhoneModal({
           </h2>
           <p className="text-xs sm:text-sm text-gray-500 dark:text-slate-400 leading-relaxed">
             {lang === "tr"
-              ? "Randevularınızın işletmeler tarafından onaylanması, değişiklikler ve hatırlatma mesajları için telefon numaranızı kaydetmeniz zorunludur."
-              : "A verified phone number is required so businesses can confirm your appointments and send updates."}
+              ? "Randevularınızın işletme tarafından onaylanması ve size ulaşabilmesi için telefon numaranızı kaydetmeniz zorunludur. Aynı numara yalnızca bir hesapta kullanılabilir."
+              : "A phone number is required so businesses can confirm your appointments and reach you. A number can only be used by one account."}
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4 pt-2">
           <div className="text-left">
-            <label className="block text-xs font-bold text-gray-700 dark:text-slate-300 mb-1.5">
+            <label
+              htmlFor="require-phone-input"
+              className="block text-xs font-bold text-gray-700 dark:text-slate-300 mb-1.5"
+            >
               {lang === "tr" ? "Telefon Numarası" : "Phone Number"}{" "}
               <span className="text-red-500">*</span>
             </label>
             <div className="relative">
               <input
+                id="require-phone-input"
                 type="tel"
+                inputMode="tel"
+                autoComplete="tel"
                 required
-                autoFocus
+                data-autofocus
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                placeholder="05XX XXX XX XX"
-                className="w-full rounded-2xl border border-gray-200 dark:border-slate-700 bg-gray-50/80 dark:bg-slate-800/80 px-4 py-3.5 text-base font-semibold text-gray-900 dark:text-white placeholder-gray-400 outline-none focus:border-[var(--brand)] focus:ring-2 focus:ring-[var(--brand)]/20 transition-all"
+                placeholder={TR_MOBILE_PLACEHOLDER}
+                className="w-full rounded-2xl border border-gray-200 dark:border-slate-700 bg-gray-50/80 dark:bg-slate-800/80 px-4 py-3.5 text-base font-semibold text-gray-900 dark:text-white placeholder-gray-400 outline-none focus:border-[var(--brand)] focus:ring-2 focus:ring-[color:var(--brand)]/20 transition-all"
               />
             </div>
             {error && (
-              <p className="mt-2 text-xs font-bold text-rose-600 dark:text-rose-400">
+              <p
+                role="alert"
+                className="mt-2 text-xs font-bold text-rose-600 dark:text-rose-400"
+              >
                 {error}
               </p>
             )}
@@ -156,6 +184,6 @@ export default function RequirePhoneModal({
           </button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }

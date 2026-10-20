@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import Link from "next/link";
+import { useEffect, useState, useCallback } from "react";import Link from "next/link";
 import {
   Users,
   CalendarDays,
@@ -27,6 +26,8 @@ import { useLanguage } from "@/context/LanguageContext";
 import type { DashboardStats, Service, Profile } from "@/types";
 import { PageSkeleton } from "@/components/Skeleton";
 import CustomSelect from "@/components/CustomSelect";
+import { ownRecordsScope } from "@/lib/staff";
+import { localDateString } from "@/lib/date";
 
 /**
  * Sorgudan dönen ham randevu satırı.
@@ -111,6 +112,23 @@ export default function DashboardPage() {
   const supabase = createClient();
   const { t, lang } = useLanguage();
 
+  /**
+   * Render anında uygulanan yedek metinler.
+   *
+   * Veri ham haliyle saklanır; "İsimsiz Müşteri" gibi yedekler burada
+   * eklenir. Böylece dil değiştirilince veri yeniden çekilmez, yalnızca
+   * metinler güncellenir.
+   */
+  const displayName = useCallback(
+    (name: string | null | undefined) =>
+      name || t("dashboard.guest_customer"),
+    [t],
+  );
+  const displayService = useCallback(
+    (name: string | null | undefined) => name || t("dashboard.service_fallback"),
+    [t],
+  );
+
   const fetchDashboardData = useCallback(async () => {
     const {
       data: { user },
@@ -119,11 +137,15 @@ export default function DashboardPage() {
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("tenant_id")
+      .select("tenant_id, role")
       .eq("id", user.id)
       .single();
     if (!profile?.tenant_id) return;
     const tId = profile.tenant_id;
+
+    // Eleman yalnızca KENDİ kayıtlarını görür; işletme sahibi tüm işletmeyi
+    // (ownRecordsScope: sahip için null → filtre uygulanmaz).
+    const scope = ownRecordsScope(profile.role, user.id);
 
     // Fetch tenant details
     // `maybeSingle()`: RLS veya silinmiş bir işletme nedeniyle 0 satır dönerse
@@ -150,7 +172,54 @@ export default function DashboardPage() {
     const thirtyDaysAgo = new Date(now);
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    // Fetch today's appointments with service & profile info
+    // Bugünün randevuları, onay bekleyenler, sıradaki randevu ve hizmetler
+    // eleman için kendi kayıtlarıyla sınırlıdır.
+    let todayApptsQuery = supabase
+      .from("appointments")
+      .select(
+        // DİKKAT: `duration_minutes` diye bir kolon YOK (services.duration kullanılır).
+        // Yanlış kolon adı PostgREST'ten 400 döndürüyor ve sorgu tamamen boş
+        // dönüyordu; bu yüzden panel "bugün randevu yok" diyordu.
+        "*, services(name, price, duration), profiles!appointments_customer_id_fkey(full_name, phone)",
+      )
+      .eq("tenant_id", tId)
+      .neq("status", "cancelled")
+      .gte("start_time", todayStart.toISOString())
+      .lte("start_time", todayEnd.toISOString())
+      .order("start_time", { ascending: true });
+    if (scope) todayApptsQuery = todayApptsQuery.eq("staff_id", scope);
+
+    let pendingQuery = supabase
+      .from("appointments")
+      .select(
+        "*, services(name, price, duration), profiles!appointments_customer_id_fkey(full_name, phone)",
+      )
+      .eq("tenant_id", tId)
+      .neq("status", "cancelled")
+      .eq("status", "pending")
+      .order("start_time", { ascending: true });
+    if (scope) pendingQuery = pendingQuery.eq("staff_id", scope);
+
+    let nextApptQuery = supabase
+      .from("appointments")
+      .select(
+        "*, services(name), profiles!appointments_customer_id_fkey(full_name)",
+      )
+      .eq("tenant_id", tId)
+      .eq("status", "confirmed")
+      .gte("start_time", now.toISOString())
+      .order("start_time", { ascending: true })
+      .limit(1);
+    if (scope) nextApptQuery = nextApptQuery.eq("staff_id", scope);
+
+    let servicesQuery = supabase
+      .from("services")
+      .select("*")
+      .eq("tenant_id", tId)
+      .eq("is_active", true)
+      .order("name");
+    if (scope) servicesQuery = servicesQuery.eq("staff_id", scope);
+
     const [
       todayApptsRes,
       pendingCountRes,
@@ -159,63 +228,62 @@ export default function DashboardPage() {
       servicesRes,
       customersRes,
     ] = await Promise.all([
-      supabase
-        .from("appointments")
-        .select(
-          // DİKKAT: `duration_minutes` diye bir kolon YOK (services.duration kullanılır).
-          // Yanlış kolon adı PostgREST'ten 400 döndürüyor ve sorgu tamamen boş
-          // dönüyordu; bu yüzden panel "bugün randevu yok" diyordu.
-          "*, services(name, price, duration), profiles!appointments_customer_id_fkey(full_name, phone)",
-        )
-        .eq("tenant_id", tId)
-        .neq("status", "cancelled")
-        .gte("start_time", todayStart.toISOString())
-        .lte("start_time", todayEnd.toISOString())
-        .order("start_time", { ascending: true }),
-
-      supabase
-        .from("appointments")
-        .select(
-          "*, services(name, price, duration), profiles!appointments_customer_id_fkey(full_name, phone)",
-        )
-        .eq("tenant_id", tId)
-        .neq("status", "cancelled")
-        .eq("status", "pending")
-        .order("start_time", { ascending: true }),
-
-      supabase
-        .from("profiles")
-        .select("*", { count: "exact", head: true })
-        .eq("tenant_id", tId)
-        .eq("role", "customer")
-        .gte("created_at", thirtyDaysAgo.toISOString()),
-
-      supabase
-        .from("appointments")
-        .select(
-          "*, services(name), profiles!appointments_customer_id_fkey(full_name)",
-        )
-        .eq("tenant_id", tId)
-        .eq("status", "confirmed")
-        .gte("start_time", now.toISOString())
-        .order("start_time", { ascending: true })
-        .limit(1),
-
-      supabase
-        .from("services")
-        .select("*")
-        .eq("tenant_id", tId)
-        .eq("is_active", true)
-        .order("name"),
-
-      supabase
-        .from("profiles")
-        .select("*")
-        .eq("tenant_id", tId)
-        .eq("role", "customer")
-        .order("full_name"),
+      todayApptsQuery,
+      pendingQuery,
+      // "Yeni müşteri" sayımı eleman için işletme genelinde yapılmaz (veri
+      // sızmasın); sayı kendi randevularından türetilir (aşağıda).
+      scope
+        ? Promise.resolve({ count: 0 })
+        : supabase
+            .from("profiles")
+            .select("*", { count: "exact", head: true })
+            .eq("tenant_id", tId)
+            .eq("role", "customer")
+            .gte("created_at", thirtyDaysAgo.toISOString()),
+      nextApptQuery,
+      servicesQuery,
+      // Müşteri listesi de eleman için işletme genelinde çekilmez; kendi
+      // müşterileri aşağıda tek sorguyla türetilir.
+      scope
+        ? Promise.resolve({ data: [] as Profile[] })
+        : supabase
+            .from("profiles")
+            .select("*")
+            .eq("tenant_id", tId)
+            .eq("role", "customer")
+            .order("full_name"),
     ]);
 
+    // Elemanın müşteri kapsamı: kendi randevularındaki müşteriler ve onlarla
+    // ilk randevu tarihi (yeni müşteri sayımı bunun üzerinden hesaplanır).
+    let myCustomerIds: string[] = [];
+    let staffNewCustomers = 0;
+    if (scope) {
+      const { data: myAppts } = await supabase
+        .from("appointments")
+        .select("customer_id, start_time")
+        .eq("tenant_id", tId)
+        .eq("staff_id", scope)
+        .not("customer_id", "is", null);
+
+      const firstSeen = new Map<string, string>();
+      for (const row of (myAppts ?? []) as {
+        customer_id: string;
+        start_time: string;
+      }[]) {
+        const prev = firstSeen.get(row.customer_id);
+        if (!prev || row.start_time < prev) {
+          firstSeen.set(row.customer_id, row.start_time);
+        }
+      }
+      myCustomerIds = [...firstSeen.keys()];
+      staffNewCustomers = [...firstSeen.values()].filter(
+        (d) => d >= thirtyDaysAgo.toISOString(),
+      ).length;
+    }
+
+    // SAFETY: Supabase'in iç içe select sonucu derinlemesine tiplenmiyor;
+    // satırlar appointments + services/profiles join şemasına karşılık gelir.
     const rawTodayAppts =
       (todayApptsRes.data as unknown as RawAppointment[] | null) || [];
     const dailyRev = rawTodayAppts.reduce(
@@ -227,10 +295,10 @@ export default function DashboardPage() {
       .reduce((sum, app) => sum + (app.services?.price || 0), 0);
 
     const formattedToday: TodayAppointment[] = rawTodayAppts.map((app) => {
+      // Yedek (fallback) metinler render anında uygulanır; burada ham veri
+      // saklanır. Böylece dil değişince tüm veri yeniden çekilmez.
       const name =
-        app.profiles?.full_name ||
-        app.custom_fields?.customer_name ||
-        (lang === "tr" ? "İsimsiz Müşteri" : "Guest Customer");
+        app.profiles?.full_name || app.custom_fields?.customer_name || "";
       const phone = app.profiles?.phone || app.custom_fields?.phone || "";
       return {
         id: app.id,
@@ -239,21 +307,20 @@ export default function DashboardPage() {
         status: app.status as TodayAppointment["status"],
         customer_name: name,
         customer_phone: phone,
-        service_name:
-          app.services?.name || (lang === "tr" ? "Hizmet" : "Service"),
+        service_name: app.services?.name || "",
         service_price: app.services?.price || 0,
         service_duration: app.services?.duration || 30,
         note: app.custom_fields?.note || "",
       };
     });
 
+    // SAFETY: Yukarıdakiyle aynı gerekçe — onay bekleyen randevular için de
+    // iç içe select sonucu tiplenmiyor, satır şeması aynıdır.
     const rawPendingAppts =
       (pendingCountRes.data as unknown as RawAppointment[] | null) || [];
     const formattedPending: TodayAppointment[] = rawPendingAppts.map((app) => {
       const name =
-        app.profiles?.full_name ||
-        app.custom_fields?.customer_name ||
-        (lang === "tr" ? "İsimsiz Müşteri" : "Guest Customer");
+        app.profiles?.full_name || app.custom_fields?.customer_name || "";
       const phone = app.profiles?.phone || app.custom_fields?.phone || "";
       return {
         id: app.id,
@@ -262,8 +329,7 @@ export default function DashboardPage() {
         status: "pending",
         customer_name: name,
         customer_phone: phone,
-        service_name:
-          app.services?.name || (lang === "tr" ? "Hizmet" : "Service"),
+        service_name: app.services?.name || "",
         service_price: app.services?.price || 0,
         service_duration: app.services?.duration || 30,
         note: app.custom_fields?.note || "",
@@ -275,22 +341,43 @@ export default function DashboardPage() {
       nextAppt.customer_name =
         nextAppt.profiles?.full_name ||
         nextAppt.custom_fields?.customer_name ||
-        (lang === "tr" ? "Müşteri" : "Customer");
+        "";
     }
 
     setStats({
       dailyRevenue: dailyRev,
       pendingAppointments: formattedPending.length,
-      newCustomers: newCustRes.count || 0,
+      // Eleman için sayı kendi randevularından türetilir (yukarıda).
+      newCustomers: scope ? staffNewCustomers : newCustRes.count || 0,
       nextAppointment: nextAppt,
     });
     setCompletedRevenue(compRev);
     setTodayAppointments(formattedToday);
     setPendingApprovalAppts(formattedPending);
     setServices((servicesRes.data as Service[]) || []);
-    setCustomers((customersRes.data as Profile[]) || []);
+
+    // Müşteri listesi: işletme sahibi işletmenin tüm müşterilerini, eleman
+    // yalnızca kendi randevusu olan müşterileri görür.
+    if (scope) {
+      if (myCustomerIds.length > 0) {
+        const { data: myCust } = await supabase
+          .from("profiles")
+          .select("*")
+          .in("id", myCustomerIds)
+          .order("full_name");
+        setCustomers((myCust as Profile[]) || []);
+      } else {
+        setCustomers([]);
+      }
+    } else {
+      setCustomers((customersRes.data as Profile[]) || []);
+    }
     setLoading(false);
-  }, [supabase, lang]);
+    // `lang` BİLEREK dahil DEĞİL: dil değişince veri aynıdır, sadece
+    // gösterilen metinler değişir. Yedek metinler render anında uygulanır
+    // (`displayName` / `displayService`); böylece her dil değişiminde tüm
+    // panel verisi baştan çekilmiyordu.
+  }, [supabase]);
 
   useEffect(() => {
     // Veri çekme bir "dış sistem" aboneliğidir; setState çağrıları await'ten
@@ -303,7 +390,9 @@ export default function DashboardPage() {
   useEffect(() => {
     if (showAddModal) {
       const d = new Date();
-      const dateStr = d.toISOString().split("T")[0];
+      // Yerel tarih: `toISOString()` UTC verdiği için TR'de gece yarısından
+      // sonra "bugün"ün tarihi DÜN gösteriliyordu.
+      const dateStr = localDateString(d);
       d.setHours(d.getHours() + 1, 0, 0, 0);
       const timeStr = `${d.getHours().toString().padStart(2, "0")}:00`;
       // Yeni randevu modalı için varsayılan tarih/saat, hizmetler yüklendikten
@@ -669,7 +758,7 @@ export default function DashboardPage() {
         <div className="relative overflow-hidden rounded-2xl sm:rounded-[28px] border border-white/50 bg-gradient-to-br from-white/90 via-white/70 to-white/40 p-3.5 sm:p-6 backdrop-blur-3xl shadow-[0_8px_30px_rgb(0,0,0,0.03)] dark:border-slate-700/50 dark:from-slate-800/90 dark:via-slate-800/60 dark:to-slate-900/40 transition-all hover:-translate-y-0.5">
           <div className="flex items-center justify-between gap-1">
             <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-400 truncate">
-              {t("dashboard.occupancy")} (₺)
+              {t("dashboard.daily_revenue")} (₺)
             </span>
             <div className="flex h-8 w-8 sm:h-11 sm:w-11 items-center justify-center rounded-xl sm:rounded-2xl bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400 shrink-0">
               <DollarSign size={17} className="sm:w-[22px] sm:h-[22px]" />
@@ -826,7 +915,7 @@ export default function DashboardPage() {
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <h4 className="font-bold text-gray-900 dark:text-white text-base">
-                          {app.customer_name}
+                          {displayName(app.customer_name)}
                         </h4>
                         <span className="px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300">
                           {lang === "tr" ? "Onay Bekliyor" : "Pending"}
@@ -839,7 +928,7 @@ export default function DashboardPage() {
                         </span>
                         <span>•</span>
                         <span className="font-semibold text-gray-800 dark:text-slate-200">
-                          {app.service_name}
+                          {displayService(app.service_name)}
                         </span>
                         <span>•</span>
                         <span className="font-bold text-emerald-600 dark:text-emerald-400">
@@ -869,8 +958,8 @@ export default function DashboardPage() {
                       <a
                         href={`https://wa.me/${cleanPhone.startsWith("90") ? cleanPhone : `90${cleanPhone}`}?text=${encodeURIComponent(
                           lang === "tr"
-                            ? `Merhaba ${app.customer_name}, Randera üzerinden oluşturduğunuz randevu talebiniz hakkında iletişime geçiyorum.`
-                            : `Hello ${app.customer_name}, contacting you regarding your booking request on Randera.`,
+                            ? `Merhaba ${displayName(app.customer_name)}, Randera üzerinden oluşturduğunuz randevu talebiniz hakkında iletişime geçiyorum.`
+                            : `Hello ${displayName(app.customer_name)}, contacting you regarding your booking request on Randera.`,
                         )}`}
                         target="_blank"
                         rel="noopener noreferrer"
@@ -926,7 +1015,7 @@ export default function DashboardPage() {
                   </span>
                 </div>
                 <h3 className="text-lg font-bold text-gray-900 dark:text-white mt-0.5">
-                  {stats.nextAppointment.customer_name}
+                  {displayName(stats.nextAppointment.customer_name)}
                   <span className="text-sm font-normal text-gray-500 dark:text-slate-400 ml-2">
                     •{" "}
                     {stats.nextAppointment.services?.name ||
@@ -1032,7 +1121,7 @@ export default function DashboardPage() {
                       <div>
                         <div className="flex items-center gap-2">
                           <p className="font-bold text-gray-900 dark:text-white text-sm sm:text-base">
-                            {app.customer_name}
+                            {displayName(app.customer_name)}
                           </p>
                           {isCompleted ? (
                             <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300">
@@ -1052,7 +1141,7 @@ export default function DashboardPage() {
                         </div>
                         <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-slate-400 mt-0.5">
                           <span className="font-medium text-gray-700 dark:text-slate-300">
-                            {app.service_name}
+                            {displayService(app.service_name)}
                           </span>
                           <span>•</span>
                           <span className="font-semibold text-emerald-600 dark:text-emerald-400">
@@ -1078,8 +1167,8 @@ export default function DashboardPage() {
                         <a
                           href={`https://wa.me/${cleanPhone.startsWith("90") ? cleanPhone : `90${cleanPhone}`}?text=${encodeURIComponent(
                             lang === "tr"
-                              ? `Merhaba ${app.customer_name}, Randera üzerinden saat ${new Date(app.start_time).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })} randevunuz hakkında iletişime geçiyorum.`
-                              : `Hello ${app.customer_name}, contacting you regarding your appointment at ${new Date(app.start_time).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}.`,
+                              ? `Merhaba ${displayName(app.customer_name)}, Randera üzerinden saat ${new Date(app.start_time).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })} randevunuz hakkında iletişime geçiyorum.`
+                              : `Hello ${displayName(app.customer_name)}, contacting you regarding your appointment at ${new Date(app.start_time).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}.`,
                           )}`}
                           target="_blank"
                           rel="noopener noreferrer"

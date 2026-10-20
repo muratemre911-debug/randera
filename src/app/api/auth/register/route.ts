@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/utils/supabase/server";
+import { inspectTrMobile, trMobileErrorMessage } from "@/lib/phone";
 
 export async function POST(req: Request) {
   try {
@@ -9,10 +10,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Lütfen tüm zorunlu alanları (telefon dahil) doldurun." }, { status: 400 });
     }
 
-    const cleanPhone = phone.replace(/\D/g, "");
-    if (cleanPhone.length < 10 || cleanPhone.length > 13) {
-      return NextResponse.json({ error: "Lütfen geçerli bir telefon numarası girin (Örn: 05XX XXX XX XX)." }, { status: 400 });
+    // Numara biçimi ve uydurma desen kontrolü (bkz. src/lib/phone.ts)
+    const phoneCheck = inspectTrMobile(phone);
+    if (!phoneCheck.ok) {
+      return NextResponse.json({ error: trMobileErrorMessage(phoneCheck.issue) }, { status: 400 });
     }
+    const cleanPhone = phoneCheck.phone;
 
     const normalizedNickname = nickname.trim().toLowerCase();
     if (!/^[a-z0-9._]{3,30}$/.test(normalizedNickname)) {
@@ -35,6 +38,17 @@ export async function POST(req: Request) {
 
     if (existingNick) {
       return NextResponse.json({ error: "Bu kullanıcı adı zaten kullanılıyor. Lütfen farklı bir tane seçin." }, { status: 400 });
+    }
+
+    // Telefon numarası da hesaba özeldir: aynı numara ikinci bir hesapta açılamaz
+    const { data: existingPhone } = await supabaseAdmin
+      .from("profiles")
+      .select("id")
+      .eq("phone", cleanPhone)
+      .maybeSingle();
+
+    if (existingPhone) {
+      return NextResponse.json({ error: "Bu telefon numarası başka bir hesapta kayıtlı. Bir numara yalnızca tek hesapta kullanılabilir." }, { status: 409 });
     }
 
     // 1. Kullanıcıyı e-posta onayıyla birlikte doğrudan oluştur
@@ -70,6 +84,9 @@ export async function POST(req: Request) {
 
     if (profileError) {
       console.error("Profile upsert error:", profileError);
+      if (profileError.code === "23505") {
+        return NextResponse.json({ error: "Bu telefon numarası ya da kullanıcı adı başka bir hesapta kayıtlı." }, { status: 409 });
+      }
       return NextResponse.json({ error: "Profil oluşturulurken hata: " + profileError.message }, { status: 500 });
     }
 
