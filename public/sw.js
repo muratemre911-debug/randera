@@ -7,13 +7,19 @@
  *
  * Strateji özeti:
  *  - /_next/static/*  → cache-first (içerik hash'li, asla değişmez)
+ *  - /_next/image     → cache-first (optimize edilmiş görsel; içerik sabit)
  *  - gezinme (HTML)   → network-first + 4sn zaman aşımı → önbellek → /offline
  *  - /api/*           → asla önbelleğe alınmaz (kullanıcıya özel veri)
  *  - diğer aynı köken GET → stale-while-revalidate
  *  - farklı köken (Supabase, harita karoları) → dokunulmaz
+ *
+ * Geliştirme: bu dosya artık YALNIZCA production'da kaydediliyor
+ * (bkz. src/components/pwa/PwaManager.tsx). `isDevHost()` kontrolü ikinci bir
+ * emniyet supabı olarak duruyor: SW bir şekilde dev sunucusundan servis edilirse
+ * dev chunk'ları (hash'siz, adı her derlemede değişir) önbelleğe yazılmaz.
  */
 
-const VERSION = "v4";
+const VERSION = "v5";
 const STATIC_CACHE = `randera-static-${VERSION}`;
 const PAGE_CACHE = `randera-pages-${VERSION}`;
 
@@ -89,6 +95,9 @@ const isApi = (url) => url.pathname.startsWith("/api/");
 /** Next.js build çıktısı ve diğer değişmez varlıklar. */
 const isImmutable = (url) =>
   url.pathname.startsWith("/_next/static/") ||
+  // Optimize edilmiş görsel ucunu: yol adı `/_next/image`, boyut/format sorgu
+  // dizesinde geldiği için uzantı sınayamıyoruz.
+  url.pathname.startsWith("/_next/image") ||
   /\.(?:png|jpg|jpeg|svg|gif|webp|avif|ico|woff2?|ttf|otf|css|js)$/.test(
     url.pathname,
   );

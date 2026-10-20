@@ -90,18 +90,36 @@ export default function PwaManager() {
       });
     };
 
-    // Geliştirme ortamında (localhost) eski SW önbelleklerini temizle ki
-    // yapılan kod/tasarım değişiklikleri yenilemede eski sürüme dönmesin.
-    if (
-      typeof window !== "undefined" &&
-      (window.location.hostname === "localhost" ||
-        window.location.hostname === "127.0.0.1") &&
-      "caches" in window
-    ) {
-      window.caches
-        .keys()
-        .then((keys) => Promise.all(keys.map((k) => window.caches.delete(k))))
+    /*
+     * Service worker YALNIZCA production'da kaydedilir.
+     *
+     * Geliştirme sunucusunda (Turbopack dev) chunk dosyalarının adı her
+     * derlemede değişir ve içerikleri hash'li DEĞİLDİR. SW bunları
+     * `/_next/static/*` kuralıyla cache-first önbelleğe alıyordu: kurulmuş
+     * PWA bir sonraki yenilemede eski arayüzü gösteriyor, her derlemede yeni
+     * ölü önbellek birikiyordu.
+     *
+     * Ek sorun: `sw.js` içindeki `isDevHost()` yalnızca localhost / 127.0.0.1'e
+     * bakıyordu. LAN IP'si (`http://192.168.x.x:3000`, `NEXT_PUBLIC_APP_URL`)
+     * ile açılan PWA bu kontrolü atlatıyor, yani dev chunk'ları cache'liyordu.
+     *
+     * Bu yüzden karar artık sayfanın bildiği `NODE_ENV`'den veriliyor: Next bu
+     * değeri derleme sırasında sabitleyerek istemciye gömer.
+     */
+    if (process.env.NODE_ENV !== "production") {
+      // Dev'de ZATEN kayıtlı bir SW'yi kaldır: yoksa eski SW sayfayı kontrol
+      // etmeye devam eder, önbellekleri değiştirilemez ve yeni sürümü
+      // görmek imkansızlaşır.
+      void navigator.serviceWorker
+        .getRegistrations()
+        .then((regs) => Promise.all(regs.map((reg) => reg.unregister())))
+        .then(async () => {
+          if (!("caches" in window)) return;
+          const keys = await window.caches.keys();
+          await Promise.all(keys.map((key) => window.caches.delete(key)));
+        })
         .catch(() => {});
+      return;
     }
 
     navigator.serviceWorker
@@ -109,20 +127,10 @@ export default function PwaManager() {
       .then((reg) => {
         if (cancelled) return;
         registration = reg;
-        if (
-          window.location.hostname === "localhost" ||
-          window.location.hostname === "127.0.0.1"
-        ) {
-          reg.update().catch(() => {});
-          reg.waiting?.postMessage({ type: "SKIP_WAITING" });
-        } else {
-          trackUpdates(reg);
-        }
+        trackUpdates(reg);
       })
       .catch((err) => {
-        if (process.env.NODE_ENV !== "production") {
-          console.warn("[pwa] Service worker kaydedilemedi:", err);
-        }
+        console.warn("[pwa] Service worker kaydedilemedi:", err);
       });
 
     // Uygulama öne geldiğinde güncelleme var mı diye bak (çok sık değil).

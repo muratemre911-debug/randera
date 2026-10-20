@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { useEffect } from "react";
 import {
   ArrowRight,
@@ -145,21 +144,23 @@ export default function HomeClient() {
         <header className="sticky top-0 z-50 px-3 pt-3 sm:px-6 sm:pt-4">
           <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between gap-2 rounded-2xl border border-white/60 bg-white/75 px-3 shadow-[0_4px_24px_rgb(15,23,42,0.06)] backdrop-blur-2xl sm:h-16 sm:rounded-[24px] sm:px-5 dark:border-white/10 dark:bg-slate-900/70 dark:shadow-[0_4px_24px_rgb(0,0,0,0.4)]">
             <DynamicLogoLink className="flex items-center gap-2.5">
-              <Image
-                src="/logo-light.png"
+              <img
+                src="/logo/logo-light-160.png"
                 alt="Randera Logo"
                 width={140}
                 height={40}
+                loading="lazy"
+                decoding="async"
                 className="h-7 w-auto object-contain sm:h-8 dark:hidden"
-                priority
               />
-              <Image
-                src="/logo-dark.png"
+              <img
+                src="/logo/logo-dark-160.png"
                 alt="Randera Logo"
                 width={140}
                 height={40}
+                loading="lazy"
+                decoding="async"
                 className="hidden h-7 w-auto object-contain sm:h-8 dark:block"
-                priority
               />
             </DynamicLogoLink>
 
@@ -659,18 +660,22 @@ export default function HomeClient() {
           <div className={`${SECTION} py-12`}>
             <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
               <div className="lg:col-span-2">
-                <Image
-                  src="/logo-light.png"
+                <img
+                  src="/logo/logo-light-160.png"
                   alt="Randera Logo"
                   width={140}
                   height={40}
+                  loading="lazy"
+                  decoding="async"
                   className="h-8 w-auto object-contain dark:hidden"
                 />
-                <Image
-                  src="/logo-dark.png"
+                <img
+                  src="/logo/logo-dark-160.png"
                   alt="Randera Logo"
                   width={140}
                   height={40}
+                  loading="lazy"
+                  decoding="async"
                   className="hidden h-8 w-auto object-contain dark:block"
                 />
                 <p className="mt-4 max-w-sm text-[13px] leading-relaxed text-slate-600 dark:text-slate-400">

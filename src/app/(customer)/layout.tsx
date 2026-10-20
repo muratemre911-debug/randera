@@ -20,6 +20,7 @@ import { useTheme } from "@/context/ThemeContext";
 import DynamicLogoLink from "@/components/DynamicLogoLink";
 import RequirePhoneModal from "@/components/RequirePhoneModal";
 import { SHELL } from "@/components/layout/shell";
+import BrandLogo from "@/components/layout/BrandLogo";
 import UserAvatar, { getDisplayName } from "@/components/layout/UserAvatar";
 import CustomerBottomNav, {
   type BottomNavItem,
@@ -168,16 +169,7 @@ export default function CustomerLayout({
         <div className="flex h-20 items-center justify-between px-6 pt-2">
           <DynamicLogoLink className="flex items-center gap-3 group">
             <div className="relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl shadow-md transition-transform duration-300 group-hover:scale-105 border border-gray-200/50 dark:border-slate-700/50">
-              <img
-                src="/logo-light.png"
-                alt="Randera Logo"
-                className="h-full w-full object-cover dark:hidden"
-              />
-              <img
-                src="/logo-dark.png"
-                alt="Randera Logo"
-                className="hidden h-full w-full object-cover dark:block"
-              />
+              <BrandLogo className="h-full w-full object-cover" alt="" />
             </div>
             <span className="text-xl font-bold tracking-tight text-gray-800 dark:text-slate-100">
               Randera
@@ -250,16 +242,7 @@ export default function CustomerLayout({
           <div className="flex items-center gap-2 lg:hidden">
             <DynamicLogoLink className="flex items-center gap-2">
               <div className="relative flex h-8 w-8 items-center justify-center overflow-hidden rounded-xl shadow-xs border border-gray-200/50 dark:border-slate-700/50">
-                <img
-                  src="/logo-light.png"
-                  alt="Randera Logo"
-                  className="h-full w-full object-cover dark:hidden"
-                />
-                <img
-                  src="/logo-dark.png"
-                  alt="Randera Logo"
-                  className="hidden h-full w-full object-cover dark:block"
-                />
+                <BrandLogo className="h-full w-full object-cover" alt="" />
               </div>
               <span className="hidden sm:inline text-base font-black tracking-tight text-gray-800 dark:text-slate-100">
                 Randera

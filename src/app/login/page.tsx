@@ -192,7 +192,15 @@ function LoginForm() {
         {/* Logo */}
         <div className="mb-8 text-center">
           <div className="relative mx-auto flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl shadow-lg shadow-indigo-200 border border-gray-100">
-            <img src="/logo-light.png" alt="Randera Logo" className="h-full w-full object-cover bg-white" />
+            <img
+              src="/logo/logo-light-160.png"
+              alt="Randera Logo"
+              width={160}
+              height={160}
+              loading="lazy"
+              decoding="async"
+              className="h-full w-full object-cover bg-white"
+            />
           </div>
           <h1 className="mt-4 text-2xl font-semibold text-gray-800">
             {isRegister ? (lang === "tr" ? "Kayıt Ol" : "Sign Up") : t("login.title")}

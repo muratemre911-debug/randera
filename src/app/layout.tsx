@@ -33,10 +33,19 @@ export const metadata: Metadata = {
   },
   formatDetection: { telephone: false, address: false, email: false },
   icons: {
+    /*
+     * Sekme simgesi (`<link rel="icon">`) yalnızca gerçekten gösterilen
+     * boyutlardan seçilir: `favicon.ico` + 64 px'lik PNG (~3 KB).
+     *
+     * `icon-192.png` (44 KB) ve `icon-512.png` (297 KB) bu listeye konulduğunda
+     * tarayıcı İKİSİNİ DE indiriyordu — sekme simgesi 16–48 px'te
+     * gösterildiği için 341 KB tamamen boşa gidiyordu. Bu iki dosya web app
+     * manifest içinde (`manifest.ts`) ayrıca tanımlıdır; "ana ekrana ekle"
+     * (kurulabilirlik) için manifest yeterlidir, head için gerekmez.
+     */
     icon: [
       { url: "/favicon.ico" },
-      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
-      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
+      { url: "/icon-64.png", sizes: "64x64", type: "image/png" },
     ],
     apple: [
       { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },

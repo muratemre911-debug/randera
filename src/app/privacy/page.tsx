@@ -33,7 +33,15 @@ export default function PrivacyPage() {
 
             <Link href="/" className="flex items-center gap-2">
               <div className="h-8 w-8 rounded-lg overflow-hidden border border-gray-200 shadow-sm">
-                <img src="/logo-light.png" alt="Randera" className="h-full w-full object-cover" />
+                <img
+                  src="/logo/logo-light-160.png"
+                  alt="Randera"
+                  width={160}
+                  height={160}
+                  loading="lazy"
+                  decoding="async"
+                  className="h-full w-full object-cover"
+                />
               </div>
               <span className="font-bold text-base text-slate-900 dark:text-white">Randera</span>
             </Link>

@@ -253,13 +253,13 @@ export function PostModal({
         className="absolute inset-0 bg-black/80 backdrop-blur-sm animate-backdrop-in"
         onClick={handleBackdropClick}
       />
-      <div className="relative w-full max-w-4xl h-[90vh] md:h-[90vh] bg-white dark:bg-slate-900 rounded-[28px] shadow-2xl overflow-hidden animate-modal-in">
+      <div className="relative w-full max-w-4xl h-[90vh] md:h-[90vh] bg-white dark:bg-slate-900 rounded-2xl shadow-2xl overflow-hidden animate-modal-in">
         <div className="flex h-full flex-col md:flex-row">
           <div className="relative flex-1 bg-gray-950 dark:bg-slate-950 min-h-0 md:max-w-[60%] flex items-center justify-center p-3 md:p-5">
             <img
               src={post.image_url}
               alt={post.description || "Gönderi görseli"}
-              className="max-h-full max-w-full rounded-xl md:rounded-2xl object-contain"
+              className="max-h-full max-w-full rounded-xl object-contain"
               loading="eager"
             />
           </div>
@@ -278,10 +278,10 @@ export function PostModal({
                 )}
               </div>
               <div className="min-w-0 flex-1 flex flex-col justify-center leading-none">
-                <p className="font-semibold text-gray-900 dark:text-white truncate text-sm leading-snug">
+                <p className="font-semibold text-gray-900 dark:text-white truncate text-[13px] leading-snug">
                   {post.tenant?.name || "İşletme"}
                 </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 truncate leading-tight mt-0.5">
+                <p className="font-mono text-[11px] tabular-nums text-gray-500 dark:text-gray-400 truncate leading-tight mt-0.5">
                   {formatRelativeTime(post.created_at)}
                 </p>
               </div>
@@ -296,18 +296,16 @@ export function PostModal({
 
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
               {post.description && (
-                <div className="prose prose-sm dark:prose-invert max-w-none">
-                  <p className="text-gray-900 dark:text-white whitespace-pre-wrap">
-                    {renderTextWithMentions(post.description)}
-                  </p>
-                </div>
+                <p className="text-[17px] font-semibold tracking-[-0.01em] leading-snug text-gray-900 dark:text-white whitespace-pre-wrap">
+                  {renderTextWithMentions(post.description)}
+                </p>
               )}
 
               <div className="border-t border-gray-100 dark:border-slate-800 pt-4">
-                <h3 className="font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
-                  <MessageCircle className="h-5 w-5 text-gray-500" />
+                <h3 className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
+                  <MessageCircle className="h-4 w-4 text-gray-400 dark:text-gray-500" />
                   <span>{t("posts.comments") || "Yorumlar"}</span>
-                  <span className="text-sm font-normal text-gray-500 dark:text-gray-400">
+                  <span className="font-mono text-[11px] normal-case tracking-normal tabular-nums text-gray-400 dark:text-gray-500">
                     ({formatNumber(commentCount)})
                   </span>
                 </h3>
@@ -376,7 +374,7 @@ export function PostModal({
                       value={newComment}
                       onChange={(e) => setNewComment(e.target.value)}
                       placeholder={t("posts.add_comment") || "Yorum ekle..."}
-                      className="flex-1 bg-transparent text-gray-900 dark:text-white placeholder-gray-500 text-sm leading-none py-0 px-0 focus:outline-none"
+                      className="flex-1 bg-transparent text-gray-900 dark:text-white placeholder-gray-500 text-[13px] leading-5 py-0 px-0 focus:outline-none"
                       maxLength={500}
                       disabled={submittingComment}
                       aria-label={t("posts.add_comment") || "Yorum ekle"}
@@ -419,7 +417,7 @@ export function PostModal({
                     <Heart
                       className={`h-5 w-5 ${liked ? "fill-current text-red-500" : "stroke-current"}`}
                     />
-                    <span className="text-sm font-medium leading-none">
+                    <span className="font-mono text-[11px] tabular-nums leading-none">
                       {formatNumber(likeCount)}
                     </span>
                   </button>
@@ -428,7 +426,7 @@ export function PostModal({
                     aria-label={t("posts.comment") || "Yorum yap"}
                   >
                     <MessageCircle className="h-5 w-5 stroke-current" />
-                    <span className="text-sm font-medium leading-none">
+                    <span className="font-mono text-[11px] tabular-nums leading-none">
                       {formatNumber(commentCount)}
                     </span>
                   </button>
@@ -472,19 +470,19 @@ function CommentItem({ comment, currentUserId }: CommentItemProps) {
       )}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <span className="font-semibold text-gray-900 dark:text-white text-sm">
+          <span className="font-semibold text-gray-900 dark:text-white text-[13px]">
             {comment.username}
           </span>
-          <span className="text-xs text-gray-500 dark:text-gray-400">
+          <span className="font-mono text-[11px] tabular-nums text-gray-500 dark:text-gray-400">
             {formatRelativeTime(comment.created_at)}
           </span>
           {isOwn && (
-            <span className="text-xs text-[var(--brand-text)] text-[var(--brand-text)] bg-[var(--brand-soft)] bg-[var(--brand-soft-hover)] px-1.5 py-0.5 rounded-full">
+            <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-[0.14em] text-[var(--brand-text)] text-[var(--brand-text)] bg-[var(--brand-soft)] bg-[var(--brand-soft-hover)]">
               {t("posts.you") || "Sen"}
             </span>
           )}
         </div>
-        <p className="mt-0.5 text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap leading-relaxed">
+        <p className="mt-0.5 text-[13px] text-gray-700 dark:text-gray-300 whitespace-pre-wrap leading-6">
           {renderTextWithMentions(comment.text)}
         </p>
       </div>
