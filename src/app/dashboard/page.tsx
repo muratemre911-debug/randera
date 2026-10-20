@@ -27,7 +27,6 @@ import type { DashboardStats, Service, Profile } from "@/types";
 import { PageSkeleton } from "@/components/Skeleton";
 import CustomSelect from "@/components/CustomSelect";
 import { ownRecordsScope } from "@/lib/staff";
-import { localDateString } from "@/lib/date";
 
 /**
  * Sorgudan dönen ham randevu satırı.
@@ -61,6 +60,17 @@ interface TodayAppointment {
   service_duration: number;
   note?: string;
 }
+
+/**
+ * Üst bar hızlı işlem chip'leri için ORTAK ölçü.
+ *
+ * "Randevu Linki" ve "Yeni Randevu" birebir aynı olmalı; ölçü (yükseklik,
+ * köşe yarıçapı, iç boşluk, genişlik) tek yerden tanımlanır ki iki buton
+ * her zaman aynı boyutta görünsün. Mobilde iki chip satırı eşit ikiye
+ * bölünür (`flex-1`), geniş ekranda ikisi de sabit `sm:w-[11.5rem]`.
+ */
+const QUICK_CHIP =
+  "inline-flex h-11 min-w-0 flex-1 sm:flex-none sm:w-[12.5rem] items-center rounded-2xl p-1";
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats>({
@@ -386,26 +396,33 @@ export default function DashboardPage() {
     fetchDashboardData();
   }, [fetchDashboardData]);
 
-  // Set default appointment date & time when opening modal
-  useEffect(() => {
-    if (showAddModal) {
-      const d = new Date();
-      // Yerel tarih: `toISOString()` UTC verdiği için TR'de gece yarısından
-      // sonra "bugün"ün tarihi DÜN gösteriliyordu.
-      const dateStr = localDateString(d);
-      d.setHours(d.getHours() + 1, 0, 0, 0);
-      const timeStr = `${d.getHours().toString().padStart(2, "0")}:00`;
-      // Yeni randevu modalı için varsayılan tarih/saat, hizmetler yüklendikten
-      // SONRA türetilir (kullanıcı girdisi ezilmez).
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setAppointmentDate(dateStr);
-      setAppointmentTime(timeStr);
-      if (services.length > 0 && !selectedServiceId) {
-        setSelectedServiceId(services[0].id);
-      }
-      setFormError("");
-    }
-  }, [showAddModal, services, selectedServiceId]);
+  /**
+   * Yeni randevu modalını açar ve formu sıfırlar.
+   *
+   * Tarih ve saat OTOMATİK SEÇİLMEZ: modal açılır açılmaz "ilk müsait
+   * saate" atanıyordu; artık günü ve saati kullanıcı kendisi seçer (her iki
+   * alan da zorunlu).
+   */
+  const openAddModal = () => {
+    setSelectedServiceId("");
+    setSelectedCustomerId("");
+    setNewCustomerName("");
+    setNewCustomerPhone("");
+    setAppointmentDate("");
+    setAppointmentTime("");
+    setAppointmentNote("");
+    setCustomerMode("new");
+    setFormError("");
+    setShowAddModal(true);
+  };
+
+  /**
+   * Seçili hizmet; yoksa listenin ilk hizmeti önerilir.
+   *
+   * Türetilmiş değer olduğu için hizmetler geç yüklendiğinde de doğru
+   * çalışır (effect içinde setState çağırmaya gerek kalmaz).
+   */
+  const effectiveServiceId = selectedServiceId || (services[0]?.id ?? "");
 
   const bookingUrl =
     typeof window !== "undefined" && tenant?.slug
@@ -493,9 +510,18 @@ export default function DashboardPage() {
   const handleQuickAddAppointment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!tenant) return;
-    if (!selectedServiceId) {
+    if (!effectiveServiceId) {
       setFormError(
         lang === "tr" ? "Lütfen bir hizmet seçin." : "Please select a service.",
+      );
+      return;
+    }
+    // Tarih/saat kullanıcı tarafından seçilir (otomatik doldurulmaz).
+    if (!appointmentDate || !appointmentTime) {
+      setFormError(
+        lang === "tr"
+          ? "Lütfen randevu gününü ve saatini seçin."
+          : "Please select the appointment date and time.",
       );
       return;
     }
@@ -543,7 +569,7 @@ export default function DashboardPage() {
       }
     }
 
-    const selectedService = services.find((s) => s.id === selectedServiceId);
+    const selectedService = services.find((s) => s.id === effectiveServiceId);
     const duration = selectedService?.duration || 30;
 
     const [hours, minutes] = appointmentTime.split(":").map(Number);
@@ -556,7 +582,7 @@ export default function DashboardPage() {
 
     const insertPayload: Record<string, unknown> = {
       tenant_id: tenant.id,
-      service_id: selectedServiceId,
+      service_id: effectiveServiceId,
       start_time: start.toISOString(),
       end_time: end.toISOString(),
       status: "confirmed",
@@ -692,20 +718,29 @@ export default function DashboardPage() {
           </p>
         </div>
 
-        {/* Action Buttons Toolbar */}
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+        {/* Action Buttons Toolbar
+            Sol tarafta "Randevu Linki", sağ tarafta "Yeni Randevu" ve ikisi
+            birebir aynı ölçüde (genişlik + yükseklik + köşe). Mobilde iki
+            chip satırı iki eşit yarıya bölünür, geniş ekranda sabit genişlikte
+            sağa yaslanır. */}
+        <div className="flex w-full items-center justify-between gap-2 sm:gap-3 sm:justify-end md:w-auto">
           {/* Copy Booking Link Button */}
           {tenant?.slug && (
-            <div className="inline-flex items-center rounded-2xl bg-white/70 dark:bg-slate-800/70 p-1 border border-gray-200/70 dark:border-slate-700/60 shadow-sm backdrop-blur-xl">
+            <div
+              className={`${QUICK_CHIP} bg-white/70 dark:bg-slate-800/70 border border-gray-200/70 dark:border-slate-700/60 shadow-sm backdrop-blur-xl`}
+            >
               <button
                 onClick={handleCopyLink}
-                className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold text-gray-700 dark:text-slate-200 hover:bg-gray-100 dark:hover:bg-slate-700/80 transition-all active:scale-95"
+                className="flex h-9 min-w-0 items-center gap-2 px-3.5 rounded-xl text-xs sm:text-sm font-semibold text-gray-700 dark:text-slate-200 hover:bg-gray-100 dark:hover:bg-slate-700/80 transition-all active:scale-95"
                 title={bookingUrl}
               >
                 {copied ? (
                   <>
-                    <Check size={16} className="text-emerald-500" />
-                    <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+                    <Check
+                      size={16}
+                      className="shrink-0 text-emerald-500"
+                    />
+                    <span className="truncate text-emerald-600 dark:text-emerald-400 font-bold">
                       {t("dashboard.link_copied")}
                     </span>
                   </>
@@ -713,18 +748,20 @@ export default function DashboardPage() {
                   <>
                     <Copy
                       size={16}
-                      className="text-indigo-600 dark:text-indigo-400"
+                      className="shrink-0 text-indigo-600 dark:text-indigo-400"
                     />
-                    <span>{t("dashboard.copy_link")}</span>
+                    <span className="truncate">{t("dashboard.copy_link")}</span>
                   </>
                 )}
               </button>
 
+              {/* "Sayfayı Gör" düğmesi mobilde gizli: iki chip birebir aynı
+                  genişlikte olmalı, ayrı düğme mobilde kırpılmayı gerektiriyor. */}
               <a
                 href={`/b/${tenant.slug}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="p-2 text-gray-400 hover:text-gray-700 dark:hover:text-slate-200 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
+                className="hidden h-9 w-9 shrink-0 items-center justify-center text-gray-400 hover:text-gray-700 dark:hover:text-slate-200 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors sm:flex"
                 title={t("dashboard.view_page")}
               >
                 <ExternalLink size={15} />
@@ -732,19 +769,24 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {/* Quick Add Appointment Button */}
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm shadow-md shadow-indigo-500/20 hover:shadow-indigo-500/30 transition-all active:scale-95"
+          {/* Quick Add Appointment Button
+              "Randevu Linki" chipi ile BİREBİR aynı ölçü ve yapı. */}
+          <div
+            className={`${QUICK_CHIP} bg-indigo-700 border border-indigo-500/40 shadow-md shadow-indigo-500/25`}
           >
-            <Plus size={18} strokeWidth={2.5} />
-            <span>{t("dashboard.new_appointment")}</span>
-          </button>
+            <button
+              onClick={openAddModal}
+              className="flex h-9 w-full items-center justify-center gap-2 px-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs sm:text-sm font-semibold whitespace-nowrap transition-colors active:scale-95"
+            >
+              <Plus size={16} strokeWidth={2.5} className="shrink-0" />
+              <span>{t("dashboard.new_appointment")}</span>
+            </button>
+          </div>
 
           {/* Link to Calendar */}
           <Link
             href="/dashboard/takvim"
-            className="hidden sm:flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl bg-white/70 dark:bg-slate-800/70 border border-gray-200/70 dark:border-slate-700/60 text-sm font-semibold text-gray-700 dark:text-slate-200 hover:bg-gray-100 dark:hover:bg-slate-700/80 transition-all active:scale-95"
+            className="hidden sm:flex h-11 shrink-0 items-center gap-1.5 px-3.5 rounded-2xl bg-white/70 dark:bg-slate-800/70 border border-gray-200/70 dark:border-slate-700/60 text-sm font-semibold text-gray-700 dark:text-slate-200 hover:bg-gray-100 dark:hover:bg-slate-700/80 transition-all active:scale-95"
           >
             <Calendar size={17} />
             <span>{t("nav.calendar")}</span>
@@ -1268,7 +1310,7 @@ export default function DashboardPage() {
                   {t("dashboard.service")}
                 </label>
                 <CustomSelect
-                  value={selectedServiceId}
+                  value={effectiveServiceId}
                   onChange={(val) => setSelectedServiceId(val)}
                   options={services.map((s) => {
                     const dur = s.duration || 30;
