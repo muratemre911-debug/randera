@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { useParams, useRouter } from "next/navigation";
 import { useLanguage } from "@/context/LanguageContext";
@@ -12,7 +12,6 @@ import {
   Heart,
   MessageSquare,
   ShieldCheck,
-  Sparkles,
   ChevronRight,
   Tag,
   Wrench,
@@ -65,6 +64,18 @@ interface ReviewsResponse {
   user_has_reviewed: boolean;
 }
 
+const tabButtonClass = (active: boolean) =>
+  `flex min-h-10 min-w-0 shrink-0 snap-start items-center justify-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-bold whitespace-nowrap transition-all lg:min-h-11 lg:flex-1 lg:shrink lg:gap-2 lg:rounded-xl lg:px-3 ${
+    active
+      ? "bg-[var(--brand)] text-white shadow-[0_4px_12px_var(--brand-shadow)] lg:bg-[var(--brand-soft)] lg:text-[var(--brand-text)] lg:shadow-sm lg:ring-1 lg:ring-[var(--brand-border)]"
+      : "bg-slate-100 text-slate-600 hover:text-slate-900 dark:bg-slate-800/80 dark:text-slate-300 dark:hover:text-white lg:bg-transparent lg:text-slate-500 lg:hover:bg-slate-100 lg:hover:text-slate-900 lg:dark:bg-transparent lg:dark:text-slate-400 lg:dark:hover:bg-slate-800 lg:dark:hover:text-slate-100"
+  }`;
+
+const tabCountClass = (active: boolean) =>
+  `shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold lg:bg-black/5 lg:dark:bg-white/10 ${
+    active ? "bg-white/20" : "bg-slate-200/80 dark:bg-slate-700"
+  }`;
+
 export default function BusinessPage() {
   const { slug } = useParams<{ slug: string }>();
   const supabase = createClient();
@@ -106,16 +117,16 @@ export default function BusinessPage() {
   // Favorites state
   const [isFavorited, setIsFavorited] = useState(false);
 
-  const tabsBarRef = useRef<HTMLDivElement>(null);
-
   const minPrice =
     services.length > 0 ? Math.min(...services.map((s) => s.price)) : null;
 
-  // Mobilde sekme şeridi dar kalınca aktif sekme kırpılmasın: yatay olarak ortala
+  const tabsBarRef = useRef<HTMLDivElement>(null);
+
+  // Mobilde sekme şeridi kaydırılabildiği için aktif sekmeyi görünür alana getir
   useEffect(() => {
     const bar = tabsBarRef.current;
     const tab = bar?.querySelector<HTMLElement>(`[data-tab="${activeTab}"]`);
-    if (!bar || !tab) return;
+    if (!bar || !tab || bar.scrollWidth <= bar.clientWidth) return;
     const delta =
       tab.getBoundingClientRect().left - bar.getBoundingClientRect().left;
     bar.scrollTo({
@@ -287,6 +298,18 @@ export default function BusinessPage() {
   const handlePostClick = (post: PostWithTenant) => {
     setSelectedPost(post);
     setModalOpen(true);
+  };
+
+  const openSection = (tab: "services" | "reviews" | "posts" | "location") => {
+    setActiveTab(tab);
+    document
+      .getElementById("business-tabs")
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const handlePostNavigate = (postId: string) => {
+    const nextPost = posts.find((item) => item.id === postId);
+    if (nextPost) setSelectedPost(nextPost);
   };
 
   const handleReviewSuccess = () => {
@@ -486,68 +509,71 @@ export default function BusinessPage() {
         </div>
       </div>
 
-      {/* APPLE / AIRBNB TARZI YATAY SEKME (SEGMENTED CONTROL) ÇUBUĞU */}
-      {/* Masaüstünde tam genişliktedir ve "Randevu Al" sağa entegre her zaman
-          görünür. Mobil/tablette ana buton ekrandan çıkınca CTA belirir. */}
+      {/* Mobil: birincil aksiyonlar sekmelerin üstünde, sabitlenmez */}
+      <div className="!mb-3 flex items-stretch gap-2 lg:hidden">
+        <button
+          type="button"
+          onClick={() => router.push(`/b/${slug}/randevu`)}
+          className="flex min-h-12 flex-1 items-center justify-between gap-2 rounded-2xl bg-[var(--brand)] px-4 text-sm font-extrabold text-white shadow-[0_10px_24px_var(--brand-shadow)] transition-all active:scale-[0.98]"
+        >
+          <span className="flex items-center gap-2">
+            <CalendarIcon size={17} strokeWidth={2.4} />
+            <span>{lang === "tr" ? "Randevu Al" : "Book now"}</span>
+          </span>
+          {minPrice !== null && (
+            <span className="text-[11px] font-semibold text-white/80">
+              {lang === "tr" ? `₺${minPrice}'den` : `From ₺${minPrice}`}
+            </span>
+          )}
+        </button>
+        <button
+          type="button"
+          onClick={() => openSection("reviews")}
+          aria-label={lang === "tr" ? "Değerlendirmeleri gör" : "View reviews"}
+          className="flex min-h-12 shrink-0 items-center gap-1.5 rounded-2xl border border-amber-200/80 bg-amber-50 px-3.5 text-sm font-extrabold text-amber-700 transition-all active:scale-[0.98] dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-400"
+        >
+          <Star size={15} className="fill-amber-400 text-amber-400" />
+          <span>{reviewsData.average_rating ?? (lang === "tr" ? "Yeni" : "New")}</span>
+          {reviewsData.average_rating !== null && (
+            <span className="text-[11px] font-semibold opacity-70">
+              ({reviewsData.total_reviews})
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* İşletme aksiyonları ve bölüm navigasyonu */}
       <div
         id="business-tabs"
-        className="sticky top-2 z-30 p-1.5 w-full rounded-2xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200/70 dark:border-slate-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.06)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] scroll-mt-4 flex flex-col lg:flex-row lg:items-center gap-2 lg:justify-between select-none"
+        className="sticky top-2 z-30 w-full scroll-mt-4 rounded-3xl border border-slate-200/80 bg-white/95 p-1.5 shadow-[0_12px_36px_rgb(15,23,42,0.10)] backdrop-blur-2xl dark:border-slate-700/70 dark:bg-slate-900/95 dark:shadow-[0_12px_36px_rgb(0,0,0,0.4)] sm:p-3 select-none lg:flex lg:items-center lg:gap-3 lg:rounded-[26px]"
       >
-        {/* Mobil: kartın üst yarısı — solda Randevu Al, sağda Değerlendirmeler */}
-        <div className="grid grid-cols-2 gap-2 lg:hidden">
-          <button
-            type="button"
-            onClick={() => router.push(`/b/${slug}/randevu`)}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-strong)] px-4 py-2.5 text-sm font-bold text-white shadow-sm active:scale-95 transition-all cursor-pointer whitespace-nowrap"
-          >
-            <CalendarIcon size={16} strokeWidth={2.4} />
-            <span>{lang === "tr" ? "Randevu Al" : "Book"}</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("reviews")}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 px-4 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-200 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
-          >
-            <Star size={15} className="fill-amber-400 text-amber-400 shrink-0" />
-            <span>{lang === "tr" ? "Değerlendirmeler" : "Reviews"}</span>
-          </button>
-        </div>
-
         <div
           ref={tabsBarRef}
-          className="flex min-w-0 items-center gap-1 overflow-x-auto scrollbar-none snap-x lg:flex-1"
+          className="-my-1 flex min-w-0 snap-x gap-1.5 overflow-x-auto py-1 scrollbar-none lg:flex-1 lg:items-center lg:gap-2 lg:overflow-visible lg:py-0"
         >
           <button
             type="button"
             data-tab="services"
             onClick={() => setActiveTab("services")}
-            className={`flex-1 sm:flex-none shrink-0 snap-start flex items-center justify-center gap-1.5 px-2.5 sm:px-5 py-2 rounded-xl text-[10px] min-[400px]:text-[11px] sm:text-sm font-bold whitespace-nowrap transition-all cursor-pointer ${
-              activeTab === "services"
-                ? "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs"
-                : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
-            }`}
+            className={tabButtonClass(activeTab === "services")}
           >
-            <span>{lang === "tr" ? "Hizmetler" : "Services"}</span>
-            {services.length > 0 && (
-              <span className="hidden min-[400px]:inline text-[11px] opacity-70 font-normal">
-                ({services.length})
-              </span>
-            )}
+            <Wrench size={15} className="shrink-0" />
+            <span className="truncate">{lang === "tr" ? "Hizmetler" : "Services"}</span>
+            <span className={tabCountClass(activeTab === "services")}>
+              {services.length}
+            </span>
           </button>
 
           <button
             type="button"
             data-tab="reviews"
             onClick={() => setActiveTab("reviews")}
-            className={`flex-1 sm:flex-none shrink-0 snap-start flex items-center justify-center gap-1.5 px-2.5 sm:px-5 py-2 rounded-xl text-[10px] min-[400px]:text-[11px] sm:text-sm font-bold whitespace-nowrap transition-all cursor-pointer ${
-              activeTab === "reviews"
-                ? "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs"
-                : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
-            }`}
+            className={tabButtonClass(activeTab === "reviews")}
           >
-            <span>{lang === "tr" ? "Değerlendirmeler" : "Reviews"}</span>
-            <span className="hidden min-[400px]:inline text-[11px] opacity-70 font-normal">
-              ({reviewsData.total_reviews})
+            <Star size={15} className="shrink-0" />
+            <span className="truncate">{lang === "tr" ? "Değerlendirmeler" : "Reviews"}</span>
+            <span className={tabCountClass(activeTab === "reviews")}>
+              {reviewsData.total_reviews}
             </span>
           </button>
 
@@ -555,18 +581,13 @@ export default function BusinessPage() {
             type="button"
             data-tab="posts"
             onClick={() => setActiveTab("posts")}
-            className={`flex-1 sm:flex-none shrink-0 snap-start flex items-center justify-center gap-1.5 px-2.5 sm:px-5 py-2 rounded-xl text-[10px] min-[400px]:text-[11px] sm:text-sm font-bold whitespace-nowrap transition-all cursor-pointer ${
-              activeTab === "posts"
-                ? "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs"
-                : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
-            }`}
+            className={tabButtonClass(activeTab === "posts")}
           >
-            <span>{lang === "tr" ? "Paylaşımlar" : "Posts"}</span>
-            {posts.length > 0 && (
-              <span className="hidden min-[400px]:inline text-[11px] opacity-70 font-normal">
-                ({posts.length})
-              </span>
-            )}
+            <MessageSquare size={15} className="shrink-0" />
+            <span className="truncate">{lang === "tr" ? "Paylaşımlar" : "Posts"}</span>
+            <span className={tabCountClass(activeTab === "posts")}>
+              {posts.length}
+            </span>
           </button>
 
           {hasLocation && (
@@ -574,23 +595,19 @@ export default function BusinessPage() {
               type="button"
               data-tab="location"
               onClick={() => setActiveTab("location")}
-              className={`flex-1 sm:flex-none shrink-0 snap-start flex items-center justify-center gap-1.5 px-2.5 sm:px-5 py-2 rounded-xl text-[10px] min-[400px]:text-[11px] sm:text-sm font-bold whitespace-nowrap transition-all cursor-pointer ${
-                activeTab === "location"
-                  ? "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs"
-                  : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
-              }`}
+              className={tabButtonClass(activeTab === "location")}
             >
-              <span>{lang === "tr" ? "Konum" : "Location"}</span>
+              <MapPin size={15} className="shrink-0" />
+              <span className="truncate">{lang === "tr" ? "Konum" : "Location"}</span>
             </button>
           )}
         </div>
 
-        {/* Masaüstü: sağa entegre Randevu Al */}
-        <div className="hidden lg:flex items-center shrink-0">
-          <div className="flex items-center gap-2.5 pl-2 border-l border-slate-200/70 dark:border-slate-700/60">
+        <div className="hidden shrink-0 border-l border-slate-200/70 pl-3 dark:border-slate-700/60 lg:flex lg:items-center">
+          <div className="flex items-center gap-3">
             {minPrice !== null && (
-              <div className="hidden md:flex flex-col items-end text-right leading-tight px-1">
-                <span className="text-[10px] text-slate-400 font-medium">
+              <div className="flex flex-col items-end px-1 text-right leading-tight">
+                <span className="text-[10px] font-medium text-slate-400">
                   {lang === "tr" ? "Başlangıç Fiyatı" : "Starting from"}
                 </span>
                 <span className="text-xs font-black text-[var(--brand-text)]">
@@ -601,12 +618,10 @@ export default function BusinessPage() {
             <button
               type="button"
               onClick={() => router.push(`/b/${slug}/randevu`)}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-strong)] px-5 sm:px-6 py-2 sm:py-2.5 text-sm font-bold text-white shadow-xs active:scale-95 transition-all cursor-pointer whitespace-nowrap"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-[var(--brand)] px-5 text-sm font-extrabold text-white shadow-[0_8px_20px_var(--brand-shadow)] transition-all hover:bg-[var(--brand-strong)] active:scale-[0.98]"
             >
               <CalendarIcon size={16} strokeWidth={2.4} />
-              <span>
-                {lang === "tr" ? "Randevu Al" : "Book"}
-              </span>
+              <span>{lang === "tr" ? "Randevu Al" : "Book now"}</span>
             </button>
           </div>
         </div>
@@ -977,6 +992,8 @@ export default function BusinessPage() {
         onClose={() => setModalOpen(false)}
         onLikeToggle={handleLikeToggle}
         onAddComment={handleAddComment}
+        posts={posts}
+        onNavigate={handlePostNavigate}
       />
 
       {/* New Review Modal */}

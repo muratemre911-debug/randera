@@ -4,14 +4,15 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
+  Bookmark,
+  ChevronLeft,
+  ChevronRight,
   X,
   Heart,
   MessageCircle,
   Send,
-  Loader2,
-  MoreVertical,
+  MoreHorizontal,
   User,
-  AtSign,
 } from "lucide-react";
 import { Post, PostComment } from "@/types";
 import { createClient } from "@/utils/supabase/client";
@@ -33,6 +34,8 @@ interface PostModalProps {
     postId: string,
     text: string,
   ) => Promise<{ comment?: PostComment; commentCount?: number } | void>;
+  posts?: Post[];
+  onNavigate?: (postId: string) => void;
 }
 
 export function PostModal({
@@ -41,8 +44,10 @@ export function PostModal({
   onClose,
   onLikeToggle,
   onAddComment,
+  posts,
+  onNavigate,
 }: PostModalProps) {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const router = useRouter();
   const supabase = createClient();
   const [comments, setComments] = useState<PostComment[]>([]);
@@ -51,7 +56,6 @@ export function PostModal({
   const [submittingComment, setSubmittingComment] = useState(false);
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
-  const [commentCount, setCommentCount] = useState(0);
   const [user, setUser] = useState<{
     id: string;
     username: string;
@@ -61,7 +65,15 @@ export function PostModal({
   const [loadingUser, setLoadingUser] = useState(true);
   const [requireAuth, setRequireAuth] = useState(false);
   const commentsEndRef = useRef<HTMLDivElement>(null);
+  const commentInputRef = useRef<HTMLInputElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
+  const currentPostIndex = posts?.findIndex((item) => item.id === post?.id) ?? -1;
+  const previousPost =
+    currentPostIndex > 0 ? posts?.[currentPostIndex - 1] : undefined;
+  const nextPost =
+    currentPostIndex >= 0 && currentPostIndex < (posts?.length ?? 0) - 1
+      ? posts?.[currentPostIndex + 1]
+      : undefined;
 
   const fetchCurrentUser = async () => {
     setLoadingUser(true);
@@ -106,7 +118,6 @@ export function PostModal({
       const data = await res.json();
       if (Array.isArray(data)) {
         setComments(data);
-        setCommentCount(data.length);
       }
     } catch (err) {
       console.error("Failed to fetch comments:", err);
@@ -120,7 +131,7 @@ export function PostModal({
     if (isOpen && post) {
       setLiked(post.user_has_liked || false);
       setLikeCount(post.like_count || 0);
-      setCommentCount(post.comment_count || 0);
+      setComments([]);
       fetchComments(post.id);
       fetchCurrentUser();
       document.body.style.overflow = "hidden";
@@ -164,6 +175,12 @@ export function PostModal({
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Escape") {
       onClose();
+    } else if (e.key === "ArrowLeft" && previousPost && onNavigate) {
+      e.preventDefault();
+      onNavigate(previousPost.id);
+    } else if (e.key === "ArrowRight" && nextPost && onNavigate) {
+      e.preventDefault();
+      onNavigate(nextPost.id);
     }
   };
 
@@ -222,18 +239,35 @@ export function PostModal({
     };
 
     setComments((prev) => [...prev, optimisticComment]);
-    setCommentCount((c) => c + 1);
     scrollToBottom();
 
     try {
       await onAddComment(post.id, text);
     } catch (err) {
       setComments((prev) => prev.filter((c) => c.id !== optimisticComment.id));
-      setCommentCount((c) => c - 1);
       setNewComment(text);
       console.error("Failed to add comment:", err);
     } finally {
       setSubmittingComment(false);
+    }
+  };
+
+  const handleShare = async () => {
+    if (!post) return;
+    const shareUrl = window.location.href;
+
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: post.tenant?.name || "İşletme paylaşımı",
+          text: post.description || "",
+          url: shareUrl,
+        });
+      } else {
+        await navigator.clipboard.writeText(shareUrl);
+      }
+    } catch {
+      // Kullanıcı paylaşım penceresini kapatmış olabilir.
     }
   };
 
@@ -243,30 +277,29 @@ export function PostModal({
     <div
       ref={modalRef}
       data-no-swipe
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center"
       role="dialog"
       aria-modal="true"
       aria-label="Gönderi detayı"
       onKeyDown={handleKeyDown}
     >
       <div
-        className="absolute inset-0 bg-black/80 backdrop-blur-sm animate-backdrop-in"
+        className="absolute inset-0 bg-[#08090b]/90 backdrop-blur-[2px] animate-backdrop-in"
         onClick={handleBackdropClick}
       />
-      <div className="relative w-full max-w-4xl h-[90vh] md:h-[90vh] bg-white dark:bg-slate-900 rounded-2xl shadow-2xl overflow-hidden animate-modal-in">
-        <div className="flex h-full flex-col md:flex-row">
-          <div className="relative flex-1 bg-gray-950 dark:bg-slate-950 min-h-0 md:max-w-[60%] flex items-center justify-center p-3 md:p-5">
+      <div className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-[#1c1d20] text-white shadow-2xl animate-modal-in md:h-[min(92vh,960px)] md:w-[min(92vw,1320px)] md:flex-row md:rounded-2xl md:border md:border-white/10">
+          <div className="relative flex h-[43dvh] shrink-0 items-center justify-center bg-[#090a0c] md:h-full md:min-h-0 md:flex-1">
             <img
               src={post.image_url}
               alt={post.description || "Gönderi görseli"}
-              className="max-h-full max-w-full rounded-xl object-contain"
+              className="h-full w-full object-contain"
               loading="eager"
             />
           </div>
 
-          <div className="flex-1 flex flex-col w-full md:w-[380px] md:max-w-[380px] border-l border-gray-100 dark:border-slate-800 overflow-hidden">
-            <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 dark:border-slate-800">
-              <div className="h-10 w-10 rounded-full bg-[var(--brand-soft-hover)] bg-[var(--brand-soft-hover)] flex items-center justify-center shrink-0 overflow-hidden">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden border-t border-white/10 bg-[#1c1d20] md:h-full md:w-[min(57%,750px)] md:flex-none md:border-l md:border-t-0">
+            <div className="flex shrink-0 items-center gap-3 border-b border-white/10 px-4 py-3.5">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white/10">
                 {post.tenant?.profile_image_url ? (
                   <img
                     src={post.tenant.profile_image_url}
@@ -274,80 +307,147 @@ export function PostModal({
                     className="h-10 w-10 rounded-full object-cover"
                   />
                 ) : (
-                  <User className="h-5 w-5 text-[var(--brand-text)] text-[var(--brand-text)]" />
+                  <User className="h-5 w-5 text-white/75" />
                 )}
               </div>
-              <div className="min-w-0 flex-1 flex flex-col justify-center leading-none">
-                <p className="font-semibold text-gray-900 dark:text-white truncate text-[13px] leading-snug">
+              <div className="flex min-w-0 flex-1 flex-col justify-center leading-none">
+                <p className="truncate text-[14px] font-semibold leading-snug text-white">
                   {post.tenant?.name || "İşletme"}
                 </p>
-                <p className="font-mono text-[11px] tabular-nums text-gray-500 dark:text-gray-400 truncate leading-tight mt-0.5">
+                <p className="mt-1 truncate text-[12px] leading-tight text-white/60">
                   {formatRelativeTime(post.created_at)}
                 </p>
               </div>
               <button
+                type="button"
                 onClick={onClose}
-                className="shrink-0 rounded-full p-1.5 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white transition-colors"
+                className="rounded-full p-2 text-white/75 transition-colors hover:bg-white/10 hover:text-white md:hidden"
                 aria-label={t("modal.close") || "Kapat"}
               >
                 <X className="h-5 w-5" />
               </button>
+              <span
+                className="inline-flex rounded-full p-2 text-white/75"
+                aria-hidden="true"
+              >
+                <MoreHorizontal className="h-5 w-5" />
+              </span>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 custom-scrollbar md:px-5">
               {post.description && (
-                <p className="text-[17px] font-semibold tracking-[-0.01em] leading-snug text-gray-900 dark:text-white whitespace-pre-wrap">
-                  {renderTextWithMentions(post.description)}
-                </p>
+                <div className="mb-5 flex gap-3">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white/10">
+                    {post.tenant?.profile_image_url ? (
+                      <img
+                        src={post.tenant.profile_image_url}
+                        alt=""
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <User className="h-4 w-4 text-white/70" />
+                    )}
+                  </div>
+                  <p className="min-w-0 pt-1 text-[14px] leading-[1.45] text-white/95">
+                    <span className="mr-1.5 font-semibold">
+                      {post.tenant?.name || "İşletme"}
+                    </span>
+                    <span className="whitespace-pre-wrap">
+                      {renderTextWithMentions(post.description)}
+                    </span>
+                    <span className="ml-2 whitespace-nowrap text-[12px] text-white/45">
+                      {formatRelativeTime(post.created_at)}
+                    </span>
+                  </p>
+                </div>
               )}
 
-              <div className="border-t border-gray-100 dark:border-slate-800 pt-4">
-                <h3 className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
-                  <MessageCircle className="h-4 w-4 text-gray-400 dark:text-gray-500" />
-                  <span>{t("posts.comments") || "Yorumlar"}</span>
-                  <span className="font-mono text-[11px] normal-case tracking-normal tabular-nums text-gray-400 dark:text-gray-500">
-                    ({formatNumber(commentCount)})
-                  </span>
-                </h3>
-
+              <div className="space-y-5">
                 {loadingComments ? (
                   <div className="space-y-3">
                     {[1, 2, 3].map((i) => (
                       <div key={i} className="flex gap-3 animate-pulse">
-                        <div className="h-8 w-8 rounded-full bg-slate-200 dark:bg-slate-700 shrink-0" />
+                        <div className="h-8 w-8 shrink-0 rounded-full bg-white/10" />
                         <div className="flex-1 space-y-2">
-                          <div className="h-4 w-1/4 bg-slate-200 dark:bg-slate-700 rounded" />
-                          <div className="h-4 w-3/4 bg-slate-200 dark:bg-slate-700 rounded" />
+                          <div className="h-3 w-1/4 rounded bg-white/10" />
+                          <div className="h-3 w-3/4 rounded bg-white/10" />
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : comments.length === 0 ? (
-                  <div className="py-8 text-center text-gray-500 dark:text-gray-400">
-                    <MessageCircle className="h-10 w-10 mx-auto mb-2 opacity-30" />
-                    <p>
+                  <div className="py-8 text-center text-white/55">
+                    <MessageCircle className="mx-auto mb-2 h-8 w-8 opacity-40" />
+                    <p className="text-sm">
                       {t("posts.no_comments") ||
                         "Henüz yorum yok. İlk yorumu siz yapın!"}
                     </p>
                   </div>
                 ) : (
-                  <div className="space-y-3 max-h-[40vh] overflow-y-auto pr-2 custom-scrollbar">
-                    {comments.map((comment) => (
-                      <CommentItem
-                        key={comment.id}
-                        comment={comment}
-                        currentUserId={user?.id}
-                      />
-                    ))}
-                    <div ref={commentsEndRef} />
-                  </div>
+                  comments.map((comment) => (
+                    <CommentItem
+                      key={comment.id}
+                      comment={comment}
+                      currentUserId={user?.id}
+                    />
+                  ))
                 )}
+                <div ref={commentsEndRef} />
               </div>
             </div>
 
-            <div className="border-t border-gray-100 dark:border-slate-800 px-4 py-3 space-y-2">
+            <div className="shrink-0 border-t border-white/10 px-4 pb-3 pt-3 md:px-5">
+              <div className="mb-3 flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <button
+                    type="button"
+                    onClick={handleLikeClick}
+                    className="rounded-sm text-white transition-transform hover:scale-105"
+                    aria-label={
+                      liked
+                        ? t("posts.unlike") || "Beğeniyi geri al"
+                        : t("posts.like") || "Beğen"
+                    }
+                    aria-pressed={liked}
+                  >
+                    <Heart
+                      className={`h-7 w-7 ${liked ? "fill-rose-500 text-rose-500" : ""}`}
+                      strokeWidth={1.8}
+                    />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => commentInputRef.current?.focus()}
+                    className="rounded-sm text-white transition-transform hover:scale-105"
+                    aria-label={t("posts.comment") || "Yorum yap"}
+                  >
+                    <MessageCircle className="h-7 w-7" strokeWidth={1.8} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleShare}
+                    className="rounded-sm text-white transition-transform hover:scale-105"
+                    aria-label={lang === "tr" ? "Paylaş" : "Share"}
+                  >
+                    <Send className="h-6 w-6" strokeWidth={1.8} />
+                  </button>
+                </div>
+                <span
+                  className="inline-flex rounded-sm text-white"
+                  aria-hidden="true"
+                >
+                  <Bookmark className="h-6 w-6" strokeWidth={1.8} />
+                </span>
+              </div>
+              <p className="text-[14px] font-semibold text-white">
+                {formatNumber(likeCount)} {lang === "tr" ? "beğeni" : "likes"}
+              </p>
+              <p className="mb-3 mt-1 text-[12px] text-white/50">
+                {formatRelativeTime(post.created_at)}
+              </p>
+
               {requireAuth || loadingUser ? (
-                <div className="flex items-center gap-2 text-center py-3 text-sm text-gray-500 dark:text-gray-400">
+                <div className="border-t border-white/10 py-3 text-sm text-white/55">
                   <span>
                     {t("posts.login_to_comment") || "Giriş yaparak yorum yapın"}
                   </span>
@@ -355,7 +455,7 @@ export function PostModal({
               ) : (
                 <form
                   onSubmit={handleSubmitComment}
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-2 border-t border-white/10 pt-3"
                 >
                   {user?.avatar_url ? (
                     <img
@@ -364,17 +464,18 @@ export function PostModal({
                       className="h-8 w-8 rounded-full object-cover shrink-0"
                     />
                   ) : (
-                    <div className="h-8 w-8 rounded-full bg-[var(--brand-soft-hover)] bg-[var(--brand-soft-hover)] flex items-center justify-center shrink-0">
-                      <User className="h-4 w-4 text-[var(--brand-text)] text-[var(--brand-text)]" />
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10">
+                      <User className="h-4 w-4 text-white/70" />
                     </div>
                   )}
-                  <div className="flex-1 flex items-center gap-2 min-h-9">
+                  <div className="flex min-h-9 flex-1 items-center gap-2">
                     <input
+                      ref={commentInputRef}
                       type="text"
                       value={newComment}
                       onChange={(e) => setNewComment(e.target.value)}
                       placeholder={t("posts.add_comment") || "Yorum ekle..."}
-                      className="flex-1 bg-transparent text-gray-900 dark:text-white placeholder-gray-500 text-[13px] leading-5 py-0 px-0 focus:outline-none"
+                      className="flex-1 bg-transparent px-0 py-0 text-[13px] leading-5 text-white placeholder:text-white/45 focus:outline-none"
                       maxLength={500}
                       disabled={submittingComment}
                       aria-label={t("posts.add_comment") || "Yorum ekle"}
@@ -387,61 +488,47 @@ export function PostModal({
                         requireAuth ||
                         loadingUser
                       }
-                      className="shrink-0 p-1.5 rounded-full text-[var(--brand-text)] text-[var(--brand-text)] hover:bg-[var(--brand-soft)] hover:bg-[var(--brand-soft-hover)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      className="shrink-0 rounded-full p-1.5 text-sm font-semibold text-[var(--brand)] transition-colors hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
                       aria-label={t("posts.send") || "Gönder"}
                     >
-                      <Send className="h-5 w-5" />
+                      {lang === "tr" ? "Gönder" : "Post"}
                     </button>
                   </div>
                 </form>
               )}
-
-              <div className="flex items-center justify-between pt-1">
-                <div className="flex items-center gap-5">
-                  <button
-                    onClick={handleLikeClick}
-                    className="flex items-center gap-1 text-gray-500 hover:text-red-500 transition-colors"
-                    aria-label={
-                      liked
-                        ? t("posts.unlike") || "Beğeniyi geri al"
-                        : t("posts.like") || "Beğen"
-                    }
-                    aria-pressed={liked}
-                    title={
-                      requireAuth
-                        ? t("posts.login_to_like") ||
-                          "Beğenmek için giriş yapın"
-                        : undefined
-                    }
-                  >
-                    <Heart
-                      className={`h-5 w-5 ${liked ? "fill-current text-red-500" : "stroke-current"}`}
-                    />
-                    <span className="font-mono text-[11px] tabular-nums leading-none">
-                      {formatNumber(likeCount)}
-                    </span>
-                  </button>
-                  <button
-                    className="flex items-center gap-1 text-gray-500 hover:text-[var(--brand-text)] hover:text-[var(--brand-text)] transition-colors"
-                    aria-label={t("posts.comment") || "Yorum yap"}
-                  >
-                    <MessageCircle className="h-5 w-5 stroke-current" />
-                    <span className="font-mono text-[11px] tabular-nums leading-none">
-                      {formatNumber(commentCount)}
-                    </span>
-                  </button>
-                </div>
-                <button
-                  className="flex items-center text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
-                  aria-label={t("posts.more") || "Daha fazla"}
-                >
-                  <MoreVertical className="h-5 w-5" />
-                </button>
-              </div>
             </div>
-          </div>
-        </div>
       </div>
+      </div>
+
+      <button
+        type="button"
+        onClick={onClose}
+        className="absolute right-4 top-4 z-20 hidden rounded-full p-2 text-white transition-colors hover:bg-white/10 md:block"
+        aria-label={t("modal.close") || "Kapat"}
+      >
+        <X className="h-7 w-7" />
+      </button>
+
+      {previousPost && onNavigate && (
+        <button
+          type="button"
+          onClick={() => onNavigate(previousPost.id)}
+          className="absolute left-3 top-1/2 z-20 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white text-black shadow-lg transition-transform hover:scale-105 md:left-5"
+          aria-label={lang === "tr" ? "Önceki fotoğraf" : "Previous photo"}
+        >
+          <ChevronLeft className="h-6 w-6" />
+        </button>
+      )}
+      {nextPost && onNavigate && (
+        <button
+          type="button"
+          onClick={() => onNavigate(nextPost.id)}
+          className="absolute right-3 top-1/2 z-20 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white text-black shadow-lg transition-transform hover:scale-105 md:right-5"
+          aria-label={lang === "tr" ? "Sonraki fotoğraf" : "Next photo"}
+        >
+          <ChevronRight className="h-6 w-6" />
+        </button>
+      )}
     </div>,
     document.body,
   );
@@ -464,25 +551,25 @@ function CommentItem({ comment, currentUserId }: CommentItemProps) {
           className="h-8 w-8 rounded-full object-cover shrink-0"
         />
       ) : (
-        <div className="h-8 w-8 rounded-full bg-[var(--brand-soft-hover)] bg-[var(--brand-soft-hover)] flex items-center justify-center shrink-0">
-          <User className="h-4 w-4 text-[var(--brand-text)] text-[var(--brand-text)]" />
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10">
+          <User className="h-4 w-4 text-white/70" />
         </div>
       )}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <span className="font-semibold text-gray-900 dark:text-white text-[13px]">
+          <span className="text-[13px] font-semibold text-white">
             {comment.username}
           </span>
-          <span className="font-mono text-[11px] tabular-nums text-gray-500 dark:text-gray-400">
+          <span className="text-[11px] text-white/45">
             {formatRelativeTime(comment.created_at)}
           </span>
           {isOwn && (
-            <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-[0.14em] text-[var(--brand-text)] text-[var(--brand-text)] bg-[var(--brand-soft)] bg-[var(--brand-soft-hover)]">
+            <span className="rounded bg-white/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-white/70">
               {t("posts.you") || "Sen"}
             </span>
           )}
         </div>
-        <p className="mt-0.5 text-[13px] text-gray-700 dark:text-gray-300 whitespace-pre-wrap leading-6">
+        <p className="mt-0.5 whitespace-pre-wrap text-[13px] leading-6 text-white/95">
           {renderTextWithMentions(comment.text)}
         </p>
       </div>
