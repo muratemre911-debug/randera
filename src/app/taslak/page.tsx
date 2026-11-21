@@ -125,7 +125,7 @@ export default function PrototypePreviewPage() {
                   <span className="h-2.5 w-4 rounded-sm border border-white/70" />
                 </span>
               </div>
-              <div className="h-[720px] overflow-y-auto overflow-x-hidden bg-white dark:bg-slate-900">
+              <div className="@container h-[720px] overflow-y-auto overflow-x-hidden bg-white dark:bg-slate-900">
                 <Screen />
               </div>
             </div>
@@ -146,7 +146,7 @@ export default function PrototypePreviewPage() {
                   randera.app/{current.id}
                 </span>
               </div>
-              <div className="h-[680px] overflow-y-auto bg-white dark:bg-slate-900">
+              <div className="@container h-[680px] overflow-y-auto overflow-x-hidden bg-white dark:bg-slate-900">
                 <Screen />
               </div>
             </div>

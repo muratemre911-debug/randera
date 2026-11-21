@@ -36,7 +36,7 @@ import {
   MockChip,
   MockThumb,
   MockStatus,
-  MockBottomNav,
+  MockShell,
   MockTopBar,
 } from "./kit";
 
@@ -93,8 +93,8 @@ export function DiscoverMock() {
   ];
 
   return (
-    <div className="flex min-h-full flex-col bg-slate-50 dark:bg-[#0B0D14]">
-      <div className="space-y-4 p-4 pb-6">
+    <MockShell nav={NAV} active={0}>
+      <div className="space-y-4 p-4 pb-6 @3xl:p-8">
         <MockTopBar
           title="Keşfet"
           subtitle="Size en uygun işletmeyi bulun, anında randevu alın."
@@ -145,7 +145,7 @@ export function DiscoverMock() {
         </div>
 
         {/* İşletme listesi */}
-        <div className="space-y-3">
+        <div className="grid gap-3 @3xl:grid-cols-2 @5xl:grid-cols-3">
           {businesses.map((b) => (
             <MockCard key={b.name} className="flex items-center gap-3 p-3">
               <MockThumb src={b.img} className="h-[72px] w-[72px]" />
@@ -178,11 +178,7 @@ export function DiscoverMock() {
           ))}
         </div>
       </div>
-
-      <div className="mt-auto">
-        <MockBottomNav items={NAV} active={0} />
-      </div>
-    </div>
+    </MockShell>
   );
 }
 
@@ -190,11 +186,11 @@ export function DiscoverMock() {
 
 export function BusinessMock() {
   return (
-    <div className="flex min-h-full flex-col bg-slate-50 dark:bg-[#0B0D14]">
-      <div className="space-y-4 p-4 pb-6">
+    <MockShell nav={NAV} active={0}>
+      <div className="space-y-4 p-4 pb-6 @3xl:p-8">
         {/* Kapak + avatar */}
         <div className="relative">
-          <div className="relative h-40 overflow-hidden rounded-3xl">
+          <div className="relative h-40 overflow-hidden rounded-3xl @3xl:h-56">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={IMG.barbershop} alt="" className="h-full w-full object-cover" />
             <div className="absolute inset-0 bg-gradient-to-b from-black/25 via-transparent to-black/55" />
@@ -270,7 +266,7 @@ export function BusinessMock() {
           title="İşletme Paylaşımları"
           hint="İşletmenin güncel duyuruları ve çalışmalarından kareler."
         />
-        <div className="grid grid-cols-2 gap-2.5">
+        <div className="grid grid-cols-2 gap-2.5 @3xl:grid-cols-3">
           {[IMG.cut, IMG.cut2, IMG.spa, IMG.nail].map((src, i) => (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -282,19 +278,14 @@ export function BusinessMock() {
           ))}
         </div>
       </div>
-
-      <div className="mt-auto">
-        <MockBottomNav items={NAV} active={0} />
-      </div>
-    </div>
+    </MockShell>
   );
 }
 
 /* -------------------------------------------------------------- Randevu */
 
 export function BookingMock() {
-  const services = [
-    { name: "Saç Kesimi", price: "₺350", time: "30 dk", active: true },
+  const services = [    { name: "Saç Kesimi", price: "₺350", time: "30 dk", active: true },
     { name: "Sakal Tıraşı", price: "₺200", time: "20 dk", active: false },
     { name: "Saç + Sakal", price: "₺500", time: "45 dk", active: false },
     { name: "Çocuk Saç Kesimi", price: "₺250", time: "25 dk", active: false },
@@ -309,8 +300,8 @@ export function BookingMock() {
   const slots = ["09:00", "10:30", "12:00", "13:30", "15:00", "16:30", "18:00"];
 
   return (
-    <div className="flex min-h-full flex-col bg-slate-50 dark:bg-[#0B0D14]">
-      <div className="space-y-5 p-4 pb-6">
+    <MockShell nav={NAV} active={2}>
+      <div className="space-y-5 p-4 pb-6 @3xl:p-8">
         <div className="flex items-center gap-3">
           <span className="rounded-xl border border-slate-200/80 bg-white p-2 text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
             <ArrowLeft size={18} />
@@ -325,6 +316,7 @@ export function BookingMock() {
           </div>
         </div>
 
+        <div className="grid gap-5 @3xl:grid-cols-2 @3xl:items-start">
         {/* Hizmet seçimi */}
         <MockSectionTitle title="Hizmet seç" hint="Tek hizmet veya combo seçebilirsiniz" />
         <div className="space-y-2">
@@ -383,7 +375,7 @@ export function BookingMock() {
 
         {/* Saat */}
         <MockSectionTitle title="Saat" hint="Uygun saatler" />
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
+        <div className="grid grid-cols-3 gap-2 @3xl:grid-cols-6">
           {slots.map((s, i) => (
             <span
               key={s}
@@ -397,10 +389,11 @@ export function BookingMock() {
             </span>
           ))}
         </div>
+        </div>
       </div>
 
       {/* Sabit alt eylem çubuğu */}
-      <div className="sticky bottom-0 border-t border-slate-200/80 bg-white/90 px-4 py-3 backdrop-blur-2xl dark:border-slate-800 dark:bg-slate-900/90">
+      <div className="sticky bottom-0 border-t border-slate-200/80 bg-white/90 px-4 py-3 backdrop-blur-2xl dark:border-slate-800 dark:bg-slate-900/90 @3xl:px-8">
         <div className="flex items-center gap-3">
           <div className="min-w-0">
             <p className="text-[10px] font-medium text-slate-500 dark:text-slate-400">
@@ -413,15 +406,14 @@ export function BookingMock() {
           <MockPrimary className="flex-1 py-3">Randevuyu Onayla</MockPrimary>
         </div>
       </div>
-    </div>
+    </MockShell>
   );
 }
 
 /* --------------------------------------------------------- Randevularım */
 
 export function AppointmentsMock() {
-  const items = [
-    {
+  const items = [    {
       name: "Yakuşıklu Berber",
       when: "24 Kasım, 15:00",
       service: "Saç + Sakal · 45 dk",
@@ -440,8 +432,8 @@ export function AppointmentsMock() {
   ];
 
   return (
-    <div className="flex min-h-full flex-col bg-slate-50 dark:bg-[#0B0D14]">
-      <div className="space-y-4 p-4 pb-6">
+    <MockShell nav={NAV} active={2}>
+      <div className="space-y-4 p-4 pb-6 @3xl:p-8">
         <MockTopBar
           title="Randevularım"
           subtitle="Yaklaşan ve geçmiş randevularınız."
@@ -461,7 +453,7 @@ export function AppointmentsMock() {
           </span>
         </div>
 
-        <div className="space-y-3">
+        <div className="grid gap-3 @3xl:grid-cols-2 @5xl:grid-cols-3">
           {items.map((it) => (
             <MockCard key={it.name} className="p-4">
               <div className="flex items-start gap-3">
@@ -496,11 +488,7 @@ export function AppointmentsMock() {
           ))}
         </div>
       </div>
-
-      <div className="mt-auto">
-        <MockBottomNav items={NAV} active={2} />
-      </div>
-    </div>
+    </MockShell>
   );
 }
 
@@ -517,8 +505,8 @@ const MENU = [
 
 export function ProfileMock() {
   return (
-    <div className="flex min-h-full flex-col bg-slate-50 dark:bg-[#0B0D14]">
-      <div className="space-y-4 p-4 pb-6">
+    <MockShell nav={NAV} active={3}>
+      <div className="space-y-4 p-4 pb-6 @3xl:p-8">
         <MockTopBar title="Profilim" subtitle="Hesabınızı ve randevu tercihlerinizi yönetin." />
 
         {/* Kimlik kartı */}
@@ -576,19 +564,14 @@ export function ProfileMock() {
           Çıkış yap
         </div>
       </div>
-
-      <div className="mt-auto">
-        <MockBottomNav items={NAV} active={3} />
-      </div>
-    </div>
+    </MockShell>
   );
 }
 
 /* --------------------------------------------------------------- Panel */
 
 export function DashboardMock() {
-  const stats = [
-    { label: "Bugün", value: "8", icon: <Calendar size={16} /> },
+  const stats = [    { label: "Bugün", value: "8", icon: <Calendar size={16} /> },
     { label: "Bekleyen", value: "3", icon: <Clock size={16} /> },
     { label: "Bu ay ciro", value: "₺42.8B", icon: <TrendingUp size={16} /> },
   ];
@@ -599,9 +582,16 @@ export function DashboardMock() {
     { time: "13:30", name: "Zeynep A.", service: "Çocuk Saç Kesimi", tone: "pending" as const, label: "Bekliyor" },
   ];
 
+  const PANEL_NAV = [
+    { label: "Özet", icon: <LayoutDashboard size={20} strokeWidth={2.2} /> },
+    { label: "Takvim", icon: <Calendar size={20} strokeWidth={2.2} /> },
+    { label: "Müşteriler", icon: <User size={20} strokeWidth={2.2} /> },
+    { label: "Profil", icon: <User size={20} strokeWidth={2.2} /> },
+  ];
+
   return (
-    <div className="flex min-h-full flex-col bg-slate-50 dark:bg-[#0B0D14]">
-      <div className="space-y-4 p-4 pb-6">
+    <MockShell nav={PANEL_NAV} active={0}>
+      <div className="space-y-4 p-4 pb-6 @3xl:p-8">
         <MockTopBar
           title="Yakuşıklu Berber"
           subtitle="22 Kasım Pazar · Panel özeti"
@@ -671,18 +661,6 @@ export function DashboardMock() {
           ))}
         </MockCard>
       </div>
-
-      <div className="mt-auto">
-        <MockBottomNav
-          items={[
-            { label: "Özet", icon: <LayoutDashboard size={20} strokeWidth={2.2} /> },
-            { label: "Takvim", icon: <Calendar size={20} strokeWidth={2.2} /> },
-            { label: "Müşteriler", icon: <User size={20} strokeWidth={2.2} /> },
-            { label: "Profil", icon: <User size={20} strokeWidth={2.2} /> },
-          ]}
-          active={0}
-        />
-      </div>
-    </div>
+    </MockShell>
   );
 }
