@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { Fragment, useEffect, useState, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { createClient } from "@/utils/supabase/client";
 import Link from "next/link";
@@ -402,10 +402,10 @@ export default function DiscoverPage() {
       <div className="flex flex-col gap-4">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
           <div>
-            <h1 className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white tracking-normal">
+            <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white sm:text-3xl lg:text-4xl lg:tracking-normal">
               {lang === "tr" ? "Keşfet" : "Discover"}
             </h1>
-            <p className="text-sm sm:text-base text-slate-500 dark:text-slate-400 mt-1">
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400 lg:text-base">
               {lang === "tr"
                 ? "Size en uygun işletmeyi bulun ve anında randevu alın."
                 : "Find the best business for you and book instantly."}
@@ -413,14 +413,14 @@ export default function DiscoverPage() {
           </div>
 
           {/* Segmented Control (Apple Maps Style) */}
-          <div className="inline-flex w-full sm:w-auto p-1 bg-slate-200/70 dark:bg-slate-800/80 backdrop-blur-2xl rounded-2xl border border-slate-300/40 dark:border-slate-700/50 shadow-inner self-stretch sm:self-auto">
+          <div className="inline-flex w-full self-stretch gap-1.5 rounded-2xl bg-slate-100 p-1 dark:bg-slate-800 sm:w-auto sm:self-auto lg:gap-0 lg:border lg:border-slate-300/40 lg:bg-slate-200/70 lg:shadow-inner lg:backdrop-blur-2xl lg:dark:border-slate-700/50 lg:dark:bg-slate-800/80">
             <button
               type="button"
               onClick={() => setViewMode("list")}
-              className={`flex flex-1 sm:flex-none items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 cursor-pointer ${
+              className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-bold transition-all duration-200 cursor-pointer sm:flex-none sm:rounded-xl sm:px-4 sm:text-sm ${
                 viewMode === "list"
-                  ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm"
-                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                  ? "bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white lg:dark:bg-slate-900"
+                  : "text-slate-500 dark:text-slate-400 lg:text-slate-600 lg:dark:text-slate-400 lg:hover:text-slate-900 lg:dark:hover:text-white"
               }`}
             >
               <List size={16} strokeWidth={2.4} />
@@ -429,10 +429,10 @@ export default function DiscoverPage() {
             <button
               type="button"
               onClick={() => setViewMode("map")}
-              className={`flex flex-1 sm:flex-none items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 cursor-pointer ${
+              className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-bold transition-all duration-200 cursor-pointer sm:flex-none sm:rounded-xl sm:px-4 sm:text-sm ${
                 viewMode === "map"
-                  ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm"
-                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                  ? "bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white lg:dark:bg-slate-900"
+                  : "text-slate-500 dark:text-slate-400 lg:text-slate-600 lg:dark:text-slate-400 lg:hover:text-slate-900 lg:dark:hover:text-white"
               }`}
             >
               <MapIcon size={16} strokeWidth={2.4} />
@@ -444,8 +444,8 @@ export default function DiscoverPage() {
         {/* Minimalist Apple Maps Tarzı Arama Çubuğu + Tek Oval Filtre Butonu */}
         <div className="flex items-center gap-2.5 sm:gap-3">
           {/* Arama Kutusu */}
-          <div className="relative flex-1 group">
-            <div className="absolute left-2.5 top-1/2 -translate-y-1/2 flex items-center justify-center w-9 h-9 rounded-xl bg-indigo-50 dark:bg-indigo-950/70 text-indigo-600 dark:text-indigo-400 group-focus-within:bg-indigo-600 group-focus-within:text-white group-focus-within:shadow-md group-focus-within:shadow-indigo-500/20 transition-all pointer-events-none">
+          <div className="relative flex-1 group min-w-0">
+            <div className="pointer-events-none absolute left-2.5 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-xl text-slate-400 transition-all lg:bg-indigo-50 lg:text-indigo-600 lg:dark:bg-indigo-950/70 lg:dark:text-indigo-400 lg:group-focus-within:bg-indigo-600 lg:group-focus-within:text-white lg:group-focus-within:shadow-md lg:group-focus-within:shadow-indigo-500/20">
               <Search size={17} strokeWidth={2.6} />
             </div>
             <input
@@ -457,12 +457,15 @@ export default function DiscoverPage() {
               }
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-13 pr-10 py-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white/80 dark:bg-slate-900/70 backdrop-blur-2xl text-sm font-medium text-slate-800 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm transition-all"
+              className="w-full rounded-2xl border border-slate-200/80 bg-white py-3.5 pl-13 pr-10 text-sm font-medium text-slate-800 shadow-[0_1px_2px_rgb(15,23,42,0.04),0_10px_30px_rgb(15,23,42,0.05)] transition-all placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[var(--brand)] dark:border-slate-800 dark:bg-slate-900 dark:text-white lg:bg-white/80 lg:shadow-sm lg:backdrop-blur-2xl lg:focus:ring-indigo-500 lg:dark:bg-slate-900/70"
             />
             {search && (
               <button
                 type="button"
                 onClick={() => setSearch("")}
+                aria-label={
+                  lang === "tr" ? "Aramayı temizle" : "Clear search"
+                }
                 className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
               >
                 <X size={15} />
@@ -474,23 +477,21 @@ export default function DiscoverPage() {
           <button
             type="button"
             onClick={() => setIsFilterSheetOpen(true)}
-            className={`flex items-center gap-2 px-4 sm:px-5 py-3.5 rounded-2xl text-xs sm:text-sm font-bold transition-all duration-200 active:scale-95 cursor-pointer shadow-sm border shrink-0 ${
+            className={`flex shrink-0 cursor-pointer items-center gap-2 rounded-xl border px-4 py-3 text-sm font-bold transition-all duration-200 active:scale-[0.98] lg:rounded-2xl lg:px-5 lg:py-3.5 lg:active:scale-95 ${
               activeFilterCount > 0
-                ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900 border-slate-900 dark:border-white shadow-md"
-                : "bg-white/80 dark:bg-slate-900/70 backdrop-blur-2xl text-slate-700 dark:text-slate-200 border-slate-200/80 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700"
+                ? "border-[var(--brand-border)] bg-[var(--brand-soft)] text-[var(--brand-text)] shadow-[0_1px_2px_rgb(15,23,42,0.04)] lg:border-slate-900 lg:bg-slate-900 lg:text-white lg:shadow-md lg:dark:border-white lg:dark:bg-white lg:dark:text-slate-900"
+                : "border-transparent bg-slate-100 text-slate-700 shadow-[0_1px_2px_rgb(15,23,42,0.04)] dark:bg-slate-800 dark:text-slate-200 lg:border-slate-200/80 lg:bg-white/80 lg:text-slate-700 lg:shadow-sm lg:backdrop-blur-2xl lg:hover:border-slate-300 lg:dark:border-slate-800 lg:dark:bg-slate-900/70 lg:dark:text-slate-200 lg:dark:hover:border-slate-700"
             }`}
           >
             <SlidersHorizontal size={17} strokeWidth={2.2} />
-            {/* `xs` breakpoint'i Tailwind v4'te TANIMLI DEĞİL; `hidden xs:inline`
-                yüzünden etiket hiçbir genişlikte görünmüyordu. `sm` kullanılır. */}
-            <span className="hidden sm:inline">
-              {lang === "tr" ? "Filtrele" : "Filters"}
-            </span>
+            {/* Etiket artık mobilde de görünür; eski `hidden sm:inline` kuralı
+                kaldırıldı (masaüstünde zaten `sm` ile görünüyordu). */}
+            <span>{lang === "tr" ? "Filtrele" : "Filters"}</span>
             {activeFilterCount > 0 && (
               <span
-                className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-extrabold ${
+                className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-extrabold ${
                   activeFilterCount > 0
-                    ? "bg-indigo-600 text-white dark:bg-indigo-600 dark:text-white"
+                    ? "bg-[var(--brand)] text-white lg:bg-indigo-600 lg:text-white lg:dark:bg-indigo-600 lg:dark:text-white"
                     : ""
                 }`}
               >
@@ -504,8 +505,11 @@ export default function DiscoverPage() {
             <button
               type="button"
               onClick={resetAllFilters}
-              className="p-3.5 rounded-2xl bg-red-50/80 hover:bg-red-100 dark:bg-red-500/10 dark:hover:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-200/60 dark:border-red-500/20 transition-all active:scale-90 cursor-pointer shrink-0"
+              className="shrink-0 cursor-pointer rounded-2xl border border-rose-200/80 bg-rose-50 p-3.5 text-rose-600 transition-all active:scale-90 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-400 lg:border-red-200/60 lg:bg-red-50/80 lg:text-red-600 lg:hover:bg-red-100 lg:dark:border-red-500/20 lg:dark:bg-red-500/10 lg:dark:text-red-400 lg:dark:hover:bg-red-500/20"
               title={
+                lang === "tr" ? "Tüm Filtreleri Temizle" : "Clear All Filters"
+              }
+              aria-label={
                 lang === "tr" ? "Tüm Filtreleri Temizle" : "Clear All Filters"
               }
             >
@@ -520,10 +524,10 @@ export default function DiscoverPage() {
             <button
               type="button"
               onClick={() => setFilterSector("")}
-              className={`whitespace-nowrap px-4 sm:px-5 py-2 rounded-full text-xs sm:text-sm font-bold transition-all duration-200 cursor-pointer shrink-0 ${
+              className={`inline-flex shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-bold transition-all duration-200 sm:px-5 sm:py-2 sm:text-sm ${
                 filterSector === ""
-                  ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-md ring-2 ring-indigo-500/20"
-                  : "bg-white/70 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/80 backdrop-blur-2xl border border-slate-200/60 dark:border-slate-700/60"
+                  ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900 lg:shadow-md lg:ring-2 lg:ring-indigo-500/20"
+                  : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 lg:border lg:border-slate-200/60 lg:bg-white/70 lg:backdrop-blur-2xl lg:hover:bg-slate-100 lg:dark:border-slate-700/60 lg:dark:bg-slate-800/60 lg:dark:text-slate-300 lg:dark:hover:bg-slate-700/80"
               }`}
             >
               {lang === "tr" ? "Tümü" : "All"}
@@ -536,10 +540,10 @@ export default function DiscoverPage() {
                 onClick={() =>
                   setFilterSector(filterSector === s.value ? "" : s.value)
                 }
-                className={`whitespace-nowrap px-4 sm:px-5 py-2 rounded-full text-xs sm:text-sm font-bold transition-all duration-200 cursor-pointer shrink-0 ${
+                className={`inline-flex shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-bold transition-all duration-200 sm:px-5 sm:py-2 sm:text-sm ${
                   filterSector === s.value
-                    ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-md ring-2 ring-indigo-500/20"
-                    : "bg-white/70 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/80 backdrop-blur-2xl border border-slate-200/60 dark:border-slate-700/60"
+                    ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900 lg:shadow-md lg:ring-2 lg:ring-indigo-500/20"
+                    : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 lg:border lg:border-slate-200/60 lg:bg-white/70 lg:backdrop-blur-2xl lg:hover:bg-slate-100 lg:dark:border-slate-700/60 lg:dark:bg-slate-800/60 lg:dark:text-slate-300 lg:dark:hover:bg-slate-700/80"
                 }`}
               >
                 {s.name}
@@ -551,11 +555,11 @@ export default function DiscoverPage() {
         {/* Aktif Filtre Rozetleri Çubuğu (Varsa) */}
         {(filterProvince || filterDistrict || minPrice || maxPrice) && (
           <div className="flex items-center gap-2 flex-wrap text-xs pt-0.5">
-            <span className="text-slate-400 font-medium">
+            <span className="text-slate-500 font-medium dark:text-slate-400 lg:text-slate-400">
               {lang === "tr" ? "Filtreler:" : "Filters:"}
             </span>
             {filterProvince && (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-bold border border-indigo-200 dark:border-indigo-500/20">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--brand-border)] bg-[var(--brand-soft)] px-3 py-1 font-bold text-[var(--brand-text)] lg:border-indigo-200 lg:bg-indigo-50 lg:text-indigo-600 lg:dark:border-indigo-500/20 lg:dark:bg-indigo-500/10 lg:dark:text-indigo-400">
                 <MapPin size={12} />
                 <span>
                   {filterProvince} {filterDistrict ? `• ${filterDistrict}` : ""}
@@ -573,7 +577,7 @@ export default function DiscoverPage() {
               </span>
             )}
             {(minPrice || maxPrice) && (
-              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold border border-amber-200 dark:border-amber-500/20">
+              <span className="inline-flex items-center gap-1 rounded-full border border-transparent bg-slate-100 px-3 py-1 font-bold text-slate-700 dark:bg-slate-800 dark:text-slate-300 lg:border-amber-200 lg:bg-amber-50 lg:text-amber-600 lg:dark:border-amber-500/20 lg:dark:bg-amber-500/10 lg:dark:text-amber-400">
                 <span>
                   ₺{minPrice || "0"} - ₺{maxPrice || "∞"}
                 </span>
@@ -616,17 +620,17 @@ export default function DiscoverPage() {
         /* LİSTE GÖRÜNÜMÜ (Airbnb Seviyesi Zengin Keşfet Kartları) */
         <div>
           {filtered.length === 0 ? (
-            <div className="text-center py-28 px-4 text-slate-400 bg-white/40 dark:bg-slate-900/40 backdrop-blur-3xl rounded-[32px] border border-slate-200/50 dark:border-slate-800/50 shadow-sm">
+            <div className="rounded-3xl border border-slate-200/80 bg-white p-8 text-center shadow-[0_1px_2px_rgb(15,23,42,0.04),0_10px_30px_rgb(15,23,42,0.05)] dark:border-slate-800 dark:bg-slate-900 dark:shadow-[0_1px_2px_rgb(0,0,0,0.35),0_10px_30px_rgb(0,0,0,0.4)] lg:rounded-[32px] lg:border-slate-200/50 lg:bg-white/40 lg:px-4 lg:py-28 lg:text-slate-400 lg:shadow-sm lg:backdrop-blur-3xl lg:dark:border-slate-800/50 lg:dark:bg-slate-900/40">
               <Building2
                 size={56}
                 className="mx-auto mb-4 text-slate-300 dark:text-slate-700"
               />
-              <p className="text-lg font-bold text-slate-700 dark:text-slate-300">
+              <p className="text-[15px] font-bold text-slate-900 dark:text-white lg:text-lg lg:text-slate-700 lg:dark:text-slate-300">
                 {lang === "tr"
                   ? "Eşleşen işletme bulunamadı"
                   : "No matching businesses found"}
               </p>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-sm mx-auto">
+              <p className="mt-1 max-w-sm mx-auto text-sm text-slate-500 dark:text-slate-400">
                 {lang === "tr"
                   ? "Farklı bir il, ilçe veya sektör filtresi deneyebilir ya da aramayı sıfırlayabilirsiniz."
                   : "Try changing your location, category or clear filters."}
@@ -634,21 +638,21 @@ export default function DiscoverPage() {
               <button
                 type="button"
                 onClick={resetAllFilters}
-                className="mt-5 px-6 py-2.5 bg-slate-900 text-white dark:bg-white dark:text-slate-900 rounded-full text-sm font-bold hover:bg-slate-800 dark:hover:bg-slate-100 transition-all active:scale-95 shadow-md cursor-pointer"
+                className="mt-5 inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-[var(--brand)] px-4 py-3 text-sm font-extrabold text-white shadow-[0_6px_16px_var(--brand-shadow)] transition-all active:scale-[0.98] lg:rounded-full lg:bg-slate-900 lg:px-6 lg:py-2.5 lg:font-bold lg:shadow-md lg:hover:bg-slate-800 lg:active:scale-95 lg:dark:bg-white lg:dark:text-slate-900 lg:dark:hover:bg-slate-100"
               >
                 {lang === "tr" ? "Filtreleri Temizle" : "Clear Filters"}
               </button>
             </div>
           ) : (
             <>
-              <div className="flex items-center justify-between mb-4 px-1">
-                <p className="text-xs sm:text-sm font-semibold text-slate-500 dark:text-slate-400">
+              <div className="flex items-center justify-between mb-3 px-1 lg:mb-4">
+                <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 lg:text-sm">
                   {filtered.length}{" "}
                   {lang === "tr" ? "işletme listeleniyor" : "businesses found"}
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6 lg:gap-7">
+              <div className="grid grid-cols-1 gap-3 lg:grid-cols-3 lg:gap-7">
                 {filtered.map((tenant) => {
                   const sectorLabel = getSectorLabel(tenant.sector);
                   const price = getTenantPrice(tenant);
@@ -658,10 +662,136 @@ export default function DiscoverPage() {
                   const tenantAvailability = availability[tenant.id];
 
                   return (
-                    <div
-                      key={tenant.id}
-                      className="group relative bg-white/70 dark:bg-slate-900/60 backdrop-blur-3xl rounded-[28px] border border-slate-200/70 dark:border-slate-800/70 shadow-sm hover:shadow-xl hover:-translate-y-1 hover:border-slate-300/90 dark:hover:border-slate-700/90 transition-all duration-300 cursor-pointer overflow-hidden flex flex-col"
-                    >
+                    <Fragment key={tenant.id}>
+                      {/* ---------------------------------------------- */}
+                      {/* MOBİL: liste satırı (72x72 görsel + bilgi + eylem) */}
+                      {/* ---------------------------------------------- */}
+                      <div className="relative flex items-center gap-3 rounded-2xl border border-slate-200/80 bg-white p-3 shadow-[0_1px_2px_rgb(15,23,42,0.04),0_10px_30px_rgb(15,23,42,0.05)] dark:border-slate-800 dark:bg-slate-900 dark:shadow-[0_1px_2px_rgb(0,0,0,0.35),0_10px_30px_rgb(0,0,0,0.4)] lg:hidden">
+                        {/* Satırın tamamı gerçek bağlantı (stretched link) */}
+                        <Link
+                          href={`/b/${tenant.slug}`}
+                          aria-label={tenant.name}
+                          className="absolute inset-0 z-[1] rounded-2xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand)]"
+                        />
+
+                        {/* 72x72 kare görsel + favori butonu */}
+                        <div className="relative flex h-[72px] w-[72px] shrink-0 items-center justify-center">
+                          <SafeImage
+                            src={coverImage}
+                            alt={tenant.name}
+                            fallbackSrc={getSectorImage(tenant)}
+                            fallbackIcon={
+                              <Building2
+                                size={26}
+                                className="text-[var(--brand-text)]"
+                              />
+                            }
+                            className="h-[72px] w-[72px] rounded-xl object-cover"
+                          />
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleFavorite(tenant.id);
+                            }}
+                            aria-label={
+                              isFavorited
+                                ? lang === "tr"
+                                  ? "Favorilerden Çıkar"
+                                  : "Remove from favorites"
+                                : lang === "tr"
+                                  ? "Favorilere Ekle"
+                                  : "Add to favorites"
+                            }
+                            title={
+                              isFavorited
+                                ? "Favorilerden Çıkar"
+                                : "Favorilere Ekle"
+                            }
+                            className="absolute -right-1.5 -top-1.5 z-10 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-white text-slate-400 shadow-sm ring-1 ring-slate-200/80 transition-transform active:scale-90 dark:bg-slate-800 dark:ring-slate-700"
+                          >
+                            <Heart
+                              size={14}
+                              className={`transition-colors ${
+                                isFavorited
+                                  ? "fill-rose-500 text-rose-500 stroke-rose-500"
+                                  : "text-slate-400 stroke-[2.2]"
+                              }`}
+                            />
+                          </button>
+                        </div>
+
+                        {/* Ad, sektör/mesafe, puan ve fiyat */}
+                        <div className="min-w-0 flex-1">
+                          <h3 className="truncate text-[15px] font-bold text-slate-900 dark:text-white">
+                            {tenant.name}
+                          </h3>
+                          <p className="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400">
+                            {sectorLabel} ·{" "}
+                            {tenant.district ||
+                              tenant.province ||
+                              (lang === "tr"
+                                ? "Konum belirtilmedi"
+                                : "No location")}
+                          </p>
+                          <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                            {rating.hasReviews ? (
+                              <>
+                                <span className="inline-flex items-center gap-1 text-xs font-bold text-slate-700 dark:text-slate-200">
+                                  <Star
+                                    size={12}
+                                    className="fill-amber-400 text-amber-400"
+                                  />
+                                  {rating.score}
+                                </span>
+                                <span className="text-[11px] text-slate-400">
+                                  ({rating.reviews})
+                                </span>
+                              </>
+                            ) : (
+                              <span className="text-[11px] font-semibold text-slate-400">
+                                {lang === "tr"
+                                  ? "Henüz değerlendirilmedi"
+                                  : "No reviews yet"}
+                              </span>
+                            )}
+                            {price != null && (
+                              <span className="text-xs font-extrabold tabular-nums text-[var(--brand-text)]">
+                                ₺{price}
+                                {lang === "tr" ? "'den" : ""}
+                              </span>
+                            )}
+                          </div>
+                          {tenantAvailability?.hasFreeSlot && (
+                            <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400">
+                              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                              {tenantAvailability.nextSlot
+                                ? lang === "tr"
+                                  ? `Bugün ${tenantAvailability.nextSlot} müsait`
+                                  : `Today ${tenantAvailability.nextSlot}`
+                                : lang === "tr"
+                                  ? "Bugün Müsait"
+                                  : "Available Today"}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Randevu butonu (gerçek bağlantı) */}
+                        <Link
+                          href={`/b/${tenant.slug}/randevu`}
+                          aria-label={`${tenant.name} — ${
+                            lang === "tr" ? "Randevu" : "Book"
+                          }`}
+                          className="relative z-10 shrink-0 rounded-xl bg-[var(--brand)] px-3 py-2 text-xs font-extrabold text-white shadow-[0_4px_12px_var(--brand-shadow)] transition-all active:scale-[0.98]"
+                        >
+                          {lang === "tr" ? "Randevu" : "Book"}
+                        </Link>
+                      </div>
+
+                      {/* ------------------------------------------- */}
+                      {/* MASAÜSTÜ: mevcut Airbnb tarzı zengin kart */}
+                      {/* ------------------------------------------- */}
+                      <div className="group relative hidden lg:flex flex-col bg-white/70 dark:bg-slate-900/60 backdrop-blur-3xl rounded-[28px] border border-slate-200/70 dark:border-slate-800/70 shadow-sm hover:shadow-xl hover:-translate-y-1 hover:border-slate-300/90 dark:hover:border-slate-700/90 transition-all duration-300 cursor-pointer overflow-hidden">
                       {/*
                         Kartın tamamı GERÇEK bir bağlantıdır (stretched link):
                         klavye ile odaklanabilir, uzun basıp/ctrl ile yeni
@@ -837,6 +967,7 @@ export default function DiscoverPage() {
                         </div>
                       </div>
                     </div>
+                    </Fragment>
                   );
                 })}
               </div>

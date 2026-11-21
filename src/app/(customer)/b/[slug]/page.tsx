@@ -349,7 +349,7 @@ export default function BusinessPage() {
       <div className="relative !mb-0">
         {/* Cover Image Banner */}
         <div
-          className="w-full h-48 sm:h-56 md:h-64 bg-cover bg-center relative rounded-[32px] overflow-hidden shadow-sm"
+          className="w-full h-40 bg-cover bg-center relative rounded-3xl overflow-hidden sm:h-56 md:h-64 lg:rounded-[32px] lg:shadow-sm"
           style={{
             backgroundImage: tenant.cover_image_url
               ? `url(${tenant.cover_image_url})`
@@ -378,9 +378,9 @@ export default function BusinessPage() {
 
         {/* Profile Section */}
         <div className="relative z-10">
-          <div className="-mt-12 md:-mt-16 mb-4 ml-6 md:ml-8 flex items-end justify-between">
+          <div className="-mt-10 md:-mt-16 mb-4 ml-6 md:ml-8 flex items-end justify-between">
             {/* Profile Image / Avatar */}
-            <div className="h-24 w-24 md:h-28 md:w-28 shrink-0 rounded-full border-[5px] border-white dark:border-slate-900 shadow-xl overflow-hidden bg-white dark:bg-slate-800 flex items-center justify-center">
+            <div className="h-20 w-20 shrink-0 rounded-full overflow-hidden ring-4 ring-white dark:ring-slate-900 bg-white dark:bg-slate-800 md:h-28 md:w-28 lg:border-[5px] lg:shadow-xl flex items-center justify-center">
               {tenant.profile_image_url ? (
                 <img
                   src={tenant.profile_image_url}
@@ -632,7 +632,7 @@ export default function BusinessPage() {
         <div className="space-y-5 animate-in fade-in duration-200">
           <div className="flex items-center justify-between px-2">
             <div>
-              <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+              <h2 className="text-lg font-black text-slate-900 dark:text-white tracking-tight sm:text-2xl">
                 {lang === "tr" ? "Hizmet Menüsü" : "Services Menu"}
               </h2>
               <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
@@ -644,7 +644,7 @@ export default function BusinessPage() {
           </div>
 
           {services.length === 0 ? (
-            <div className="p-8 sm:p-12 text-center rounded-3xl bg-white/60 dark:bg-slate-900/60 backdrop-blur-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-2">
+            <div className="rounded-3xl border border-slate-200/80 bg-white p-8 text-center shadow-[0_1px_2px_rgb(15,23,42,0.04),0_10px_30px_rgb(15,23,42,0.05)] dark:border-slate-800 dark:bg-slate-900 dark:shadow-[0_1px_2px_rgb(0,0,0,0.35),0_10px_30px_rgb(0,0,0,0.4)] space-y-2 lg:bg-white/60 lg:backdrop-blur-2xl lg:shadow-sm lg:p-12 dark:lg:bg-slate-900/60">
               <Wrench size={32} className="text-slate-400 mx-auto" />
               <p className="text-sm font-semibold text-slate-600 dark:text-slate-300">
                 {lang === "tr"
@@ -659,7 +659,7 @@ export default function BusinessPage() {
                 return (
                   <div
                     key={s.id}
-                    className="p-5 sm:p-6 rounded-3xl bg-white/80 dark:bg-slate-900/70 backdrop-blur-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs hover:border-[var(--brand-border)] hover:border-[var(--brand-border)] transition-all flex flex-col justify-between gap-4 group"
+                    className="flex flex-col justify-between gap-4 rounded-3xl border border-slate-200/80 bg-white p-5 shadow-[0_1px_2px_rgb(15,23,42,0.04),0_10px_30px_rgb(15,23,42,0.05)] transition-all group dark:border-slate-800 dark:bg-slate-900 dark:shadow-[0_1px_2px_rgb(0,0,0,0.35),0_10px_30px_rgb(0,0,0,0.4)] lg:bg-white/80 lg:backdrop-blur-2xl lg:shadow-xs lg:hover:border-[var(--brand-border)] lg:p-6 dark:lg:bg-slate-900/70"
                   >
                     <div className="space-y-1.5">
                       <div className="flex items-start justify-between gap-2">
@@ -750,7 +750,7 @@ export default function BusinessPage() {
           </div>
 
           {reviewsData.reviews.length === 0 ? (
-            <div className="p-8 sm:p-12 text-center rounded-3xl bg-white/60 dark:bg-slate-900/60 backdrop-blur-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-3">
+            <div className="rounded-3xl border border-slate-200/80 bg-white p-8 text-center shadow-[0_1px_2px_rgb(15,23,42,0.04),0_10px_30px_rgb(15,23,42,0.05)] dark:border-slate-800 dark:bg-slate-900 dark:shadow-[0_1px_2px_rgb(0,0,0,0.35),0_10px_30px_rgb(0,0,0,0.4)] space-y-3 lg:bg-white/60 lg:backdrop-blur-2xl lg:shadow-sm lg:p-12 dark:lg:bg-slate-900/60">
               <div className="w-12 h-12 rounded-2xl bg-amber-50 dark:bg-amber-950/40 text-amber-500 flex items-center justify-center mx-auto">
                 <Star size={24} />
               </div>
@@ -768,7 +768,7 @@ export default function BusinessPage() {
           ) : (
             <div className="space-y-6">
               {/* Airbnb Tarzı Özet Kartı ve Dağılım Çubukları */}
-              <div className="p-6 sm:p-7 rounded-3xl bg-white/80 dark:bg-slate-900/70 backdrop-blur-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
+              <div className="grid grid-cols-1 items-center gap-6 rounded-3xl border border-slate-200/80 bg-white p-6 shadow-[0_1px_2px_rgb(15,23,42,0.04),0_10px_30px_rgb(15,23,42,0.05)] dark:border-slate-800 dark:bg-slate-900 dark:shadow-[0_1px_2px_rgb(0,0,0,0.35),0_10px_30px_rgb(0,0,0,0.4)] md:grid-cols-12 lg:bg-white/80 lg:backdrop-blur-3xl lg:shadow-sm lg:p-7 dark:lg:bg-slate-900/70">
                 {/* Sol: Büyük Puan Rozeti */}
                 <div className="md:col-span-4 text-center md:text-left flex flex-col items-center md:items-start justify-center border-b md:border-b-0 md:border-r border-slate-200/80 dark:border-slate-800 pb-5 md:pb-0 md:pr-6">
                   <div className="text-5xl font-black text-slate-900 dark:text-white tracking-tight">
@@ -833,7 +833,7 @@ export default function BusinessPage() {
                 {reviewsData.reviews.map((rev) => (
                   <div
                     key={rev.appointment_id}
-                    className="p-5 sm:p-6 rounded-3xl bg-white/70 dark:bg-slate-900/60 backdrop-blur-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-xs flex flex-col justify-between space-y-3"
+                    className="flex flex-col justify-between space-y-3 rounded-3xl border border-slate-200/80 bg-white p-5 shadow-[0_1px_2px_rgb(15,23,42,0.04),0_10px_30px_rgb(15,23,42,0.05)] dark:border-slate-800 dark:bg-slate-900 dark:shadow-[0_1px_2px_rgb(0,0,0,0.35),0_10px_30px_rgb(0,0,0,0.4)] lg:bg-white/70 lg:backdrop-blur-2xl lg:shadow-xs lg:p-6 lg:border-slate-200/80 dark:lg:bg-slate-900/60"
                   >
                     <div>
                       {/* Yazar Bilgisi */}
@@ -916,7 +916,7 @@ export default function BusinessPage() {
         <div className="space-y-4 animate-in fade-in duration-200">
           <div className="flex items-center justify-between px-2">
             <div>
-              <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+              <h2 className="text-lg font-black text-slate-900 dark:text-white tracking-tight sm:text-2xl">
                 {lang === "tr" ? "İşletme Paylaşımları" : "Posts"}
               </h2>
               <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
@@ -928,7 +928,7 @@ export default function BusinessPage() {
           </div>
 
           {posts.length === 0 ? (
-            <div className="p-8 sm:p-12 text-center text-gray-400 dark:text-slate-500 rounded-3xl bg-white/40 dark:bg-slate-900/40 border border-slate-200/50 dark:border-slate-800/50">
+            <div className="rounded-3xl border border-slate-200/80 bg-white p-8 text-center text-slate-500 shadow-[0_1px_2px_rgb(15,23,42,0.04),0_10px_30px_rgb(15,23,42,0.05)] dark:border-slate-800 dark:bg-slate-900 dark:text-slate-500 dark:shadow-[0_1px_2px_rgb(0,0,0,0.35),0_10px_30px_rgb(0,0,0,0.4)] lg:bg-white/40 lg:border-slate-200/50 lg:p-12 lg:text-gray-400 lg:shadow-sm dark:lg:bg-slate-900/40 dark:lg:border-slate-800/50 dark:lg:text-slate-500">
               {lang === "tr" ? "Henüz gönderi paylaşılmamış." : "No posts yet."}
             </div>
           ) : (
@@ -946,7 +946,7 @@ export default function BusinessPage() {
         <div className="space-y-5 animate-in fade-in duration-200">
           <div className="flex items-center justify-between px-2">
             <div>
-              <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+              <h2 className="text-lg font-black text-slate-900 dark:text-white tracking-tight sm:text-2xl">
                 {lang === "tr" ? "Konum" : "Location"}
               </h2>
               <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
@@ -955,7 +955,7 @@ export default function BusinessPage() {
             </div>
           </div>
 
-          <div className="rounded-3xl overflow-hidden border border-slate-200/80 dark:border-slate-800 bg-white/70 dark:bg-slate-900/60 shadow-xs">
+          <div className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-[0_1px_2px_rgb(15,23,42,0.04),0_10px_30px_rgb(15,23,42,0.05)] dark:border-slate-800 dark:bg-slate-900 dark:shadow-[0_1px_2px_rgb(0,0,0,0.35),0_10px_30px_rgb(0,0,0,0.4)] lg:bg-white/70 lg:shadow-xs dark:lg:bg-slate-900/60">
             <MapPoint
               lat={tenant.latitude ?? null}
               lng={tenant.longitude ?? null}

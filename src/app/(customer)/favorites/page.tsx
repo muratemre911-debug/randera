@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { Fragment, useEffect, useState, useMemo } from "react";
 import { createClient } from "@/utils/supabase/client";
 import SafeImage from "@/components/SafeImage";
 import { useRouter } from "next/navigation";
@@ -173,10 +173,10 @@ export default function FavoritesPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
         <div>
-          <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white tracking-normal">
+          <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white sm:text-3xl lg:text-4xl lg:font-extrabold lg:tracking-normal">
             {lang === "tr" ? "Favori İşletmelerim" : "My Favorites"}
           </h1>
-          <p className="text-sm sm:text-base text-slate-500 dark:text-slate-400 mt-1">
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400 lg:text-base">
             {lang === "tr"
               ? "Beğendiğiniz işletmeleri buradan takip edin ve anında randevu alın."
               : "Keep track of your favorite places and book with a single tap."}
@@ -186,7 +186,7 @@ export default function FavoritesPage() {
         <button
           type="button"
           onClick={() => router.push("/discover")}
-          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs sm:text-sm shadow-md shadow-indigo-600/20 active:scale-95 transition-all self-start sm:self-auto cursor-pointer"
+          className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-[var(--brand)] px-4 py-3 text-sm font-extrabold text-white shadow-[0_6px_16px_var(--brand-shadow)] transition-all active:scale-[0.98] lg:rounded-2xl lg:bg-indigo-600 lg:px-5 lg:py-2.5 lg:text-xs lg:font-bold lg:shadow-md lg:shadow-indigo-600/20 lg:hover:bg-indigo-700 lg:active:scale-95 lg:sm:text-sm"
         >
           <Compass size={16} />
           <span>{lang === "tr" ? "Daha Fazla Keşfet" : "Explore More"}</span>
@@ -199,14 +199,14 @@ export default function FavoritesPage() {
         </div>
       ) : favoriteTenants.length === 0 ? (
         /* Empty State */
-        <div className="text-center py-24 sm:py-32 px-4 rounded-[32px] bg-white/60 dark:bg-slate-900/60 backdrop-blur-3xl border border-slate-200/70 dark:border-slate-800 shadow-sm max-w-lg mx-auto space-y-4">
-          <div className="w-16 h-16 rounded-3xl bg-rose-50 dark:bg-rose-950/50 text-rose-500 flex items-center justify-center mx-auto shadow-lg shadow-rose-500/10">
+        <div className="mx-auto max-w-lg space-y-4 rounded-3xl border border-slate-200/80 bg-white p-8 text-center shadow-[0_1px_2px_rgb(15,23,42,0.04),0_10px_30px_rgb(15,23,42,0.05)] dark:border-slate-800 dark:bg-slate-900 dark:shadow-[0_1px_2px_rgb(0,0,0,0.35),0_10px_30px_rgb(0,0,0,0.4)] lg:rounded-[32px] lg:border-slate-200/70 lg:bg-white/60 lg:py-32 lg:shadow-sm lg:backdrop-blur-3xl dark:lg:bg-slate-900/60 lg:dark:border-slate-800">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-rose-50 text-rose-500 shadow-lg shadow-rose-500/10 dark:bg-rose-950/50">
             <Heart size={32} className="stroke-[2.2]" />
           </div>
-          <h3 className="text-lg sm:text-xl font-extrabold text-slate-900 dark:text-white">
+          <h3 className="text-[15px] font-bold text-slate-900 dark:text-white lg:text-lg lg:font-extrabold lg:sm:text-xl">
             {lang === "tr" ? "Henüz favori işletmeniz yok" : "No favorites yet"}
           </h3>
-          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 leading-relaxed max-w-sm mx-auto">
+          <p className="mx-auto max-w-sm text-xs leading-relaxed text-slate-500 dark:text-slate-400 lg:text-sm">
             {lang === "tr"
               ? "Keşfet ekranında gördüğünüz işletmelerin sağ üstündeki kalp butonuna dokunarak favorilerinize ekleyebilirsiniz."
               : "Tap the heart icon on any business card in Discover to save your favorite businesses here."}
@@ -214,7 +214,7 @@ export default function FavoritesPage() {
           <button
             type="button"
             onClick={() => router.push("/discover")}
-            className="mt-2 inline-flex items-center gap-2 px-6 py-3 rounded-full bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 font-extrabold text-xs sm:text-sm shadow-md active:scale-95 transition-all cursor-pointer"
+            className="mt-2 inline-flex cursor-pointer items-center gap-2 rounded-xl bg-[var(--brand)] px-4 py-3 text-sm font-extrabold text-white shadow-[0_6px_16px_var(--brand-shadow)] transition-all active:scale-[0.98] lg:rounded-full lg:bg-slate-900 lg:px-6 lg:font-bold lg:shadow-md lg:hover:bg-slate-800 lg:active:scale-95 lg:dark:bg-white lg:dark:text-slate-900 lg:dark:hover:bg-slate-100 lg:sm:text-sm"
           >
             <Compass size={16} />
             <span>
@@ -232,17 +232,133 @@ export default function FavoritesPage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-3 lg:gap-6">
             {favoriteTenants.map((tenant) => {
               const coverImage = getCoverImage(tenant);
               const price = getTenantPrice(tenant);
               const ratingInfo = ratingSummary[tenant.id];
 
               return (
-                <div
-                  key={tenant.id}
-                  className="group relative bg-white/75 dark:bg-slate-900/65 backdrop-blur-3xl rounded-[28px] border border-slate-200/70 dark:border-slate-800/70 shadow-sm hover:shadow-xl hover:-translate-y-1 hover:border-slate-300/90 dark:hover:border-slate-700/90 transition-all duration-300 cursor-pointer overflow-hidden flex flex-col"
-                >
+                <Fragment key={tenant.id}>
+                  {/* ------------------------------------------- */}
+                  {/* MOBİL: liste satırı (72x72 görsel + bilgi + eylem) */}
+                  {/* ------------------------------------------- */}
+                  <div className="relative flex items-center gap-3 rounded-2xl border border-slate-200/80 bg-white p-3 shadow-[0_1px_2px_rgb(15,23,42,0.04),0_10px_30px_rgb(15,23,42,0.05)] dark:border-slate-800 dark:bg-slate-900 dark:shadow-[0_1px_2px_rgb(0,0,0,0.35),0_10px_30px_rgb(0,0,0,0.4)] lg:hidden">
+                    {/* Satırın tamamı gerçek bağlantı (stretched link) */}
+                    <Link
+                      href={`/b/${tenant.slug}`}
+                      aria-label={tenant.name}
+                      className="absolute inset-0 z-[1] rounded-2xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand)]"
+                    />
+
+                    {/* 72x72 kare görsel + favoriden kaldır butonu */}
+                    <div className="relative flex h-[72px] w-[72px] shrink-0 items-center justify-center">
+                      <SafeImage
+                        src={coverImage}
+                        alt={tenant.name}
+                        fallbackSrc={getSectorImage(tenant)}
+                        fallbackIcon={
+                          <Building2 size={26} className="text-[var(--brand-text)]" />
+                        }
+                        className="h-[72px] w-[72px] rounded-xl object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeFavorite(tenant.id);
+                        }}
+                        aria-label={
+                          lang === "tr"
+                            ? "Favorilerden Çıkar"
+                            : "Remove from favorites"
+                        }
+                        title={
+                          lang === "tr"
+                            ? "Favorilerden Çıkar"
+                            : "Remove from favorites"
+                        }
+                        className="absolute -right-1.5 -top-1.5 z-10 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-white text-slate-400 shadow-sm ring-1 ring-slate-200/80 transition-transform active:scale-90 dark:bg-slate-800 dark:ring-slate-700"
+                      >
+                        <Heart
+                          size={14}
+                          className="fill-rose-500 text-rose-500 stroke-rose-500"
+                        />
+                      </button>
+                    </div>
+
+                    {/* Ad, konum, puan ve fiyat */}
+                    <div className="min-w-0 flex-1">
+                      <h3 className="truncate text-[15px] font-bold text-slate-900 dark:text-white">
+                        {tenant.name}
+                      </h3>
+                      <p className="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400">
+                        {tenant.sector
+                          ? `${tenant.sector} · `
+                          : ""}
+                        {[tenant.district, tenant.province].filter(Boolean).join(", ") ||
+                          (lang === "tr"
+                            ? "Konum belirtilmedi"
+                            : "No location")}
+                      </p>
+                      <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                        {ratingInfo?.average_rating ? (
+                          <>
+                            <span className="inline-flex items-center gap-1 text-xs font-bold text-slate-700 dark:text-slate-200">
+                              <Star
+                                size={12}
+                                className="fill-amber-400 text-amber-400"
+                              />
+                              {ratingInfo.average_rating}
+                            </span>
+                            <span className="text-[11px] text-slate-400">
+                              ({ratingInfo.total_reviews})
+                            </span>
+                          </>
+                        ) : (
+                          <span className="text-[11px] font-semibold text-slate-400">
+                            {lang === "tr" ? "Yeni İşletme" : "New"}
+                          </span>
+                        )}
+                        {price != null && (
+                          <span className="text-xs font-extrabold tabular-nums text-[var(--brand-text)]">
+                            ₺{price}
+                            {lang === "tr" ? "'den" : ""}
+                          </span>
+                        )}
+                      </div>
+                      {availability[tenant.id]?.hasFreeSlot && (
+                        <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                          {availability[tenant.id].nextSlot
+                            ? lang === "tr"
+                              ? `Bugün ${availability[tenant.id].nextSlot} müsait`
+                              : `Today ${availability[tenant.id].nextSlot}`
+                            : lang === "tr"
+                              ? "Bugün Müsait"
+                              : "Available Today"}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Randevu butonu */}
+                    <Link
+                      href={`/b/${tenant.slug}/randevu`}
+                      aria-label={`${tenant.name} — ${
+                        lang === "tr" ? "Randevu Al" : "Book"
+                      }`}
+                      className="relative z-10 shrink-0 rounded-xl bg-[var(--brand)] px-3 py-2 text-xs font-extrabold text-white shadow-[0_4px_12px_var(--brand-shadow)] transition-all active:scale-[0.98]"
+                    >
+                      {lang === "tr" ? "Randevu" : "Book"}
+                    </Link>
+                  </div>
+
+                  {/* ------------------------------------------- */}
+                  {/* MASAÜSTÜ: mevcut zengin kart */}
+                  {/* ------------------------------------------- */}
+                  <div
+                    className="group relative hidden lg:flex flex-col bg-white/75 dark:bg-slate-900/65 backdrop-blur-3xl rounded-[28px] border border-slate-200/70 dark:border-slate-800/70 shadow-sm hover:shadow-xl hover:-translate-y-1 hover:border-slate-300/90 dark:hover:border-slate-700/90 transition-all duration-300 cursor-pointer overflow-hidden"
+                  >
                   {/* Kartın tamamı gerçek bir bağlantı (stretched link):
                       klavye erişimi + yeni sekmede açma + ekran okuyucu uyumu. */}
                   <Link
@@ -393,7 +509,8 @@ export default function FavoritesPage() {
                       </button>
                     </div>
                   </div>
-                </div>
+                  </div>
+                </Fragment>
               );
             })}
           </div>

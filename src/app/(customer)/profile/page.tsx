@@ -182,12 +182,12 @@ export default function ProfilePage() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto py-10 px-4 md:px-0">
-      <h1 className="text-3xl font-bold mb-6 text-gray-900 dark:text-white">
+    <div className="max-w-2xl mx-auto px-4 py-6 md:px-0 md:py-10">
+      <h1 className="mb-6 text-2xl font-black tracking-tight text-slate-900 dark:text-white lg:text-3xl lg:font-bold lg:tracking-normal lg:text-gray-900">
         {t("profile.title")}
       </h1>
 
-      <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 shadow-sm">
+      <div className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-[0_1px_2px_rgb(15,23,42,0.04),0_10px_30px_rgb(15,23,42,0.05)] dark:border-slate-800 dark:bg-slate-900 dark:shadow-[0_1px_2px_rgb(0,0,0,0.35),0_10px_30px_rgb(0,0,0,0.4)] lg:border-0 lg:p-6 lg:shadow-sm md:p-8">
         {fetching ? (
           <div className="flex justify-center items-center h-32">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 dark:border-blue-400"></div>
@@ -197,10 +197,10 @@ export default function ProfilePage() {
             {message.text && (
               <div
                 role="alert"
-                className={`p-4 rounded-xl ${
+                className={`rounded-xl border p-4 ${
                   message.type === "success"
-                    ? "bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800"
-                    : "bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800"
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/25 dark:bg-emerald-500/10 dark:text-emerald-400 lg:border-green-200 lg:bg-green-50 lg:text-green-700 dark:lg:border-green-800 dark:lg:bg-green-900/30 dark:lg:text-green-400"
+                    : "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/25 dark:bg-rose-500/10 dark:text-rose-400 lg:border-red-200 lg:bg-red-50 lg:text-red-700 dark:lg:border-red-800 dark:lg:bg-red-900/30 dark:lg:text-red-400"
                 }`}
               >
                 {message.text}
@@ -210,7 +210,7 @@ export default function ProfilePage() {
             {/* Profile Photo */}
             <div className="flex flex-col items-center gap-3">
               <div className="relative h-24 w-24">
-                <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 text-3xl font-bold text-white shadow-md">
+                <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full bg-[var(--brand-soft)] text-3xl font-black text-[var(--brand-text)] lg:bg-gradient-to-br lg:from-indigo-400 lg:to-purple-500 lg:text-white lg:shadow-md">
                   {avatarPreview || avatarUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
@@ -225,7 +225,7 @@ export default function ProfilePage() {
                 <label
                   htmlFor="avatar"
                   aria-label={t("profile.photo_add")}
-                  className="absolute bottom-0 right-0 flex h-11 w-11 cursor-pointer items-center justify-center rounded-full bg-blue-600 text-white shadow-md hover:bg-blue-700 transition-colors"
+                  className="absolute bottom-0 right-0 flex h-11 w-11 cursor-pointer items-center justify-center rounded-full bg-[var(--brand)] text-white shadow-[0_6px_16px_var(--brand-shadow)] transition-colors hover:bg-[var(--brand-strong)] lg:bg-blue-600 lg:shadow-md lg:hover:bg-blue-700"
                 >
                   <Camera size={18} />
                 </label>
@@ -237,7 +237,7 @@ export default function ProfilePage() {
                   className="hidden"
                 />
               </div>
-              <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
+              <p className="text-xs font-medium text-slate-500 dark:text-slate-400 lg:text-gray-500 dark:lg:text-gray-400">
                 {t("profile.photo_add")}
               </p>
             </div>
@@ -245,7 +245,7 @@ export default function ProfilePage() {
             <div>
               <label
                 htmlFor="fullName"
-                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+                className="mb-2 block text-sm font-bold text-slate-700 dark:text-slate-300 lg:font-medium lg:text-gray-700 dark:lg:text-gray-300"
               >
                 {t("profile.name")}
               </label>
@@ -257,7 +257,7 @@ export default function ProfilePage() {
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 placeholder={t("profile.name_placeholder")}
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-slate-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                className="w-full rounded-xl border border-slate-200/80 bg-white px-4 py-3 text-gray-900 outline-none transition-all focus:ring-2 focus:ring-[var(--brand)] dark:border-slate-700 dark:bg-slate-800 dark:text-white lg:border-gray-200 lg:bg-gray-50 lg:focus:ring-blue-500 dark:lg:border-gray-700 dark:lg:bg-slate-800"
                 required
               />
             </div>
@@ -265,7 +265,7 @@ export default function ProfilePage() {
             <div>
               <label
                 htmlFor="phone"
-                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+                className="mb-2 block text-sm font-bold text-slate-700 dark:text-slate-300 lg:font-medium lg:text-gray-700 dark:lg:text-gray-300"
               >
                 {t("profile.phone")}
               </label>
@@ -278,9 +278,9 @@ export default function ProfilePage() {
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder={TR_MOBILE_PLACEHOLDER}
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-slate-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                className="w-full rounded-xl border border-slate-200/80 bg-white px-4 py-3 text-gray-900 outline-none transition-all focus:ring-2 focus:ring-[var(--brand)] dark:border-slate-700 dark:bg-slate-800 dark:text-white lg:border-gray-200 lg:bg-gray-50 lg:focus:ring-blue-500 dark:lg:border-gray-700 dark:lg:bg-slate-800"
               />
-              <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+              <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400 lg:text-gray-500 dark:lg:text-gray-400">
                 {t("profile.phone_note")}
               </p>
             </div>
@@ -288,7 +288,7 @@ export default function ProfilePage() {
             <button
               type="submit"
               disabled={saving}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 rounded-xl transition-all disabled:opacity-70 flex justify-center items-center mt-4"
+              className="mt-4 flex w-full items-center justify-center rounded-xl bg-[var(--brand)] py-3.5 text-sm font-extrabold text-white shadow-[0_6px_16px_var(--brand-shadow)] transition-all active:scale-[0.98] disabled:opacity-70 lg:bg-blue-600 lg:py-3 lg:font-medium lg:shadow-none lg:hover:bg-blue-700"
             >
               {saving ? (
                 <>
@@ -308,7 +308,7 @@ export default function ProfilePage() {
         {(role === "owner" || role === "staff") && (
           <Link
             href="/dashboard"
-            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-md shadow-indigo-200 hover:from-indigo-600 hover:to-purple-700 dark:shadow-indigo-950/40 py-3.5 px-4 text-sm font-bold transition-all active:scale-[0.98]"
+            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-[var(--brand-border)] bg-[var(--brand-soft)] px-4 py-3.5 text-sm font-extrabold text-[var(--brand-text)] transition-all active:scale-[0.98] lg:border-0 lg:bg-gradient-to-r lg:from-indigo-500 lg:to-purple-600 lg:text-white lg:shadow-md lg:shadow-indigo-200 lg:hover:from-indigo-600 lg:hover:to-purple-700 dark:lg:shadow-indigo-950/40"
           >
             <LayoutDashboard size={18} strokeWidth={2.2} />
             <span>{t("profile.back_to_business")}</span>
@@ -319,7 +319,7 @@ export default function ProfilePage() {
           type="button"
           onClick={handleLogout}
           disabled={loggingOut}
-          className="w-full flex items-center justify-center gap-2.5 rounded-2xl bg-red-50 hover:bg-red-100 text-red-600 dark:bg-red-500/10 dark:hover:bg-red-500/20 dark:text-red-400 border border-red-200/70 dark:border-red-500/20 py-3.5 px-4 text-sm font-bold transition-all active:scale-[0.98] shadow-xs cursor-pointer disabled:opacity-60"
+          className="flex w-full cursor-pointer items-center justify-center gap-2.5 rounded-2xl border border-rose-200/80 bg-rose-50 px-4 py-3.5 text-sm font-bold text-rose-600 transition-all active:scale-[0.98] disabled:opacity-60 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-400 lg:border-red-200/70 lg:bg-red-50 lg:text-red-600 lg:hover:bg-red-100 dark:lg:border-red-500/20 dark:lg:bg-red-500/10 dark:lg:text-red-400 dark:lg:hover:bg-red-500/20"
         >
           <LogOut size={18} strokeWidth={2.2} />
           <span>
