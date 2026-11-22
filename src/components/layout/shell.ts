@@ -33,16 +33,20 @@ export const SHELL = {
  header:
   "shrink-0 z-30 flex h-14 sm:h-16 min-w-0 items-center justify-between rounded-2xl sm:rounded-[28px] border border-white/50 bg-white/60 backdrop-blur-3xl px-3.5 sm:px-5 shadow-[0_4px_20px_rgb(0,0,0,0.03)] dark:bg-slate-900/60 dark:border-slate-700/50 dark:shadow-[0_4px_20px_rgb(0,0,0,0.2)] transition-all",
 
- /** İçerik kartı (kaydırılabilir sayfa alanı) */
- main:
-  "flex-1 min-w-0 min-h-0 rounded-2xl sm:rounded-[28px] bg-white/70 dark:bg-slate-900/60 backdrop-blur-3xl border border-white/50 dark:border-slate-800/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] overflow-y-auto overflow-x-hidden overscroll-y-contain custom-scrollbar p-3 sm:p-6 md:p-8 pb-24 sm:pb-24 lg:pb-8 pr-2.5 sm:pr-4 relative z-0",
+  /** İçerik kartı (kaydırılabilir sayfa alanı) */
+  main:
+   "flex-1 min-w-0 min-h-0 rounded-2xl sm:rounded-[28px] bg-white/70 dark:bg-slate-900/60 backdrop-blur-3xl border border-white/50 dark:border-slate-800/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] relative z-0",
 
- /** Mobil alt navigasyon çubuğu */
- bottomNav:
- "fixed bottom-0 inset-x-0 z-40 lg:hidden bg-white/85 dark:bg-slate-900/85 backdrop-blur-2xl border-t border-gray-200/80 dark:border-slate-800/80 shadow-[0_-4px_25px_rgba(0,0,0,0.06)] dark:shadow-[0_-4px_25px_rgba(0,0,0,0.4)] pt-1.5 select-none shell-bottomnav",
+  /** Her kalıcı sekmenin bağımsız dikey kaydırma alanı */
+  tabPane:
+    "h-full min-w-0 overflow-y-auto overflow-x-hidden overscroll-y-contain custom-scrollbar p-3 sm:p-6 md:p-8 pb-24 sm:pb-24 lg:pb-8 pr-2.5 sm:pr-4",
+
+  /** Mobil alt navigasyon çubuğu */
+  bottomNav:
+    "fixed bottom-0 inset-x-0 z-40 lg:hidden select-none shell-bottomnav",
 
   /** Mobil alt navigasyon iç genişliği (her iki panelde aynı) */
-  bottomNavInner: "flex items-center justify-around max-w-md mx-auto",
+  bottomNavInner: "shell-bottomnav-inner",
 } as const;
 
 /** Alt navigasyon çubuğunun göründüğü yol önekleri. */

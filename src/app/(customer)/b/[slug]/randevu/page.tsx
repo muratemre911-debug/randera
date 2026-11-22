@@ -32,6 +32,7 @@ import {
   type StaffMember,
 } from "@/lib/staff";
 import { isTrMobile } from "@/lib/phone";
+import { notifyPanelChange } from "@/lib/panelEvents";
 
 /** Hizmetin süresini dakika cinsinden döner (kolon adı iki biçimde olabilir). */
 function getServiceDuration(svc: ServiceItem): number {
@@ -532,6 +533,7 @@ export default function BookPage() {
       // kullanıcı tarafından fark edilmiyordu.
       setBookingError(data.error || t("booking.booking_error"));
     } else {
+      notifyPanelChange("appointments");
       setBookingSuccess(true);
     }
   };

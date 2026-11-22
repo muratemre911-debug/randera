@@ -23,6 +23,7 @@ import { ownRecordsScope } from "@/lib/staff";
 import { useLanguage } from "@/context/LanguageContext";
 import { format, parseISO } from "date-fns";
 import { tr, enUS } from "date-fns/locale";
+import { subscribePanelChanges } from "@/lib/panelEvents";
 
 /**
  * Sorgudan dönen ham randevu satırı
@@ -82,8 +83,8 @@ export default function MusterilerPage() {
   const [sortBy, setSortBy] = useState<SortOption>("spent_desc");
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
 
-  const fetchCustomers = async () => {
-    setLoading(true);
+  const fetchCustomers = async (quiet = false) => {
+    if (!quiet) setLoading(true);
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
@@ -258,6 +259,13 @@ export default function MusterilerPage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchCustomers();
     // `lang` bilerek bağımlılık DEĞİL: dil değişince veri aynıdır.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    return subscribePanelChanges(["appointments"], () => {
+      void fetchCustomers(true);
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -914,4 +922,3 @@ export default function MusterilerPage() {
     </div>
   );
 }
-

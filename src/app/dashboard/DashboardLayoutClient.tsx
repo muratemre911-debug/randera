@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   LayoutDashboard,
   Calendar,
@@ -40,15 +40,18 @@ import DynamicLogoLink from "@/components/DynamicLogoLink";
 import { SHELL } from "@/components/layout/shell";
 import BrandLogo from "@/components/layout/BrandLogo";
 import SwipePager from "@/components/layout/SwipePager";
+import MobileBottomNav from "@/components/layout/MobileBottomNav";
+import DashboardOverviewPage from "./page";
+import DashboardCalendarPage from "./takvim/page";
+import DashboardServicesPage from "./hizmetler/page";
+import DashboardTeamPage from "./ekip/page";
+import DashboardCustomersPage from "./musteriler/page";
 import UserAvatar, { getDisplayName } from "@/components/layout/UserAvatar";
 import { preventFocusScroll } from "@/lib/preventFocusScroll";
 
 /**
- * Panelde parmakla geçiş yapılabilen sekmeler.
- * Alt navigasyon çubuğunda görünen sekmelerle BİREBİR aynı sıradadır; böylece
- * kaydırma hareketi ile sekme göstergesi hep tutarlı kalır. Menü sayfasından
- * açılan diğer sayfalar (İçerikler, Geçmiş Randevular, Ayarlar) kaydırma
- * kapsamı dışındadır — alt çubukta sekmesi yoktur.
+ * Panelde parmakla geçiş yapılabilen kalıcı sayfalar. Ekip ve Müşteriler
+ * menüden de açılabilir; bu liste SwipePager'ın sayfa durumunu koruması içindir.
  */
 const DASHBOARD_SWIPE_TABS = [
   { href: "/dashboard" },
@@ -58,13 +61,23 @@ const DASHBOARD_SWIPE_TABS = [
   { href: "/dashboard/musteriler" },
 ];
 
+const DASHBOARD_TAB_PAGES: Record<string, React.ComponentType> = {
+  "/dashboard": DashboardOverviewPage,
+  "/dashboard/takvim": DashboardCalendarPage,
+  "/dashboard/hizmetler": DashboardServicesPage,
+  "/dashboard/ekip": DashboardTeamPage,
+  "/dashboard/musteriler": DashboardCustomersPage,
+};
+
 /**
- * Mobil "Menü" çekmecesinde listelenen sayfalar (alt çubukta sekmesi
- * olmayanlar). Görünürlük kuralı burada tekrarlanmaz: liste navItems'ten
+ * Mobil "Menü" çekmecesinde listelenen sayfalar (alt çubukta gösterilmeyenler).
+ * Görünürlük kuralı burada tekrarlanmaz: liste navItems'ten
  * süzülür, böylece "yalnızca sahip" işaretli bir sayfa (ör. İçerikler)
  * çekmecede de otomatik olarak gizlenir.
  */
 const DRAWER_HREFS = [
+  "/dashboard/ekip",
+  "/dashboard/musteriler",
   "/dashboard/icerikler",
   "/dashboard/gecmis-randevular",
   "/dashboard/ayarlar",
@@ -106,7 +119,13 @@ export default function DashboardLayoutClient({
   const { t, lang, toggleLanguage } = useLanguage();
   const { theme, toggleTheme } = useTheme();
 
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [mobileMenuPhase, setMobileMenuPhase] = useState<
+    "closed" | "opening" | "open" | "closing"
+  >("closed");
+  const mobileMenuMountedRef = useRef(false);
+  const mobileMenuCloseTimerRef = useRef<number | null>(null);
+  const mobileMenuFrameRef = useRef<number | null>(null);
+  const mobileMenuSheetRef = useRef<HTMLDivElement>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [userFullName, setUserFullName] = useState<string | null>(null);
   const [userAvatarUrl, setUserAvatarUrl] = useState<string | null>(null);
@@ -128,6 +147,92 @@ export default function DashboardLayoutClient({
   const rootRef = useRef<HTMLDivElement>(null);
   const columnRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLElement>(null);
+
+  const updateMobileMenuOrigin = useCallback(() => {
+    const sheet = mobileMenuSheetRef.current;
+    const trigger = document.querySelector<HTMLElement>("[data-nav-action]");
+    if (!sheet || !trigger) return;
+
+    const triggerRect = trigger.getBoundingClientRect();
+    const sheetTop = window.innerHeight - sheet.offsetHeight;
+    sheet.style.setProperty(
+      "--mobile-menu-origin-x",
+      `${triggerRect.left + triggerRect.width / 2}px`,
+    );
+    sheet.style.setProperty(
+      "--mobile-menu-origin-y",
+      `${Math.max(
+        0,
+        triggerRect.top + triggerRect.height / 2 - sheetTop,
+      )}px`,
+    );
+  }, []);
+
+  const openMobileMenu = useCallback(() => {
+    if (mobileMenuCloseTimerRef.current !== null) {
+      window.clearTimeout(mobileMenuCloseTimerRef.current);
+      mobileMenuCloseTimerRef.current = null;
+    }
+    if (mobileMenuFrameRef.current !== null) {
+      window.cancelAnimationFrame(mobileMenuFrameRef.current);
+    }
+    mobileMenuMountedRef.current = true;
+    setMobileMenuPhase("opening");
+    mobileMenuFrameRef.current = window.requestAnimationFrame(() => {
+      updateMobileMenuOrigin();
+      mobileMenuFrameRef.current = window.requestAnimationFrame(() => {
+        mobileMenuFrameRef.current = null;
+        setMobileMenuPhase("open");
+      });
+    });
+  }, [updateMobileMenuOrigin]);
+
+  const finishMobileMenuClose = useCallback(() => {
+    if (mobileMenuCloseTimerRef.current !== null) {
+      window.clearTimeout(mobileMenuCloseTimerRef.current);
+      mobileMenuCloseTimerRef.current = null;
+    }
+    if (mobileMenuFrameRef.current !== null) {
+      window.cancelAnimationFrame(mobileMenuFrameRef.current);
+      mobileMenuFrameRef.current = null;
+    }
+    mobileMenuMountedRef.current = false;
+    setMobileMenuPhase("closed");
+  }, []);
+
+  const closeMobileMenu = useCallback(() => {
+    if (!mobileMenuMountedRef.current || mobileMenuCloseTimerRef.current !== null) {
+      return;
+    }
+    if (mobileMenuFrameRef.current !== null) {
+      window.cancelAnimationFrame(mobileMenuFrameRef.current);
+      mobileMenuFrameRef.current = null;
+    }
+    setMobileMenuPhase("closing");
+    const reducedMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    if (reducedMotion) {
+      finishMobileMenuClose();
+      return;
+    }
+    mobileMenuCloseTimerRef.current = window.setTimeout(
+      finishMobileMenuClose,
+      480,
+    );
+  }, [finishMobileMenuClose]);
+
+  useEffect(
+    () => () => {
+      if (mobileMenuCloseTimerRef.current !== null) {
+        window.clearTimeout(mobileMenuCloseTimerRef.current);
+      }
+      if (mobileMenuFrameRef.current !== null) {
+        window.cancelAnimationFrame(mobileMenuFrameRef.current);
+      }
+    },
+    [],
+  );
 
   // Kalan gün rozetinin renkleri
   const membershipBadgeClass = (kind: MembershipInfo["kind"]) =>
@@ -156,21 +261,11 @@ export default function DashboardLayoutClient({
     return () => window.removeEventListener("scroll", lockExternalScroll);
   }, []);
 
-  // Close mobile bottom sheet and reset scroll when route changes
+  // Menüden bir rotaya geçildiğinde paneli de animasyonla kapat.
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- rota değişince mobil menüyü kapat
-    setMobileMenuOpen(false);
-    if (mainRef.current) {
-      mainRef.current.scrollTop = 0;
-    }
-    if (columnRef.current) {
-      columnRef.current.scrollTop = 0;
-    }
-    if (rootRef.current) {
-      rootRef.current.scrollTop = 0;
-    }
-    window.scrollTo(0, 0);
-  }, [pathname]);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- rota değişince açık menüyü kapat
+    closeMobileMenu();
+  }, [closeMobileMenu, pathname]);
 
   // Keyboard shortcut Cmd+K / Ctrl+K listener
   useEffect(() => {
@@ -241,8 +336,52 @@ export default function DashboardLayoutClient({
     router.push("/login");
   };
 
-  const visibleNavItems = navItems.filter(
-    (item) => !item.ownerOnly || userRole === "owner",
+  const visibleNavItems = useMemo(
+    () => navItems.filter((item) => !item.ownerOnly || userRole === "owner"),
+    [userRole],
+  );
+  const canAccessTeamTab =
+    userRole === "owner" || pathname.startsWith("/dashboard/ekip");
+  const dashboardSwipeTabs = useMemo(
+    () =>
+      DASHBOARD_SWIPE_TABS.filter(
+        (tab) => tab.href !== "/dashboard/ekip" || canAccessTeamTab,
+      ),
+    [canAccessTeamTab],
+  );
+  const dashboardPageTabs = useMemo(
+    () =>
+      dashboardSwipeTabs.flatMap(({ href }) => {
+        const Page = DASHBOARD_TAB_PAGES[href];
+        return Page ? [{ href, content: <Page /> }] : [];
+      }),
+    [dashboardSwipeTabs],
+  );
+  const dashboardBottomTabs = useMemo(
+    () =>
+      dashboardSwipeTabs.flatMap(({ href }) => {
+        const item = navItems.find((navItem) => navItem.href === href);
+        if (
+          !item ||
+          DRAWER_HREFS.includes(item.href) ||
+          (item.ownerOnly && userRole !== "owner" && !canAccessTeamTab)
+        ) {
+          return [];
+        }
+        return [
+          {
+            href: item.href,
+            icon: item.icon,
+            label: t(item.i18nKey),
+            isActive: (currentPath: string) =>
+              item.href === "/dashboard"
+                ? currentPath === item.href
+                : currentPath === item.href ||
+                  currentPath.startsWith(`${item.href}/`),
+          },
+        ];
+      }),
+    [canAccessTeamTab, dashboardSwipeTabs, t, userRole],
   );
 
   /**
@@ -539,7 +678,7 @@ export default function DashboardLayoutClient({
         {/* Sayfa içeriği — alt navigasyon sekmeleri arasında parmakla geçiş */}
         <SwipePager
           ref={mainRef}
-          tabs={DASHBOARD_SWIPE_TABS}
+          tabs={dashboardPageTabs}
           className={SHELL.main}
           onMouseDown={preventFocusScroll}
         >
@@ -547,145 +686,53 @@ export default function DashboardLayoutClient({
         </SwipePager>
       </div>
 
-      {/* Mobile Bottom Navigation Bar (Instagram / TikTok / YouTube style) */}
-      <nav className={SHELL.bottomNav}>
-        <div className={SHELL.bottomNavInner}>
-          {/* 1. Özet */}
-          <Link
-            href="/dashboard"
-            className={`flex flex-col items-center justify-center flex-1 py-1 px-0.5 min-w-0 transition-all duration-200 active:scale-90 ${
-              pathname === "/dashboard"
-                ? "text-indigo-600 dark:text-indigo-400 font-extrabold"
-                : "text-gray-400 hover:text-gray-600 dark:text-slate-400 dark:hover:text-slate-200 font-medium"
-            }`}
-          >
-            <LayoutDashboard
-              size={21}
-              strokeWidth={pathname === "/dashboard" ? 2.5 : 1.8}
-            />
-            <span className="text-[9.5px] sm:text-[10px] mt-1 tracking-tight leading-none truncate max-w-full text-center">
-              {t("nav.overview")}
-            </span>
-          </Link>
+      {/* Mobilde parmakla sürüklenebilen, cam efektli alt navigasyon */}
+      <MobileBottomNav
+        tabs={dashboardBottomTabs}
+        ariaLabel={lang === "tr" ? "İşletme menüsü" : "Business menu"}
+        action={{
+          icon: Menu,
+          label: lang === "tr" ? "Menü" : "Menu",
+          onSelect: openMobileMenu,
+          active:
+            mobileMenuPhase !== "closed" ||
+            pathname.startsWith("/dashboard/icerikler") ||
+            pathname.startsWith("/dashboard/gecmis-randevular") ||
+            pathname.startsWith("/dashboard/ayarlar") ||
+            pathname.startsWith("/dashboard/ekip") ||
+            pathname.startsWith("/dashboard/musteriler"),
+        }}
+      />
 
-          {/* 2. Takvim */}
-          <Link
-            href="/dashboard/takvim"
-            className={`flex flex-col items-center justify-center flex-1 py-1 px-0.5 min-w-0 transition-all duration-200 active:scale-90 ${
-              pathname.startsWith("/dashboard/takvim")
-                ? "text-indigo-600 dark:text-indigo-400 font-extrabold"
-                : "text-gray-400 hover:text-gray-600 dark:text-slate-400 dark:hover:text-slate-200 font-medium"
-            }`}
-          >
-            <Calendar
-              size={21}
-              strokeWidth={pathname.startsWith("/dashboard/takvim") ? 2.5 : 1.8}
-            />
-            <span className="text-[9.5px] sm:text-[10px] mt-1 tracking-tight leading-none truncate max-w-full text-center">
-              {t("nav.calendar")}
-            </span>
-          </Link>
-
-          {/* 3. Hizmetler */}
-          <Link
-            href="/dashboard/hizmetler"
-            className={`flex flex-col items-center justify-center flex-1 py-1 px-0.5 min-w-0 transition-all duration-200 active:scale-90 ${
-              pathname.startsWith("/dashboard/hizmetler")
-                ? "text-indigo-600 dark:text-indigo-400 font-extrabold"
-                : "text-gray-400 hover:text-gray-600 dark:text-slate-400 dark:hover:text-slate-200 font-medium"
-            }`}
-          >
-            <Wrench
-              size={21}
-              strokeWidth={
-                pathname.startsWith("/dashboard/hizmetler") ? 2.5 : 1.8
-              }
-            />
-            <span className="text-[9.5px] sm:text-[10px] mt-1 tracking-tight leading-none truncate max-w-full text-center">
-              {t("nav.services")}
-            </span>
-          </Link>
-
-          {/* 4. Ekip (Yalnızca işletme sahibi) */}
-          {(userRole === "owner" || pathname.startsWith("/dashboard/ekip")) && (
-            <Link
-              href="/dashboard/ekip"
-              className={`flex flex-col items-center justify-center flex-1 py-1 px-0.5 min-w-0 transition-all duration-200 active:scale-90 ${
-                pathname.startsWith("/dashboard/ekip")
-                  ? "text-indigo-600 dark:text-indigo-400 font-extrabold"
-                  : "text-gray-400 hover:text-gray-600 dark:text-slate-400 dark:hover:text-slate-200 font-medium"
-              }`}
-            >
-              <UserCog
-                size={21}
-                strokeWidth={
-                  pathname.startsWith("/dashboard/ekip") ? 2.5 : 1.8
-                }
-              />
-              <span className="text-[9.5px] sm:text-[10px] mt-1 tracking-tight leading-none truncate max-w-full text-center">
-                {t("nav.team")}
-              </span>
-            </Link>
-          )}
-
-          {/* 5. Müşteriler */}
-          <Link
-            href="/dashboard/musteriler"
-            className={`flex flex-col items-center justify-center flex-1 py-1 px-0.5 min-w-0 transition-all duration-200 active:scale-90 ${
-              pathname.startsWith("/dashboard/musteriler")
-                ? "text-indigo-600 dark:text-indigo-400 font-extrabold"
-                : "text-gray-400 hover:text-gray-600 dark:text-slate-400 dark:hover:text-slate-200 font-medium"
-            }`}
-          >
-            <Users
-              size={21}
-              strokeWidth={
-                pathname.startsWith("/dashboard/musteriler") ? 2.5 : 1.8
-              }
-            />
-            <span className="text-[9.5px] sm:text-[10px] mt-1 tracking-tight leading-none truncate max-w-full text-center">
-              {t("nav.customers")}
-            </span>
-          </Link>
-
-          {/* 6. Menü (More Drawer) */}
-          {(() => {
-            const isMoreActive =
-              pathname.startsWith("/dashboard/icerikler") ||
-              pathname.startsWith("/dashboard/gecmis-randevular") ||
-              pathname.startsWith("/dashboard/ayarlar");
-            return (
-              <button
-                type="button"
-                onClick={() => setMobileMenuOpen(true)}
-                className={`flex flex-col items-center justify-center flex-1 py-1 px-0.5 min-w-0 transition-all duration-200 active:scale-90 ${
-                  isMoreActive || mobileMenuOpen
-                    ? "text-indigo-600 dark:text-indigo-400 font-extrabold"
-                    : "text-gray-400 hover:text-gray-600 dark:text-slate-400 dark:hover:text-slate-200 font-medium"
-                }`}
-              >
-                <Menu
-                  size={21}
-                  strokeWidth={isMoreActive || mobileMenuOpen ? 2.5 : 1.8}
-                />
-                <span className="text-[9.5px] sm:text-[10px] mt-1 tracking-tight leading-none truncate max-w-full text-center">
-                  {lang === "tr" ? "Menü" : "Menu"}
-                </span>
-              </button>
-            );
-          })()}
-        </div>
-      </nav>
-
-      {/* Mobile Bottom Sheet Menu (Drawer) */}
-      {mobileMenuOpen && (
-        <div data-no-swipe className="fixed inset-0 z-50 lg:hidden">
+      {/* Menü, alt bardaki seçili kapsülden büyüyerek açılır ve aynı yere küçülür. */}
+      {mobileMenuPhase !== "closed" && (
+        <div
+          data-no-swipe
+          data-open={mobileMenuPhase === "open" ? "true" : "false"}
+          aria-hidden={mobileMenuPhase === "closing"}
+          className={`mobile-menu-overlay fixed inset-0 z-50 lg:hidden ${
+            mobileMenuPhase === "closing" ? "pointer-events-none" : ""
+          }`}
+        >
           <div
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200"
-            onClick={() => setMobileMenuOpen(false)}
+            className="mobile-menu-backdrop absolute inset-0"
+            onClick={closeMobileMenu}
           />
           <div
-            className="fixed bottom-0 inset-x-0 z-50 bg-white/95 dark:bg-slate-900/95 backdrop-blur-3xl rounded-t-[32px] border-t border-white/60 dark:border-slate-800 shadow-2xl p-5 pb-[max(env(safe-area-inset-bottom),1.5rem)] animate-in slide-in-from-bottom duration-300 max-h-[85vh] overflow-y-auto space-y-4"
+            ref={mobileMenuSheetRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label={lang === "tr" ? "İşletme menüsü" : "Business menu"}
+            className="mobile-menu-sheet fixed bottom-0 inset-x-0 z-50 border-t border-white/60 p-5 pb-[max(env(safe-area-inset-bottom),1.5rem)] shadow-2xl max-h-[85vh] overflow-y-auto space-y-4"
+            onTransitionEnd={(event) => {
+              if (
+                event.target === event.currentTarget &&
+                event.propertyName === "transform" &&
+                mobileMenuPhase === "closing"
+              ) {
+                finishMobileMenuClose();
+              }
+            }}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Grab handle */}
@@ -720,7 +767,7 @@ export default function DashboardLayoutClient({
                 </div>
               </div>
               <button
-                onClick={() => setMobileMenuOpen(false)}
+                onClick={closeMobileMenu}
                 className="p-2 rounded-full text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
               >
                 <X size={20} />
@@ -738,7 +785,7 @@ export default function DashboardLayoutClient({
                   <Link
                     key={item.href}
                     href={item.href}
-                    onClick={() => setMobileMenuOpen(false)}
+                    onClick={closeMobileMenu}
                     className={`flex items-center justify-between px-4 py-3 rounded-2xl text-sm font-bold transition-all ${
                       isActive
                         ? "bg-indigo-50 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-400 border border-indigo-200/50 dark:border-indigo-800/40"
@@ -768,7 +815,7 @@ export default function DashboardLayoutClient({
               {/* Müşteri Hesabına Dön Linki */}
               <Link
                 href="/discover"
-                onClick={() => setMobileMenuOpen(false)}
+                onClick={closeMobileMenu}
                 className="flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-bold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition-all"
               >
                 <Compass
@@ -811,7 +858,7 @@ export default function DashboardLayoutClient({
               <button
                 type="button"
                 onClick={() => {
-                  setMobileMenuOpen(false);
+                  closeMobileMenu();
                   handleLogout();
                 }}
                 className="w-full flex items-center justify-center gap-2 p-3 rounded-2xl bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-500/20 text-xs font-bold transition-colors"

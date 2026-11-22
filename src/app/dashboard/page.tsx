@@ -27,6 +27,7 @@ import type { DashboardStats, Service, Profile } from "@/types";
 import { PageSkeleton } from "@/components/Skeleton";
 import CustomSelect from "@/components/CustomSelect";
 import { ownRecordsScope } from "@/lib/staff";
+import { notifyPanelChange, subscribePanelChanges } from "@/lib/panelEvents";
 
 /**
  * Sorgudan dönen ham randevu satırı.
@@ -396,6 +397,13 @@ export default function DashboardPage() {
     fetchDashboardData();
   }, [fetchDashboardData]);
 
+  useEffect(() => {
+    return subscribePanelChanges(
+      ["appointments", "services", "staff"],
+      () => void fetchDashboardData(),
+    );
+  }, [fetchDashboardData]);
+
   /**
    * Yeni randevu modalını açar ve formu sıfırlar.
    *
@@ -454,6 +462,7 @@ export default function DashboardPage() {
       if (completedApp) {
         setCompletedRevenue((c) => c + completedApp.service_price);
       }
+      notifyPanelChange("appointments");
     }
     setActionLoadingId(null);
   };
@@ -476,6 +485,7 @@ export default function DashboardPage() {
         ...prev,
         pendingAppointments: Math.max(0, prev.pendingAppointments - 1),
       }));
+      notifyPanelChange("appointments");
     }
     setActionLoadingId(null);
   };
@@ -503,6 +513,7 @@ export default function DashboardPage() {
         ...prev,
         pendingAppointments: Math.max(0, prev.pendingAppointments - 1),
       }));
+      notifyPanelChange("appointments");
     }
     setActionLoadingId(null);
   };
@@ -618,7 +629,7 @@ export default function DashboardPage() {
     setNewCustomerName("");
     setNewCustomerPhone("");
     setAppointmentNote("");
-    fetchDashboardData();
+    notifyPanelChange("appointments");
   };
 
   const formatTimeRange = (startIso: string, endIso: string) => {

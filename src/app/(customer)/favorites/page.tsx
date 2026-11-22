@@ -16,6 +16,7 @@ import {
   Calendar,
   Building2,
 } from "lucide-react";
+import { useFavorites } from "@/lib/useFavorites";
 
 interface Tenant {
   id: string;
@@ -47,17 +48,8 @@ export default function FavoritesPage() {
   const supabase = createClient();
   const router = useRouter();
   const { lang } = useLanguage();
+  const { favoriteIds: favorites, removeFavorite } = useFavorites();
 
-  // Favoriler tarayıcıda saklanır; ilk render'da okunur
-  const [favorites, setFavorites] = useState<string[]>(() => {
-    if (typeof window === "undefined") return [];
-    try {
-      const saved = localStorage.getItem("randera_favorites");
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [tenantPrices, setTenantPrices] = useState<Record<string, number>>({});
   const [ratingSummary, setRatingSummary] = useState<
@@ -133,16 +125,6 @@ export default function FavoritesPage() {
 
     fetchFavoriteTenants();
   }, [supabase]);
-
-  const removeFavorite = (tenantId: string) => {
-    const updated = favorites.filter((id) => id !== tenantId);
-    setFavorites(updated);
-    try {
-      localStorage.setItem("randera_favorites", JSON.stringify(updated));
-    } catch {
-      // ignore
-    }
-  };
 
   const favoriteTenants = useMemo(() => {
     return tenants.filter((t) => favorites.includes(t.id));

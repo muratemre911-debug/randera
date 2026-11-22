@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo, useRef } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { format, parseISO, isAfter } from "date-fns";
 import type { Locale } from "date-fns";
@@ -24,7 +24,9 @@ import {
   Undo2,
   Loader2,
   ChevronDown,
-  Star
+  Star,
+  ArrowUpRight,
+  CalendarDays,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -35,6 +37,7 @@ import {
   effectiveBookingRules,
   type BookingRulesInput,
 } from "@/lib/staff";
+import { notifyPanelChange, subscribePanelChanges } from "@/lib/panelEvents";
 
 /** Bilinmeyen (unknown) hata değerinden gösterilebilir mesaj çıkarır. */
 function errorMessage(err: unknown, fallback: string): string {
@@ -147,8 +150,8 @@ export default function MyAppointmentsPage() {
     effectiveBookingRules(appt.staff_booking_rules, appt.tenants?.booking_rules)
       .cancelDeadlineHours;
 
-  const fetchAppointments = async () => {
-    setLoading(true);
+  const fetchAppointments = async (quiet = false) => {
+    if (!quiet) setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
@@ -226,6 +229,14 @@ export default function MyAppointmentsPage() {
     fetchAppointments();
   }, []);
 
+  useEffect(() => {
+    return subscribePanelChanges(["appointments"], () => {
+      void fetchAppointments(true);
+    });
+    // fetchAppointments yalnızca bu mounted sayfanın oturum istemcisini kullanır.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Randevu İptal İşlemi
   const handleCancelAppointment = async () => {
     if (!cancellingAppt) return;
@@ -243,6 +254,7 @@ export default function MyAppointmentsPage() {
       setAppointments((prev) =>
         prev.map((a) => (a.id === cancellingAppt.id ? { ...a, status: "cancelled" } : a))
       );
+      notifyPanelChange("appointments");
 
       setNotification({
         message: lang === "tr" ? "Randevunuz başarıyla iptal edildi." : "Appointment cancelled successfully.",
@@ -293,6 +305,7 @@ export default function MyAppointmentsPage() {
             : a
         )
       );
+      notifyPanelChange("appointments");
 
       setNotification({
         message: lang === "tr" ? "İptal isteğiniz işletmeye iletildi." : "Cancellation request sent to the business.",
@@ -339,6 +352,7 @@ export default function MyAppointmentsPage() {
           return { ...a, custom_fields: rest };
         })
       );
+      notifyPanelChange("appointments");
 
       setNotification({
         message: lang === "tr" ? "İptal isteğiniz geri çekildi. Randevunuz geçerli." : "Request withdrawn. Your appointment is still valid.",
@@ -485,14 +499,14 @@ export default function MyAppointmentsPage() {
   }
 
   return (
-    <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 max-w-5xl mx-auto space-y-8 pb-16 font-sans">
+    <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 mx-auto max-w-5xl space-y-6 pb-16 font-sans sm:space-y-8">
       {/* Toast Bildirimi */}
       {notification && (
         <div
-          className={`p-4 rounded-2xl flex items-center justify-between gap-3 text-sm font-bold shadow-lg animate-in slide-in-from-top-2 duration-200 ${
+          className={`flex items-center justify-between gap-3 rounded-2xl border p-4 text-sm font-bold shadow-lg animate-in slide-in-from-top-2 duration-200 ${
             notification.type === "success"
-              ? "bg-emerald-500 text-white"
-              : "bg-rose-500 text-white"
+              ? "border-emerald-400/30 bg-emerald-500 text-white"
+              : "border-rose-400/30 bg-rose-500 text-white"
           }`}
         >
           <div className="flex items-center gap-2">
@@ -506,28 +520,40 @@ export default function MyAppointmentsPage() {
       )}
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="flex items-center gap-3 text-2xl font-black tracking-tight text-slate-900 dark:text-white md:text-3xl">
-            {lang === "tr" ? "Randevularım" : "My Appointments"}
-            <span className="rounded-full border border-[var(--brand-border)] bg-[var(--brand-soft)] px-3 py-1 text-xs font-bold text-[var(--brand-text)]">
-              {upcomingAppointments.length} {lang === "tr" ? "Yaklaşan" : "Upcoming"}
-            </span>
-          </h1>
-          <p className="mt-1 text-sm font-medium text-slate-500 dark:text-slate-400">
-            {lang === "tr"
-              ? "Tüm randevularınızı görüntüleyin, takviminize kaydedin veya kolayca yönetin."
-              : "Track all your appointments, add to calendar, or manage booking status."}
-          </p>
-        </div>
+      <div className="relative isolate overflow-hidden rounded-[28px] border border-slate-200/80 bg-white/80 px-5 py-5 shadow-[0_18px_50px_-28px_rgba(15,23,42,0.28)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/70 dark:shadow-[0_20px_55px_-30px_rgba(0,0,0,0.8)] sm:px-7 sm:py-7">
+        <div className="pointer-events-none absolute -right-16 -top-24 h-64 w-64 rounded-full bg-indigo-400/10 blur-3xl dark:bg-indigo-500/15" />
+        <div className="pointer-events-none absolute -bottom-28 right-1/3 h-48 w-48 rounded-full bg-fuchsia-400/10 blur-3xl dark:bg-fuchsia-500/10" />
+        <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <p className="mb-2 flex items-center gap-2 text-[11px] font-extrabold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-300">
+              <CalendarDays size={14} />
+              {lang === "tr" ? "Randevu takvimi" : "Appointment calendar"}
+            </p>
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="text-3xl font-black tracking-tight text-slate-950 dark:text-white sm:text-4xl">
+                {lang === "tr" ? "Randevularım" : "My Appointments"}
+              </h1>
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-bold text-indigo-700 dark:border-indigo-400/20 dark:bg-indigo-400/10 dark:text-indigo-200">
+                <span className="h-1.5 w-1.5 rounded-full bg-indigo-500 dark:bg-indigo-300" />
+                {upcomingAppointments.length} {lang === "tr" ? "Yaklaşan" : "Upcoming"}
+              </span>
+            </div>
+            <p className="mt-2 max-w-xl text-sm leading-6 text-slate-500 dark:text-slate-400 sm:text-base">
+              {lang === "tr"
+                ? "Tüm randevularınızı görüntüleyin, takviminize kaydedin veya kolayca yönetin."
+                : "Track all your appointments, add to calendar, or manage booking status."}
+            </p>
+          </div>
 
-        <Link
-          href="/discover"
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--brand)] px-4 py-3 text-sm font-extrabold text-white shadow-[0_6px_16px_var(--brand-shadow)] transition-all active:scale-[0.98] self-start sm:self-auto"
-        >
-          <Compass size={16} />
-          {lang === "tr" ? "Yeni Randevu Keşfet" : "Explore Businesses"}
-        </Link>
+          <Link
+            href="/discover"
+            className="group inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-600 px-5 py-3 text-sm font-extrabold text-white shadow-lg shadow-indigo-600/20 transition duration-200 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-indigo-600/30 active:translate-y-0 active:scale-[0.98] dark:shadow-indigo-950/40"
+          >
+            <Compass size={17} />
+            {lang === "tr" ? "Yeni Randevu Keşfet" : "Explore Businesses"}
+            <ArrowUpRight size={16} className="transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+          </Link>
+        </div>
       </div>
 
       {/* Hero Spotlight: En Yakın Randevu Kartı (Varsa) */}
@@ -595,29 +621,47 @@ export default function MyAppointmentsPage() {
       )}
 
       {/* Tabs */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1.5 rounded-2xl bg-slate-100 p-1 dark:bg-slate-800">
+      <div className="rounded-2xl border border-slate-200/80 bg-slate-100/80 p-1.5 shadow-inner dark:border-white/[0.06] dark:bg-slate-900/70">
+        <div className="flex items-center gap-1">
           <button
+            type="button"
+            aria-pressed={activeTab === "upcoming"}
             onClick={() => setActiveTab("upcoming")}
-            className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition-all md:text-sm ${
+            className={`flex min-h-12 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-xl px-2 py-2.5 text-center text-[11px] font-bold leading-tight transition-all sm:gap-2 sm:px-4 sm:text-sm ${
               activeTab === "upcoming"
-                ? "bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white"
-                : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+                ? "bg-white text-indigo-700 shadow-[0_3px_12px_rgba(15,23,42,0.08)] dark:bg-slate-800 dark:text-indigo-200 dark:shadow-black/20"
+                : "text-slate-500 hover:bg-white/60 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/[0.04] dark:hover:text-white"
             }`}
           >
-            <Calendar size={15} />
-            {lang === "tr" ? "Yaklaşan Randevular" : "Upcoming"} ({upcomingAppointments.length})
+            <Calendar size={15} className="shrink-0" />
+            <span>{lang === "tr" ? "Yaklaşan Randevular" : "Upcoming"}</span>
+            <span className={`rounded-full px-1.5 py-0.5 text-[10px] sm:text-xs ${
+              activeTab === "upcoming"
+                ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-400/15 dark:text-indigo-200"
+                : "bg-slate-200/70 text-slate-500 dark:bg-white/[0.06] dark:text-slate-400"
+            }`}>
+              {upcomingAppointments.length}
+            </span>
           </button>
           <button
+            type="button"
+            aria-pressed={activeTab === "past"}
             onClick={() => setActiveTab("past")}
-            className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition-all md:text-sm ${
+            className={`flex min-h-12 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-xl px-2 py-2.5 text-center text-[11px] font-bold leading-tight transition-all sm:gap-2 sm:px-4 sm:text-sm ${
               activeTab === "past"
-                ? "bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white"
-                : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+                ? "bg-white text-indigo-700 shadow-[0_3px_12px_rgba(15,23,42,0.08)] dark:bg-slate-800 dark:text-indigo-200 dark:shadow-black/20"
+                : "text-slate-500 hover:bg-white/60 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/[0.04] dark:hover:text-white"
             }`}
           >
-            <Clock size={15} />
-            {lang === "tr" ? "Geçmiş & İptaller" : "Past & Cancelled"} ({pastAppointments.length})
+            <Clock size={15} className="shrink-0" />
+            <span>{lang === "tr" ? "Geçmiş & İptaller" : "Past & Cancelled"}</span>
+            <span className={`rounded-full px-1.5 py-0.5 text-[10px] sm:text-xs ${
+              activeTab === "past"
+                ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-400/15 dark:text-indigo-200"
+                : "bg-slate-200/70 text-slate-500 dark:bg-white/[0.06] dark:text-slate-400"
+            }`}>
+              {pastAppointments.length}
+            </span>
           </button>
         </div>
       </div>
@@ -625,24 +669,27 @@ export default function MyAppointmentsPage() {
       {/* Randevu Kartları Listesi */}
       {activeTab === "upcoming" ? (
         upcomingAppointments.length === 0 ? (
-          <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center shadow-[0_1px_2px_rgb(15,23,42,0.04),0_10px_30px_rgb(15,23,42,0.05)] dark:border-slate-700 dark:bg-slate-900 dark:shadow-[0_1px_2px_rgb(0,0,0,0.35),0_10px_30px_rgb(0,0,0,0.4)]">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--brand-soft)] text-[var(--brand-text)]">
-              <Calendar size={32} />
+          <div className="relative isolate overflow-hidden rounded-[30px] border border-indigo-100/80 bg-gradient-to-br from-white via-indigo-50/50 to-violet-50/70 px-5 py-10 text-center shadow-[0_18px_55px_-32px_rgba(79,70,229,0.28)] dark:border-white/10 dark:from-slate-900 dark:via-slate-900 dark:to-indigo-950/30 sm:px-8 sm:py-14">
+            <div className="pointer-events-none absolute -right-12 -top-20 h-52 w-52 rounded-full bg-indigo-400/10 blur-3xl dark:bg-indigo-500/10" />
+            <div className="pointer-events-none absolute -bottom-24 -left-10 h-52 w-52 rounded-full bg-violet-400/10 blur-3xl dark:bg-violet-500/10" />
+            <div className="relative mx-auto mb-5 flex h-[76px] w-[76px] items-center justify-center rounded-[26px] bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-lg shadow-indigo-600/25 dark:shadow-indigo-950/50">
+              <CalendarDays size={34} strokeWidth={1.9} />
             </div>
-            <h3 className="text-[15px] font-bold text-slate-900 dark:text-white">
+            <h3 className="relative text-lg font-extrabold tracking-tight text-slate-900 dark:text-white sm:text-xl">
               {lang === "tr" ? "Yaklaşan Randevunuz Yok" : "No Upcoming Appointments"}
             </h3>
-            <p className="mx-auto mt-1 max-w-md text-sm text-slate-500 dark:text-slate-400">
+            <p className="relative mx-auto mt-2 max-w-lg text-sm leading-6 text-slate-500 dark:text-slate-400 sm:text-base">
               {lang === "tr"
                 ? "Randera üzerinden kayıtlı kuaför, klinik, güzellik ve bakım işletmelerinden dilediğiniz gibi randevu oluşturabilirsiniz."
                 : "Explore top-rated businesses and book appointments seamlessly on Randera."}
             </p>
             <Link
               href="/discover"
-              className="mt-5 inline-flex items-center gap-2 rounded-xl bg-[var(--brand)] px-4 py-3 text-sm font-extrabold text-white shadow-[0_6px_16px_var(--brand-shadow)] transition-all active:scale-[0.98]"
+              className="group relative mt-6 inline-flex min-h-12 items-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-600 px-5 py-3 text-sm font-extrabold text-white shadow-lg shadow-indigo-600/20 transition duration-200 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-indigo-600/30 active:translate-y-0 active:scale-[0.98] dark:shadow-indigo-950/40"
             >
-              <Compass size={15} />
+              <Compass size={16} />
               {lang === "tr" ? "Hemen İşletme Bul" : "Find Businesses Now"}
+              <ArrowUpRight size={15} className="transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
             </Link>
           </div>
         ) : (
@@ -720,12 +767,14 @@ export default function MyAppointmentsPage() {
         )
       ) : (
         pastAppointments.length === 0 ? (
-          <div className="rounded-3xl border border-slate-200/80 bg-white p-8 text-center shadow-[0_1px_2px_rgb(15,23,42,0.04),0_10px_30px_rgb(15,23,42,0.05)] dark:border-slate-800 dark:bg-slate-900 dark:shadow-[0_1px_2px_rgb(0,0,0,0.35),0_10px_30px_rgb(0,0,0,0.4)]">
-            <Clock className="mx-auto mb-3 h-12 w-12 text-slate-300 dark:text-slate-600" />
-            <h3 className="text-[15px] font-bold text-slate-900 dark:text-white">
+          <div className="relative isolate overflow-hidden rounded-[30px] border border-slate-200/80 bg-white/80 px-5 py-10 text-center shadow-[0_18px_55px_-32px_rgba(15,23,42,0.22)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/70 sm:px-8 sm:py-14">
+            <div className="mx-auto mb-5 flex h-[68px] w-[68px] items-center justify-center rounded-[24px] bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+              <Clock size={30} />
+            </div>
+            <h3 className="text-lg font-extrabold tracking-tight text-slate-900 dark:text-white sm:text-xl">
               {lang === "tr" ? "Geçmiş Randevunuz Bulunmuyor" : "No Past Appointments"}
             </h3>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+            <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400 sm:text-base">
               {lang === "tr" ? "Daha önce tamamlanan bir randevunuz bulunmuyor." : "You have no completed or cancelled appointments yet."}
             </p>
           </div>
@@ -1241,4 +1290,3 @@ function BoardingPassCard({
     </div>
   );
 }
-

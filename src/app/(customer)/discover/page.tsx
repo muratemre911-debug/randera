@@ -25,6 +25,7 @@ import SafeImage from "@/components/SafeImage";
 import { formatFullAddress } from "@/lib/address";
 import { matchesPriceRange, parsePrice } from "@/lib/price";
 import { isDiscoverable } from "@/lib/membership";
+import { useFavorites } from "@/lib/useFavorites";
 import DiscoverMap, {
   TenantWithDetails,
 } from "@/components/discover/DiscoverMap";
@@ -70,6 +71,7 @@ const SECTOR_IMAGES: Record<string, string> = {
 export default function DiscoverPage() {
   const supabase = createClient();
   const { lang } = useLanguage();
+  const { favoriteIds: favorites, toggleFavorite } = useFavorites();
 
   const [tenants, setTenants] = useState<TenantWithDetails[]>([]);
   const [tenantPrices, setTenantPrices] = useState<Record<string, number>>({});
@@ -103,31 +105,6 @@ export default function DiscoverPage() {
   // Bottom Sheet Filter Drawer state
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
   const [provinceSearch, setProvinceSearch] = useState("");
-
-  // Favorites state (tarayıcıda saklanır)
-  const [favorites, setFavorites] = useState<string[]>(() => {
-    if (typeof window === "undefined") return [];
-    try {
-      const saved = localStorage.getItem("randera_favorites");
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
-
-  const toggleFavorite = (tenantId: string) => {
-    setFavorites((prev) => {
-      const next = prev.includes(tenantId)
-        ? prev.filter((id) => id !== tenantId)
-        : [...prev, tenantId];
-      try {
-        localStorage.setItem("randera_favorites", JSON.stringify(next));
-      } catch {
-        // ignore
-      }
-      return next;
-    });
-  };
 
   const fetchData = async () => {
     try {

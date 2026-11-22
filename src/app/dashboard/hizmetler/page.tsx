@@ -19,6 +19,7 @@ import CustomSelect from "@/components/CustomSelect";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import InlineAlert from "@/components/ui/InlineAlert";
 import { sortStaffOwnerFirst, type StaffMember } from "@/lib/staff";
+import { notifyPanelChange } from "@/lib/panelEvents";
 
 interface Service {
   id: string;
@@ -237,6 +238,7 @@ export default function HizmetlerPage() {
         setEditingService(null);
         setForm({ name: "", description: "", duration: "", price: "" });
         fetchServices(tenantId, selectedStaffId);
+        notifyPanelChange("services");
       } else {
         setPageError(
           (lang === "tr" ? "Güncelleme hatası: " : "Update failed: ") +
@@ -258,6 +260,7 @@ export default function HizmetlerPage() {
         setModalOpen(false);
         setForm({ name: "", description: "", duration: "", price: "" });
         fetchServices(tenantId, selectedStaffId);
+        notifyPanelChange("services");
       } else {
         setPageError(
           (lang === "tr" ? "Ekleme hatası: " : "Could not add: ") +
@@ -282,6 +285,7 @@ export default function HizmetlerPage() {
     }
     setPageError(null);
     if (tenantId && selectedStaffId) fetchServices(tenantId, selectedStaffId);
+    notifyPanelChange("services");
   };
 
   return (

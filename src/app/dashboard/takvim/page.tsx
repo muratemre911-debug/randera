@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { createPortal } from "react-dom";
 import {
   Plus,
@@ -12,12 +12,12 @@ import {
   Phone,
   MessageSquare,
   Check,
-  CheckCircle2,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useLanguage } from "@/context/LanguageContext";
 import CustomSelect from "@/components/CustomSelect";
 import { ownRecordsScope } from "@/lib/staff";
+import { notifyPanelChange, subscribePanelChanges } from "@/lib/panelEvents";
 
 const dayNames = [
   "pazar",
@@ -326,6 +326,15 @@ export default function TakvimPage() {
     fetchData();
   }, [dateRange.start, dateRange.end]);
 
+  useEffect(() => {
+    return subscribePanelChanges(
+      ["appointments", "services", "staff"],
+      () => void fetchData(true),
+    );
+    // fetchData, bu panelin güncel tarih aralığını ve Supabase istemcisini kullanır.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateRange.start, dateRange.end]);
+
   // Müşteri iptal isteği gönderdiğinde / geri çektiğinde takvimi otomatik güncelle
   useEffect(() => {
     if (!tenantId) return;
@@ -418,7 +427,7 @@ export default function TakvimPage() {
           setFormCustomerName("");
           setFormCustomerPhone("");
           setFormService("");
-          fetchData();
+          notifyPanelChange("appointments");
         }
       } else {
         const { error } = await supabase.from("appointments").insert({
@@ -440,7 +449,7 @@ export default function TakvimPage() {
           setFormCustomerName("");
           setFormCustomerPhone("");
           setFormService("");
-          fetchData();
+          notifyPanelChange("appointments");
         }
       }
     } finally {
@@ -459,7 +468,7 @@ export default function TakvimPage() {
 
     if (!error) {
       setSelectedAppointment(null);
-      fetchData();
+      notifyPanelChange("appointments");
     }
   };
 
@@ -476,7 +485,7 @@ export default function TakvimPage() {
       setSelectedAppointment((prev) =>
         prev ? { ...prev, status: newStatus } : null,
       );
-      fetchData();
+      notifyPanelChange("appointments");
     }
   };
 
@@ -491,7 +500,7 @@ export default function TakvimPage() {
       setSelectedAppointment((prev) =>
         prev ? { ...prev, status: "confirmed" } : null,
       );
-      fetchData();
+      notifyPanelChange("appointments");
     }
   };
 
@@ -513,7 +522,7 @@ export default function TakvimPage() {
 
     if (!error) {
       setSelectedAppointment(null);
-      fetchData();
+      notifyPanelChange("appointments");
     }
   };
 
@@ -536,7 +545,7 @@ export default function TakvimPage() {
 
     if (!error) {
       setSelectedAppointment(null);
-      fetchData();
+      notifyPanelChange("appointments");
     }
   };
 
@@ -563,7 +572,7 @@ export default function TakvimPage() {
           ? { ...prev, custom_fields: rest as typeof prev.custom_fields }
           : null,
       );
-      fetchData();
+      notifyPanelChange("appointments");
     }
   };
 

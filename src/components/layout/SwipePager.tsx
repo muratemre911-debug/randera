@@ -3,68 +3,46 @@
 import {
   forwardRef,
   useCallback,
-  useEffect,
   useLayoutEffect,
   useRef,
-  useState,
   type ReactNode,
 } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { SHELL } from "@/components/layout/shell";
+import { publishPageSwipeProgress } from "@/components/layout/pageSwipeProgress";
+import { triggerHapticFeedback } from "@/lib/haptics";
 
-/**
- * Yatay kaydırma (swipe) ile sekmeler arasında geçiş yapan sayfa kabı.
- *
- * Neden gerekli: uygulama tek bir sabit kabuk (fixed shell) içinde çalışır ve
- * alt navigasyon sekmeleri arasında geçiş yalnızca tıklamayla yapılabiliyordu.
- * Dokunmatikte parmakla sayfa çevirmek, uygulamayı "yerel uygulama" gibi
- * hissettiren en temel hareketlerden biri.
- *
- * Davranış kuralları (mobil tarayıcıyla çakışmamak için kritik):
- *  - Kaydırma yalnızca listedeki TAM eşleşen sekmelerde çalışır; alt sayfalarda
- *    (işletme detayı, randevu akışı) devre dışı kalır.
- *  - Yatay niyet, dikey hareketin en az {@link AXIS_RATIO} katı olmalı; aksi
- *    halde jest dikey kaydırmaya bırakılır.
- *  - Yatay kaydırılabilir bir öğe (ör. filtre çipleri) veya harita üzerinde
- *    başlayan jestler yok sayılır — oralarda kendi kaydırması çalışsın.
- *  - `data-no-swipe` taşıyan torunlar (modallar, harita) jesti engeller.
- *  - Masaüstünde hiçbir etkisi yoktur (yalnızca dokunma olayları dinlenir).
- */
-
-const AXIS_RATIO = 1.35; // yatay niyet eşiği
-const AXIS_SLOP = 8; // karar vermeden önceki ölü bölge (px)
-const MIN_DISTANCE = 48; // en az bu kadar sürüklenmeli (px)
-const QUICK_MS = 500; // hızlı "flick" süresi (ms)
-const COMMIT_RATIO = 0.18; // genişliğin bu oranı geçilirse geçiş yapılır
-const MAX_DRAG_RATIO = 0.32; // fazla sürüklemeyi sınırla
-const DAMPING = 0.55; // parmağın altında yumuşak takip
-const EXIT_MS = 170; // sayfadan çıkış animasyonu
-const ENTER_MS = 300; // yeni sayfanın giriş animasyonu
+const AXIS_RATIO = 1.35;
+const AXIS_SLOP = 8;
+const MIN_DISTANCE = 48;
+const QUICK_MS = 500;
+const COMMIT_RATIO = 0.18;
+const MAX_DRAG_RATIO = 0.32;
+const DAMPING = 0.55;
 
 export interface SwipeTab {
   href: string;
+  content: ReactNode;
 }
 
 interface SwipePagerProps
   extends Omit<React.ComponentPropsWithoutRef<"main">, "children"> {
-  /** Kaydırmayla gezilebilecek sekmeler, görsel sırayla. */
+  /** Sekme içerikleri sürekli mounted kalır; URL yalnızca aktif sekmeyi seçer. */
   tabs: SwipeTab[];
+  /** Ana sekmeler dışındaki rotalar (örn. /b/[slug]) burada gösterilir. */
   children: ReactNode;
 }
 
-/** Modal / harita / düzenlenen alan gibi jesti engelleyen atalar var mı? */
+/** Modal, harita ve düzenlenen alanlarda sayfa kaydırmasını devre dışı bırak. */
 function hasSwipeBlocker(target: EventTarget | null): boolean {
   let el: Element | null = target instanceof Element ? target : null;
   while (el) {
-    if (el.hasAttribute("data-no-swipe")) return true;
-    if (el.getAttribute("role") === "dialog") return true;
+    if (el.hasAttribute("data-no-swipe") || el.getAttribute("role") === "dialog") {
+      return true;
+    }
 
     const tag = el.tagName;
-    // `select`: yerel seçici açılır, dokunma jesti ona ait.
     if (tag === "SELECT") return true;
-    // Metin alanları: YALNIZCA o an düzenleniyorsa (odaktaysa) engellenir.
-    // Aksi halde profil gibi form ağırlıklı sayfalarda kaydırma jesti
-    // tamamen ölürdi — odakta olmayan bir alanda yatay sürükleme zaten
-    // yapılacak bir şey değil.
     if (
       (tag === "INPUT" || tag === "TEXTAREA") &&
       el === document.activeElement
@@ -77,7 +55,6 @@ function hasSwipeBlocker(target: EventTarget | null): boolean {
   return false;
 }
 
-/** Jest, yatay kaydırılabilir bir alanın üzerinde mi başladı? */
 function findHorizontalScroller(target: EventTarget | null): HTMLElement | null {
   let el: Element | null = target instanceof Element ? target : null;
   while (el && el !== document.body) {
@@ -90,220 +67,300 @@ function findHorizontalScroller(target: EventTarget | null): HTMLElement | null 
   return null;
 }
 
+function isMobileViewport() {
+  if (typeof window.matchMedia === "function") {
+    return window.matchMedia("(max-width: 1023px)").matches;
+  }
+  return window.innerWidth < 1024;
+}
+
 const SwipePager = forwardRef<HTMLElement, SwipePagerProps>(
-  function SwipePager({ tabs, className, children, ...mainProps }, ref) {
+  function SwipePager({ tabs, className, children, ...mainProps }, forwardedRef) {
     const pathname = usePathname();
     const router = useRouter();
-    const paneRef = useRef<HTMLElement | null>(null);
-    const [enterFrom, setEnterFrom] = useState<"left" | "right" | null>(null);
-
-    // Yalnızca tam eşleşen sekme yollarında kaydırma açılır.
-    const index = tabs.findIndex((tab) => tab.href === pathname);
+    const mainRef = useRef<HTMLElement | null>(null);
+    const trackRef = useRef<HTMLDivElement | null>(null);
+    const gestureRef = useRef<{
+      tracking: boolean;
+      axis: "x" | "y" | null;
+      startX: number;
+      startY: number;
+      startTime: number;
+      deltaX: number;
+      hScroller: HTMLElement | null;
+      handedOff: boolean;
+    } | null>(null);
+    const activeIndex = tabs.findIndex((tab) => tab.href === pathname);
+    const activeTab = activeIndex >= 0;
+    const basePercent =
+      activeIndex >= 0 ? (activeIndex * 100) / Math.max(1, tabs.length) : 0;
+    const touchHandlersRef = useRef<{
+      start: (event: TouchEvent) => void;
+      move: (event: TouchEvent) => void;
+      end: () => void;
+      cancel: () => void;
+    } | null>(null);
 
     const setRefs = useCallback(
       (node: HTMLElement | null) => {
-        paneRef.current = node;
-        if (typeof ref === "function") ref(node);
-        else if (ref) ref.current = node;
+        mainRef.current = node;
+        if (typeof forwardedRef === "function") forwardedRef(node);
+        else if (forwardedRef) forwardedRef.current = node;
       },
-      [ref],
+      [forwardedRef],
     );
 
-    // Sayfa değiştiğinde kabı hemen başlangıç konumuna al: yeni sayfa, çıkış
-    // animasyonunun bittiği kaydırılmış konumda bir kare bile görünmemeli.
-    // (useLayoutEffect: tarayıcı boyamadan önce çalışır.)
+    // Route değişince paneli yeni sekme konumunda, animasyonsuz hizala. Aynı
+    // DOM ağacı kaldığı için her sekmenin formu, scroll'u ve harita durumu yaşar.
     useLayoutEffect(() => {
-      const pane = paneRef.current;
-      if (!pane) return;
-      pane.style.transition = "none";
-      pane.style.transform = "translate3d(0,0,0)";
-    }, [pathname]);
+      if (trackRef.current) {
+        trackRef.current.style.transform = `translate3d(-${basePercent}%, 0, 0)`;
+        delete trackRef.current.dataset.dragging;
+        delete trackRef.current.dataset.settling;
+        delete trackRef.current.dataset.committing;
+      }
+    }, [basePercent, pathname]);
 
-    // Giriş animasyonu bitince sınıfı kaldır (animasyon transform'u sıfırlar).
-    useEffect(() => {
-      if (!enterFrom) return;
-      const timer = window.setTimeout(() => setEnterFrom(null), ENTER_MS);
-      return () => window.clearTimeout(timer);
-    }, [enterFrom]);
+    const publishProgress = (
+      phase: "drag" | "settle" | "commit",
+      toHref: string | null,
+      progress: number,
+    ) => {
+      const fromHref = tabs[activeIndex]?.href;
+      if (!fromHref) return;
+      publishPageSwipeProgress({ fromHref, toHref, progress, phase });
+    };
 
-    // Komşu sekme yolları efekt bağımlılığı olarak kullanılır (dizi kimliği her
-    // render'da değişebildiği için doğrudan `tabs`'a bağlanmak efekti sürekli
-    // yeniden kurardı).
-    const previousHref = index > 0 ? tabs[index - 1].href : null;
-    const nextHref = index >= 0 && index < tabs.length - 1 ? tabs[index + 1].href : null;
+    const onTouchStart = (event: TouchEvent) => {
+      if (!activeTab || !isMobileViewport()) return;
+      if (event.touches.length !== 1 || hasSwipeBlocker(event.target)) return;
 
-    useEffect(() => {
-      const pane = paneRef.current;
-      if (!pane || index < 0) return;
-
-      const previous = previousHref ? { href: previousHref } : undefined;
-      const next = nextHref ? { href: nextHref } : undefined;
-
-      let tracking = false;
-      let axis: "x" | "y" | null = null;
-      let startX = 0;
-      let startY = 0;
-      let startTime = 0;
-      let deltaX = 0;
-      /** Jest yatay kaydırılabilir bir alanda başladıysa o alan. */
-      let hScroller: HTMLElement | null = null;
-      /**
-       * Kenar devri (edge handoff): yatay kaydırılabilir alan kendi ucuna
-       * ulaştıysa jest sayfaya devredilir. Böylece takvim/filtre çubuğu gibi
-       * alanlar hem kendi içinde kaydırılır hem de sona gelindiğinde sekme
-       * değiştirilebilir (yerel uygulamalardaki davranış).
-       */
-      let handedOff = false;
-
-      const paneWidth = () => pane.clientWidth || window.innerWidth;
-
-      const clearTransform = () => {
-        pane.style.transition = "";
-        pane.style.transform = "";
+      const touch = event.touches[0];
+      gestureRef.current = {
+        tracking: true,
+        axis: null,
+        startX: touch.clientX,
+        startY: touch.clientY,
+        startTime: Date.now(),
+        deltaX: 0,
+        hScroller: findHorizontalScroller(event.target),
+        handedOff: false,
       };
+      if (trackRef.current) {
+        delete trackRef.current.dataset.settling;
+        delete trackRef.current.dataset.committing;
+        trackRef.current.dataset.dragging = "true";
+      }
+    };
 
-      const settleBack = () => {
-        pane.style.transition = `transform 230ms cubic-bezier(0.22, 1, 0.36, 1)`;
-        pane.style.transform = "translate3d(0,0,0)";
-        window.setTimeout(clearTransform, 250);
-      };
+    const onTouchMove = (event: TouchEvent) => {
+      const gesture = gestureRef.current;
+      if (!gesture?.tracking) return;
+      if (event.touches.length !== 1) {
+        gesture.tracking = false;
+        if (trackRef.current) {
+          delete trackRef.current.dataset.dragging;
+          trackRef.current.dataset.settling = "true";
+          trackRef.current.style.transform = `translate3d(-${basePercent}%, 0, 0)`;
+        }
+        publishProgress("settle", null, 0);
+        return;
+      }
 
-      const abort = () => {
-        tracking = false;
-        axis = null;
-        handedOff = false;
-        hScroller = null;
-        clearTransform();
-      };
+      const touch = event.touches[0];
+      const moveX = touch.clientX - gesture.startX;
+      const moveY = touch.clientY - gesture.startY;
 
-      const onTouchStart = (event: TouchEvent) => {
-        if (event.touches.length !== 1) return;
-        if (hasSwipeBlocker(event.target)) return;
-
-        const touch = event.touches[0];
-        startX = touch.clientX;
-        startY = touch.clientY;
-        startTime = Date.now();
-        deltaX = 0;
-        axis = null;
-        handedOff = false;
-        hScroller = findHorizontalScroller(event.target);
-        tracking = true;
-        pane.style.transition = "none";
-      };
-
-      const onTouchMove = (event: TouchEvent) => {
-        if (!tracking) return;
-        if (event.touches.length !== 1) {
-          abort();
+      if (!gesture.axis) {
+        if (Math.abs(moveX) < AXIS_SLOP && Math.abs(moveY) < AXIS_SLOP) return;
+        if (Math.abs(moveX) > Math.abs(moveY) * AXIS_RATIO) {
+          gesture.axis = "x";
+        } else {
+          gesture.tracking = false;
+          if (trackRef.current) {
+            delete trackRef.current.dataset.dragging;
+          }
           return;
         }
+      }
 
-        const touch = event.touches[0];
-        const moveX = touch.clientX - startX;
-        const moveY = touch.clientY - startY;
+      if (gesture.hScroller && !gesture.handedOff) {
+        const atStart = gesture.hScroller.scrollLeft <= 0;
+        const atEnd =
+          gesture.hScroller.scrollLeft + gesture.hScroller.clientWidth >=
+          gesture.hScroller.scrollWidth - 2;
+        const scrollerCanMove =
+          moveX < 0 ? !atEnd : !atStart;
+        if (scrollerCanMove) {
+          gesture.tracking = false;
+          if (trackRef.current) {
+            delete trackRef.current.dataset.dragging;
+          }
+          return;
+        }
+        gesture.handedOff = true;
+      }
 
-        if (!axis) {
-          if (Math.abs(moveX) < AXIS_SLOP && Math.abs(moveY) < AXIS_SLOP) return;
-          if (Math.abs(moveX) > Math.abs(moveY) * AXIS_RATIO) {
-            axis = "x";
+      gesture.deltaX = moveX;
+      const hasNeighbor =
+        moveX < 0
+          ? activeIndex < tabs.length - 1
+          : activeIndex > 0;
+      const resistance = hasNeighbor ? DAMPING : DAMPING * 0.3;
+      const width = mainRef.current?.clientWidth || window.innerWidth;
+      const limit = width * MAX_DRAG_RATIO;
+      const offset = Math.max(-limit, Math.min(limit, moveX * resistance));
+      if (trackRef.current) {
+        trackRef.current.style.transform = `translate3d(calc(-${basePercent}% + ${offset}px), 0, 0)`;
+      }
+      publishProgress(
+        "drag",
+        hasNeighbor ? tabs[moveX < 0 ? activeIndex + 1 : activeIndex - 1].href : null,
+        hasNeighbor ? Math.abs(offset) / width : 0,
+      );
+    };
+
+    const onTouchEnd = () => {
+      const gesture = gestureRef.current;
+      if (!gesture?.tracking) {
+        if (trackRef.current) delete trackRef.current.dataset.dragging;
+        return;
+      }
+      gesture.tracking = false;
+
+      const wasHorizontal =
+        gesture.axis === "x" && (gesture.handedOff || !gesture.hScroller);
+      const deltaX = gesture.deltaX;
+      const targetIndex = deltaX < 0 ? activeIndex + 1 : activeIndex - 1;
+      const target = tabs[targetIndex];
+      const travelled = Math.abs(deltaX);
+      const elapsed = Date.now() - gesture.startTime;
+      const width = mainRef.current?.clientWidth || window.innerWidth;
+      const farEnough =
+        travelled > Math.max(MIN_DISTANCE, width * COMMIT_RATIO);
+      const quickFlick = elapsed < QUICK_MS && travelled > MIN_DISTANCE;
+
+      if (!wasHorizontal || !target || (!farEnough && !quickFlick)) {
+        publishProgress("settle", target?.href ?? null, 0);
+        if (trackRef.current) {
+          delete trackRef.current.dataset.dragging;
+          if (wasHorizontal && deltaX !== 0) {
+            trackRef.current.dataset.settling = "true";
           } else {
-            // Dikey kaydırma: jesti tamamen bırak.
-            abort();
-            return;
+            delete trackRef.current.dataset.settling;
           }
+          trackRef.current.style.transform = `translate3d(-${basePercent}%, 0, 0)`;
         }
+        return;
+      }
 
-        // Yatay kaydırılabilir bir alan varsa: yalnızca o alan kendi ucuna
-        // dayanmışsa jest sayfaya geçer; aksi halde kaydırmayı o üstlenir.
-        if (hScroller && !handedOff) {
-          const atStart = hScroller.scrollLeft <= 0;
-          const atEnd =
-            hScroller.scrollLeft + hScroller.clientWidth >=
-            hScroller.scrollWidth - 2;
-          const wantsLeft = moveX < 0;
-          const scrollerCanMove = wantsLeft ? !atEnd : !atStart;
-          if (scrollerCanMove) {
-            abort();
-            return;
-          }
-          handedOff = true;
+      // Komşu panel gerçek DOM'da zaten hazırdır; track parmağın yönünde
+      // tamamlanırken Next URL'si de güncellenir.
+      publishProgress("commit", target.href, 1);
+      if (trackRef.current) {
+        delete trackRef.current.dataset.dragging;
+        trackRef.current.dataset.committing = "true";
+        trackRef.current.style.transform = `translate3d(calc(-${basePercent}% + ${
+          deltaX < 0 ? -width : width
+        }px), 0, 0)`;
+      }
+      triggerHapticFeedback();
+      router.push(target.href);
+    };
+
+    touchHandlersRef.current = {
+      start: onTouchStart,
+      move: onTouchMove,
+      end: onTouchEnd,
+      cancel: () => {
+        const gesture = gestureRef.current;
+        const toHref =
+          gesture?.deltaX === undefined || gesture.deltaX === 0
+            ? null
+            : tabs[
+                gesture.deltaX < 0 ? activeIndex + 1 : activeIndex - 1
+              ]?.href ?? null;
+        publishProgress("settle", toHref, 0);
+        gestureRef.current = null;
+        if (trackRef.current) {
+          delete trackRef.current.dataset.dragging;
+          trackRef.current.dataset.settling = "true";
+          trackRef.current.style.transform = `translate3d(-${basePercent}%, 0, 0)`;
         }
+      },
+    };
 
-        deltaX = moveX;
-        const target = deltaX < 0 ? next : previous;
-        // Karşı sekme yoksa neredeyse hiç hareket etmesin (kenarda direnç).
-        const resistance = target ? DAMPING : DAMPING * 0.3;
-        const limit = paneWidth() * MAX_DRAG_RATIO;
-        const shifted = Math.max(
-          -limit,
-          Math.min(limit, deltaX * resistance),
-        );
-
-        pane.style.transform = `translate3d(${shifted}px,0,0)`;
-      };
-
-      const onTouchEnd = () => {
-        if (!tracking) return;
-        const wasHorizontal = axis === "x" && (handedOff || !hScroller);
-        tracking = false;
-        axis = null;
-
-        if (!wasHorizontal) {
-          clearTransform();
-          return;
-        }
-
-        const target = deltaX < 0 ? next : previous;
-        const travelled = Math.abs(deltaX);
-        const elapsed = Date.now() - startTime;
-        const farEnough =
-          travelled > Math.max(MIN_DISTANCE, paneWidth() * COMMIT_RATIO);
-        const quickFlick = elapsed < QUICK_MS && travelled > MIN_DISTANCE;
-
-        if (!target || (!farEnough && !quickFlick)) {
-          settleBack();
-          return;
-        }
-
-        // Hedef sayfaya doğru kaydır, sonra rotayı değiştir.
-        const exitTo = deltaX < 0 ? -paneWidth() : paneWidth();
-        pane.style.transition = `transform ${EXIT_MS}ms ease-out`;
-        pane.style.transform = `translate3d(${exitTo}px,0,0)`;
-        setEnterFrom(deltaX < 0 ? "right" : "left");
-
-        window.setTimeout(() => {
-          router.push(target.href);
-        }, EXIT_MS);
-      };
-
-      pane.addEventListener("touchstart", onTouchStart, { passive: true });
-      pane.addEventListener("touchmove", onTouchMove, { passive: true });
-      pane.addEventListener("touchend", onTouchEnd, { passive: true });
-      pane.addEventListener("touchcancel", abort, { passive: true });
-
+    useLayoutEffect(() => {
+      const main = mainRef.current;
+      if (!main) return;
+      const onTouchStart = (event: TouchEvent) =>
+        touchHandlersRef.current?.start(event);
+      const onTouchMove = (event: TouchEvent) =>
+        touchHandlersRef.current?.move(event);
+      const onTouchEnd = () => touchHandlersRef.current?.end();
+      const onTouchCancel = () => touchHandlersRef.current?.cancel();
+      main.addEventListener("touchstart", onTouchStart, { passive: true });
+      main.addEventListener("touchmove", onTouchMove, { passive: true });
+      main.addEventListener("touchend", onTouchEnd, { passive: true });
+      main.addEventListener("touchcancel", onTouchCancel, { passive: true });
       return () => {
-        pane.removeEventListener("touchstart", onTouchStart);
-        pane.removeEventListener("touchmove", onTouchMove);
-        pane.removeEventListener("touchend", onTouchEnd);
-        pane.removeEventListener("touchcancel", abort);
-        clearTransform();
+        main.removeEventListener("touchstart", onTouchStart);
+        main.removeEventListener("touchmove", onTouchMove);
+        main.removeEventListener("touchend", onTouchEnd);
+        main.removeEventListener("touchcancel", onTouchCancel);
       };
-    }, [index, previousHref, nextHref, router]);
+    }, []);
+
+    const trackWidth = Math.max(1, tabs.length) * 100;
 
     return (
       <main
         ref={setRefs}
         {...mainProps}
-        className={`${className ?? ""} ${
-          enterFrom === "right"
-            ? "animate-swipe-in-right"
-            : enterFrom === "left"
-              ? "animate-swipe-in-left"
-              : ""
-        }`}
+        className={`${className ?? ""} relative overflow-hidden`}
       >
-        {children}
+        <div
+          aria-hidden={!activeTab}
+          className={`absolute inset-0 h-full min-h-0 w-full overflow-hidden ${
+            activeTab ? "" : "invisible pointer-events-none"
+          }`}
+        >
+          <div
+            ref={trackRef}
+            className="swipe-pager-track flex h-full min-h-0"
+            onTransitionEnd={(event) => {
+              if (
+                event.target === event.currentTarget &&
+                event.propertyName === "transform"
+              ) {
+                delete event.currentTarget.dataset.settling;
+              }
+            }}
+            style={{
+              width: `${trackWidth}%`,
+              transform: `translate3d(-${basePercent}%, 0, 0)`,
+              touchAction: "pan-y",
+            }}
+          >
+            {tabs.map((tab, index) => (
+              <section
+                key={tab.href}
+                aria-label={tab.href}
+                aria-hidden={activeIndex !== index}
+                inert={!activeTab || activeIndex !== index}
+                className="swipe-pager-page h-full min-h-0 shrink-0"
+                style={{ width: `${100 / Math.max(1, tabs.length)}%` }}
+              >
+                <div className={SHELL.tabPane}>{tab.content}</div>
+              </section>
+            ))}
+          </div>
+        </div>
+        {!activeTab && (
+          <div className="absolute inset-0 h-full min-h-0 w-full overflow-y-auto overflow-x-hidden overscroll-y-contain custom-scrollbar p-3 sm:p-6 md:p-8 pb-24 sm:pb-24 lg:pb-8 pr-2.5 sm:pr-4">
+            {children}
+          </div>
+        )}
       </main>
     );
   },

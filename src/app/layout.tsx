@@ -4,6 +4,7 @@ import "./globals.css";
 import { LanguageProvider } from "@/context/LanguageContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import HapticFeedback from "@/components/HapticFeedback";
 import PwaManager from "@/components/pwa/PwaManager";
 
 const geistSans = Geist({
@@ -93,6 +94,7 @@ export default function RootLayout({
         <LanguageProvider>
           <ThemeProvider>
             <ErrorBoundary>{children}</ErrorBoundary>
+            <HapticFeedback />
             <PwaManager />
           </ThemeProvider>
         </LanguageProvider>

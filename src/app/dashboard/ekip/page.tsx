@@ -23,6 +23,7 @@ import {
   sortStaffOwnerFirst,
   type StaffMember,
 } from "@/lib/staff";
+import { notifyPanelChange } from "@/lib/panelEvents";
 
 interface Invite {
   id: string;
@@ -213,6 +214,7 @@ export default function EkipPage() {
       }
 
       if (tenantId) await loadRoster(tenantId);
+      notifyPanelChange("staff");
     } catch (err) {
       setPageError(
         (lang === "tr" ? "Çıkarılamadı: " : "Could not remove: ") +

@@ -26,6 +26,10 @@ import CustomerBottomNav, {
   type BottomNavItem,
 } from "@/components/customer/CustomerBottomNav";
 import SwipePager from "@/components/layout/SwipePager";
+import DiscoverPage from "./discover/page";
+import FavoritesPage from "./favorites/page";
+import MyAppointmentsPage from "./my-appointments/page";
+import ProfilePage from "./profile/page";
 import { preventFocusScroll } from "@/lib/preventFocusScroll";
 import { isTrMobile } from "@/lib/phone";
 
@@ -45,6 +49,13 @@ function buildNavItems(t: (key: string) => string): BottomNavItem[] {
   ];
 }
 
+const CUSTOMER_TAB_PAGES = [
+  { href: "/discover", Page: DiscoverPage },
+  { href: "/favorites", Page: FavoritesPage },
+  { href: "/my-appointments", Page: MyAppointmentsPage },
+  { href: "/profile", Page: ProfilePage },
+];
+
 export default function CustomerLayout({
   children,
 }: {
@@ -58,6 +69,14 @@ export default function CustomerLayout({
 
   // Dil değişince etiketler de değişsin.
   const navItems = useMemo(() => buildNavItems(t), [t]);
+  const customerPageTabs = useMemo(
+    () =>
+      CUSTOMER_TAB_PAGES.map(({ href, Page }) => ({
+        href,
+        content: <Page />,
+      })),
+    [],
+  );
 
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [userFullName, setUserFullName] = useState<string | null>(null);
@@ -135,20 +154,6 @@ export default function CustomerLayout({
     window.addEventListener("scroll", lockExternalScroll, { passive: true });
     return () => window.removeEventListener("scroll", lockExternalScroll);
   }, []);
-
-  // Sayfa değiştiğinde içeriği en başa kaydır ve pencere kaymasını sıfırla
-  useEffect(() => {
-    if (mainRef.current) {
-      mainRef.current.scrollTop = 0;
-    }
-    if (columnRef.current) {
-      columnRef.current.scrollTop = 0;
-    }
-    if (rootRef.current) {
-      rootRef.current.scrollTop = 0;
-    }
-    window.scrollTo(0, 0);
-  }, [pathname]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -283,7 +288,7 @@ export default function CustomerLayout({
 
         <SwipePager
           ref={mainRef}
-          tabs={navItems}
+          tabs={customerPageTabs}
           className={SHELL.main}
           onMouseDown={preventFocusScroll}
         >
