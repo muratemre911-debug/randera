@@ -41,9 +41,9 @@ export const SHELL = {
   tabPane:
     "h-full min-w-0 overflow-y-auto overflow-x-hidden overscroll-y-contain custom-scrollbar p-3 sm:p-6 md:p-8 pb-24 sm:pb-24 lg:pb-8 pr-2.5 sm:pr-4",
 
-  /** Mobil alt navigasyon çubuğu */
+  /** Sabit uygulama kabuğuna göre konumlanan mobil alt navigasyon çubuğu */
   bottomNav:
-    "fixed bottom-0 inset-x-0 z-40 lg:hidden select-none shell-bottomnav",
+    "absolute bottom-0 inset-x-0 z-40 lg:hidden select-none shell-bottomnav",
 
   /** Mobil alt navigasyon iç genişliği (her iki panelde aynı) */
   bottomNavInner: "shell-bottomnav-inner",
