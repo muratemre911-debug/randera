@@ -12,8 +12,8 @@ import { SHELL } from "@/components/layout/shell";
 import { publishPageSwipeProgress } from "@/components/layout/pageSwipeProgress";
 import { triggerHapticFeedback } from "@/lib/haptics";
 
-const AXIS_RATIO = 1.35;
-const AXIS_SLOP = 8;
+const AXIS_RATIO = 1.5;
+const AXIS_SLOP = 12;
 const MIN_DISTANCE = 48;
 const QUICK_MS = 500;
 const COMMIT_RATIO = 0.18;
@@ -89,6 +89,7 @@ const SwipePager = forwardRef<HTMLElement, SwipePagerProps>(
       deltaX: number;
       hScroller: HTMLElement | null;
       handedOff: boolean;
+      didDragHorizontal: boolean;
     } | null>(null);
     const activeIndex = tabs.findIndex((tab) => tab.href === pathname);
     const activeTab = activeIndex >= 0;
@@ -145,12 +146,8 @@ const SwipePager = forwardRef<HTMLElement, SwipePagerProps>(
         deltaX: 0,
         hScroller: findHorizontalScroller(event.target),
         handedOff: false,
+        didDragHorizontal: false,
       };
-      if (trackRef.current) {
-        delete trackRef.current.dataset.settling;
-        delete trackRef.current.dataset.committing;
-        trackRef.current.dataset.dragging = "true";
-      }
     };
 
     const onTouchMove = (event: TouchEvent) => {
@@ -158,6 +155,7 @@ const SwipePager = forwardRef<HTMLElement, SwipePagerProps>(
       if (!gesture?.tracking) return;
       if (event.touches.length !== 1) {
         gesture.tracking = false;
+        if (!gesture.didDragHorizontal) return;
         if (trackRef.current) {
           delete trackRef.current.dataset.dragging;
           trackRef.current.dataset.settling = "true";
@@ -177,9 +175,6 @@ const SwipePager = forwardRef<HTMLElement, SwipePagerProps>(
           gesture.axis = "x";
         } else {
           gesture.tracking = false;
-          if (trackRef.current) {
-            delete trackRef.current.dataset.dragging;
-          }
           return;
         }
       }
@@ -193,12 +188,16 @@ const SwipePager = forwardRef<HTMLElement, SwipePagerProps>(
           moveX < 0 ? !atEnd : !atStart;
         if (scrollerCanMove) {
           gesture.tracking = false;
-          if (trackRef.current) {
-            delete trackRef.current.dataset.dragging;
-          }
           return;
         }
         gesture.handedOff = true;
+      }
+
+      gesture.didDragHorizontal = true;
+      if (trackRef.current) {
+        delete trackRef.current.dataset.settling;
+        delete trackRef.current.dataset.committing;
+        trackRef.current.dataset.dragging = "true";
       }
 
       gesture.deltaX = moveX;
@@ -222,11 +221,9 @@ const SwipePager = forwardRef<HTMLElement, SwipePagerProps>(
 
     const onTouchEnd = () => {
       const gesture = gestureRef.current;
-      if (!gesture?.tracking) {
-        if (trackRef.current) delete trackRef.current.dataset.dragging;
-        return;
-      }
+      if (!gesture?.tracking) return;
       gesture.tracking = false;
+      if (!gesture.didDragHorizontal) return;
 
       const wasHorizontal =
         gesture.axis === "x" && (gesture.handedOff || !gesture.hScroller);
@@ -274,14 +271,16 @@ const SwipePager = forwardRef<HTMLElement, SwipePagerProps>(
       end: onTouchEnd,
       cancel: () => {
         const gesture = gestureRef.current;
+        gestureRef.current = null;
+        if (!gesture?.didDragHorizontal) return;
+
         const toHref =
-          gesture?.deltaX === undefined || gesture.deltaX === 0
+          gesture.deltaX === 0
             ? null
             : tabs[
                 gesture.deltaX < 0 ? activeIndex + 1 : activeIndex - 1
               ]?.href ?? null;
         publishProgress("settle", toHref, 0);
-        gestureRef.current = null;
         if (trackRef.current) {
           delete trackRef.current.dataset.dragging;
           trackRef.current.dataset.settling = "true";

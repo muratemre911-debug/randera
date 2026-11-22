@@ -23,6 +23,63 @@ const tabs = [
 const links = (container: HTMLElement) =>
   Array.from(container.querySelectorAll("a"));
 
+function mockMobileViewport() {
+  vi.mocked(window.matchMedia).mockImplementation((query) => ({
+    matches: query === "(max-width: 1023px)",
+    media: query,
+    onchange: null,
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  }));
+}
+
+function mockNavGeometry(
+  navBar: HTMLDivElement,
+  tabLinks: HTMLElement[],
+  itemWidth = 100,
+) {
+  Object.defineProperty(navBar, "getBoundingClientRect", {
+    configurable: true,
+    value: () => ({
+      left: 0,
+      right: itemWidth * tabLinks.length,
+      width: itemWidth * tabLinks.length,
+      top: 0,
+      bottom: 64,
+      height: 64,
+    }),
+  });
+  tabLinks.forEach((link, index) => {
+    Object.defineProperty(link, "getBoundingClientRect", {
+      configurable: true,
+      value: () => ({
+        left: index * itemWidth,
+        right: (index + 1) * itemWidth,
+        width: itemWidth,
+        top: 0,
+        bottom: 64,
+        height: 64,
+      }),
+    });
+  });
+  window.dispatchEvent(new Event("resize"));
+}
+
+function dispatchPointer(
+  target: Element,
+  type: string,
+  values: Record<string, unknown>,
+) {
+  const event = new Event(type, { bubbles: true, cancelable: true });
+  for (const [key, value] of Object.entries(values)) {
+    Object.defineProperty(event, key, { value });
+  }
+  fireEvent(target, event);
+}
+
 describe("CustomerBottomNav", () => {
   afterEach(() => {
     nav.pathname = "/discover";
@@ -61,89 +118,173 @@ describe("CustomerBottomNav", () => {
     );
   });
 
-  it("mobil çubuk üzerinde sürükleyince hedef sekmeye geçer", () => {
+  it("mobil çubuk üzerinde sürükleyince hedef sekmeye geçer ve çubuğu esnetmez", () => {
     nav.pathname = "/discover";
-    vi.mocked(window.matchMedia).mockImplementation((query) => ({
-      matches: query === "(max-width: 1023px)",
-      media: query,
-      onchange: null,
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      dispatchEvent: vi.fn(),
-    }));
+    mockMobileViewport();
 
     const { container } = render(<CustomerBottomNav tabs={tabs} />);
     const navBar = container.querySelector(
       ".shell-bottomnav-inner",
     ) as HTMLDivElement;
     const tabLinks = links(container);
-
-    Object.defineProperty(navBar, "getBoundingClientRect", {
-      value: () => ({ left: 0, right: 400, width: 400, top: 0, bottom: 64, height: 64 }),
-    });
-    tabLinks.forEach((link, index) => {
-      Object.defineProperty(link, "getBoundingClientRect", {
-        value: () => ({
-          left: index * 100,
-          right: (index + 1) * 100,
-          width: 100,
-          top: 0,
-          bottom: 64,
-          height: 64,
-        }),
-      });
-    });
-    window.dispatchEvent(new Event("resize"));
-
-    const dispatchPointer = (
-      target: Element,
-      type: string,
-      values: Record<string, unknown>,
-    ) => {
-      const event = new Event(type, { bubbles: true, cancelable: true });
-      for (const [key, value] of Object.entries(values)) {
-        Object.defineProperty(event, key, { value });
-      }
-      fireEvent(target, event);
-    };
+    mockNavGeometry(navBar, tabLinks);
 
     dispatchPointer(tabLinks[0], "pointerdown", {
       pointerId: 1,
       pointerType: "touch",
       isPrimary: true,
       clientX: 25,
+      clientY: 20,
     });
     dispatchPointer(navBar, "pointermove", {
       pointerId: 1,
       pointerType: "touch",
       isPrimary: true,
       clientX: 250,
+      clientY: 20,
     });
+
+    expect(navBar).toHaveAttribute("data-dragging", "true");
     expect(
-      Number.parseFloat(
-        navBar.style.getPropertyValue("--shell-nav-body-scale-x"),
-      ),
-    ).toBeGreaterThan(1);
-    expect(
-      Number.parseFloat(
-        navBar.style.getPropertyValue("--shell-nav-body-scale-y"),
-      ),
-    ).toBeLessThan(1);
-    expect(navBar.style.getPropertyValue("--shell-nav-body-origin")).toBe(
-      "left center",
-    );
+      Number.parseFloat(navBar.style.getPropertyValue("--shell-nav-x")),
+    ).toBeGreaterThan(100);
+    expect(navBar.style.getPropertyValue("--shell-nav-stretch")).toBe("1");
+    expect(navBar.style.getPropertyValue("--shell-nav-body-scale-x")).toBe("");
+    expect(navBar.style.getPropertyValue("--shell-nav-body-scale-y")).toBe("");
+    expect(navBar.style.getPropertyValue("--shell-nav-body-origin")).toBe("");
+
     dispatchPointer(navBar, "pointerup", {
       pointerId: 1,
       pointerType: "touch",
       isPrimary: true,
       clientX: 250,
+      clientY: 20,
     });
 
     expect(nav.routerPush).toHaveBeenCalledWith("/my-appointments");
-    expect(navBar.style.getPropertyValue("--shell-nav-body-scale-x")).toBe("1");
-    expect(navBar.style.getPropertyValue("--shell-nav-body-scale-y")).toBe("1");
+    expect(navBar).not.toHaveAttribute("data-dragging");
+  });
+
+  it("küçük parmak titremesinde (<= 8px) sürüklemeyi başlatmaz", () => {
+    nav.pathname = "/discover";
+    mockMobileViewport();
+
+    const { container } = render(<CustomerBottomNav tabs={tabs} />);
+    const navBar = container.querySelector(
+      ".shell-bottomnav-inner",
+    ) as HTMLDivElement;
+    const tabLinks = links(container);
+    mockNavGeometry(navBar, tabLinks);
+    const initialX = navBar.style.getPropertyValue("--shell-nav-x");
+
+    dispatchPointer(tabLinks[0], "pointerdown", {
+      pointerId: 2,
+      pointerType: "touch",
+      isPrimary: true,
+      clientX: 50,
+      clientY: 20,
+    });
+    dispatchPointer(navBar, "pointermove", {
+      pointerId: 2,
+      pointerType: "touch",
+      isPrimary: true,
+      clientX: 56,
+      clientY: 22,
+    });
+
+    expect(navBar).not.toHaveAttribute("data-dragging");
+    expect(navBar.style.getPropertyValue("--shell-nav-x")).toBe(initialX);
+
+    dispatchPointer(navBar, "pointerup", {
+      pointerId: 2,
+      pointerType: "touch",
+      isPrimary: true,
+      clientX: 56,
+      clientY: 22,
+    });
+    expect(nav.routerPush).not.toHaveBeenCalled();
+  });
+
+  it("sürükleme ortasında pointercancel gelince aktif sekmeye döner ve gezinmez", () => {
+    nav.pathname = "/discover";
+    mockMobileViewport();
+
+    const { container } = render(<CustomerBottomNav tabs={tabs} />);
+    const navBar = container.querySelector(
+      ".shell-bottomnav-inner",
+    ) as HTMLDivElement;
+    const tabLinks = links(container);
+    mockNavGeometry(navBar, tabLinks);
+
+    dispatchPointer(tabLinks[0], "pointerdown", {
+      pointerId: 3,
+      pointerType: "touch",
+      isPrimary: true,
+      clientX: 25,
+      clientY: 20,
+    });
+    dispatchPointer(navBar, "pointermove", {
+      pointerId: 3,
+      pointerType: "touch",
+      isPrimary: true,
+      clientX: 240,
+      clientY: 20,
+    });
+    expect(navBar).toHaveAttribute("data-dragging", "true");
+
+    dispatchPointer(navBar, "pointercancel", {
+      pointerId: 3,
+      pointerType: "touch",
+      isPrimary: true,
+      clientX: 240,
+      clientY: 20,
+    });
+
+    expect(navBar).not.toHaveAttribute("data-dragging");
+    expect(
+      Number.parseFloat(navBar.style.getPropertyValue("--shell-nav-x")),
+    ).toBe(4);
+    expect(nav.routerPush).not.toHaveBeenCalled();
+  });
+
+  it("pencere boyutu değişince gösterge konum ve genişliğini yeniden hizalar", () => {
+    nav.pathname = "/favorites";
+    const { container } = render(<CustomerBottomNav tabs={tabs} />);
+    const navBar = container.querySelector(
+      ".shell-bottomnav-inner",
+    ) as HTMLDivElement;
+    const tabLinks = links(container);
+
+    mockNavGeometry(navBar, tabLinks, 100);
+    expect(navBar.style.getPropertyValue("--shell-nav-x")).toBe("104px");
+    expect(navBar.style.getPropertyValue("--shell-nav-width")).toBe("92px");
+
+    mockNavGeometry(navBar, tabLinks, 80);
+    expect(navBar.style.getPropertyValue("--shell-nav-x")).toBe("84px");
+    expect(navBar.style.getPropertyValue("--shell-nav-width")).toBe("72px");
+  });
+
+  it("kenar swipe'ında (toHref null) alt çubukta settle titremesi tetiklemez", () => {
+    nav.pathname = "/discover";
+    const { container } = render(<CustomerBottomNav tabs={tabs} />);
+    const navBar = container.querySelector(
+      ".shell-bottomnav-inner",
+    ) as HTMLDivElement;
+    mockNavGeometry(navBar, links(container));
+
+    window.dispatchEvent(
+      new CustomEvent(PAGE_SWIPE_PROGRESS_EVENT, {
+        detail: {
+          fromHref: "/discover",
+          toHref: null,
+          progress: 0,
+          phase: "drag",
+        },
+      }),
+    );
+
+    expect(navBar).not.toHaveAttribute("data-page-dragging");
+    expect(navBar).not.toHaveAttribute("data-page-settling");
   });
 
   it("sayfa swipe'ında seçili kapsülü parmak ilerlemesine göre uzatıp taşır", () => {
@@ -152,31 +293,7 @@ describe("CustomerBottomNav", () => {
     const navBar = container.querySelector(
       ".shell-bottomnav-inner",
     ) as HTMLDivElement;
-    const tabLinks = links(container);
-
-    Object.defineProperty(navBar, "getBoundingClientRect", {
-      value: () => ({
-        left: 0,
-        right: 400,
-        width: 400,
-        top: 0,
-        bottom: 64,
-        height: 64,
-      }),
-    });
-    tabLinks.forEach((link, index) => {
-      Object.defineProperty(link, "getBoundingClientRect", {
-        value: () => ({
-          left: index * 100,
-          right: (index + 1) * 100,
-          width: 100,
-          top: 0,
-          bottom: 64,
-          height: 64,
-        }),
-      });
-    });
-    window.dispatchEvent(new Event("resize"));
+    mockNavGeometry(navBar, links(container));
 
     window.dispatchEvent(
       new CustomEvent(PAGE_SWIPE_PROGRESS_EVENT, {

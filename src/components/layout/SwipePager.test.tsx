@@ -152,4 +152,60 @@ describe("SwipePager", () => {
     window.removeEventListener(PAGE_SWIPE_PROGRESS_EVENT, onProgress);
     expect(navigation.push).toHaveBeenCalledWith("/favorites");
   });
+
+  it("dikey kaydırmada swipe track'i ve alt çubuk swipe olaylarını tetiklemez", () => {
+    window.matchMedia = vi.fn().mockReturnValue({
+      matches: true,
+      media: "(max-width: 1023px)",
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    });
+
+    const { container } = render(
+      <SwipePager tabs={tabs} className="shell">
+        <div>detail</div>
+      </SwipePager>,
+    );
+    const main = container.querySelector("main")!;
+    Object.defineProperty(main, "clientWidth", { value: 400 });
+    const track = container.querySelector(".swipe-pager-track") as HTMLDivElement;
+    const progressEvents: PageSwipeProgress[] = [];
+    const onProgress = (event: Event) => {
+      progressEvents.push((event as CustomEvent<PageSwipeProgress>).detail);
+    };
+    window.addEventListener(PAGE_SWIPE_PROGRESS_EVENT, onProgress);
+
+    const dispatchTouch = (type: string, clientX: number, clientY: number) => {
+      const event = new Event(type, { bubbles: true });
+      Object.defineProperty(event, "touches", {
+        value: [{ clientX, clientY }],
+      });
+      fireEvent(main, event);
+    };
+
+    dispatchTouch("touchstart", 200, 300);
+    expect(track).not.toHaveAttribute("data-dragging");
+
+    dispatchTouch("touchmove", 206, 220);
+    expect(track).not.toHaveAttribute("data-dragging");
+    expect(track).not.toHaveAttribute("data-settling");
+
+    dispatchTouch("touchend", 206, 220);
+    expect(track).not.toHaveAttribute("data-dragging");
+    expect(track).not.toHaveAttribute("data-settling");
+
+    dispatchTouch("touchstart", 200, 300);
+    dispatchTouch("touchmove", 204, 240);
+    dispatchTouch("touchcancel", 204, 240);
+    expect(track).not.toHaveAttribute("data-dragging");
+    expect(track).not.toHaveAttribute("data-settling");
+
+    window.removeEventListener(PAGE_SWIPE_PROGRESS_EVENT, onProgress);
+    expect(progressEvents).toHaveLength(0);
+    expect(navigation.push).not.toHaveBeenCalled();
+  });
 });

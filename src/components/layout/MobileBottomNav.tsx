@@ -47,9 +47,9 @@ interface MobileBottomNavProps {
 interface ActivePointer {
   id: number;
   startX: number;
+  startY: number;
   index: number;
   moved: boolean;
-  lastX: number;
 }
 
 interface NavItemMetrics {
@@ -74,9 +74,11 @@ export default function MobileBottomNav({
   const navRef = useRef<HTMLDivElement>(null);
   const pointerRef = useRef<ActivePointer | null>(null);
   const suppressClickRef = useRef(false);
+  const suppressClickTimerRef = useRef<number | null>(null);
   const settleTimerRef = useRef<number | null>(null);
   const itemMetricsRef = useRef<NavItemMetrics[]>([]);
   const navLeftRef = useRef(0);
+  const navWidthRef = useRef(0);
   const tabsRef = useRef(tabs);
   const pathnameRef = useRef(pathname);
   const [preview, setPreview] = useState<{
@@ -96,11 +98,13 @@ export default function MobileBottomNav({
       : -1;
   const visualIndex =
     preview?.pathname === pathname ? preview.index : activeIndex;
+  const visualIndexRef = useRef(visualIndex);
 
   useLayoutEffect(() => {
     tabsRef.current = tabs;
     pathnameRef.current = pathname;
-  }, [pathname, tabs]);
+    visualIndexRef.current = visualIndex;
+  }, [pathname, tabs, visualIndex]);
 
   const getItemElements = useCallback(() => {
     return Array.from(
@@ -112,27 +116,14 @@ export default function MobileBottomNav({
     const nav = navRef.current;
     if (!nav) return;
     const navRect = nav.getBoundingClientRect();
+    if (navRect.width <= 0) return;
     navLeftRef.current = navRect.left;
+    navWidthRef.current = nav.clientWidth || navRect.width;
     itemMetricsRef.current = getItemElements().map((item) => {
       const rect = item.getBoundingClientRect();
       return { left: rect.left - navRect.left, width: rect.width };
     });
   }, [getItemElements]);
-
-  useLayoutEffect(() => {
-    measureItems();
-    const nav = navRef.current;
-    const observer =
-      nav && typeof ResizeObserver !== "undefined"
-        ? new ResizeObserver(measureItems)
-        : null;
-    if (nav) observer?.observe(nav);
-    window.addEventListener("resize", measureItems);
-    return () => {
-      observer?.disconnect();
-      window.removeEventListener("resize", measureItems);
-    };
-  }, [measureItems, tabs.length]);
 
   const setIndicatorPosition = useCallback(
     (index: number, pointerX?: number, stretch = 1) => {
@@ -140,18 +131,20 @@ export default function MobileBottomNav({
       const item = itemMetricsRef.current[index];
       if (!nav || !item) return;
 
+      const navWidth = nav.clientWidth || navWidthRef.current;
       const indicatorWidth = Math.max(0, item.width - 8);
       const inset = (item.width - indicatorWidth) / 2;
-      const left =
+      const rawLeft =
         pointerX === undefined
           ? item.left + inset
           : Math.max(
               4,
               Math.min(
-                nav.clientWidth - indicatorWidth - 4,
+                Math.max(4, navWidth - indicatorWidth - 4),
                 pointerX - navLeftRef.current - indicatorWidth / 2,
               ),
             );
+      const left = Math.round(rawLeft * 2) / 2;
 
       nav.style.setProperty("--shell-nav-x", `${left}px`);
       nav.style.setProperty("--shell-nav-width", `${indicatorWidth}px`);
@@ -174,8 +167,9 @@ export default function MobileBottomNav({
       const fromLeft = fromItem.left + (fromItem.width - width) / 2;
       const toLeft = toItem.left + (toItem.width - width) / 2;
       const amount = Math.max(0, Math.min(1, progress));
-      const left = fromLeft + (toLeft - fromLeft) * amount;
-      const stretch = 1 + 0.18 * Math.sin(Math.PI * amount);
+      const left =
+        Math.round((fromLeft + (toLeft - fromLeft) * amount) * 2) / 2;
+      const stretch = 1 + 0.14 * Math.sin(Math.PI * amount);
 
       nav.style.setProperty("--shell-nav-x", `${left}px`);
       nav.style.setProperty("--shell-nav-width", `${width}px`);
@@ -184,35 +178,41 @@ export default function MobileBottomNav({
     [],
   );
 
-  const setBarStretch = useCallback((distance: number, direction: number) => {
-    const nav = navRef.current;
-    if (!nav) return;
-
-    const progress = Math.min(
-      1,
-      Math.abs(distance) / Math.max(1, nav.clientWidth),
-    );
-    nav.style.setProperty(
-      "--shell-nav-body-scale-x",
-      String(1 + progress * 0.025),
-    );
-    nav.style.setProperty(
-      "--shell-nav-body-scale-y",
-      String(1 - progress * 0.006),
-    );
-    if (direction !== 0) {
-      nav.style.setProperty(
-        "--shell-nav-body-origin",
-        direction > 0 ? "left center" : "right center",
-      );
+  const syncLayout = useCallback(() => {
+    measureItems();
+    if (!pointerRef.current && visualIndexRef.current >= 0) {
+      setIndicatorPosition(visualIndexRef.current);
     }
-  }, []);
+  }, [measureItems, setIndicatorPosition]);
 
-  const resetBarStretch = useCallback(() => {
+  useLayoutEffect(() => {
+    measureItems();
     const nav = navRef.current;
-    if (!nav) return;
-    nav.style.setProperty("--shell-nav-body-scale-x", "1");
-    nav.style.setProperty("--shell-nav-body-scale-y", "1");
+    const observer =
+      nav && typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(syncLayout)
+        : null;
+    if (nav) observer?.observe(nav);
+    window.addEventListener("resize", syncLayout);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", syncLayout);
+    };
+  }, [measureItems, syncLayout, tabs.length]);
+
+  useEffect(() => {
+    const frameId = window.requestAnimationFrame(() => {
+      if (navRef.current) {
+        navRef.current.dataset.ready = "true";
+      }
+    });
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      if (suppressClickTimerRef.current !== null) {
+        window.clearTimeout(suppressClickTimerRef.current);
+        suppressClickTimerRef.current = null;
+      }
+    };
   }, []);
 
   useLayoutEffect(() => {
@@ -224,7 +224,6 @@ export default function MobileBottomNav({
       delete nav.dataset.pageDragging;
       delete nav.dataset.pageSettling;
     }
-    resetBarStretch();
     if (settleTimerRef.current !== null) {
       window.clearTimeout(settleTimerRef.current);
       settleTimerRef.current = null;
@@ -234,7 +233,7 @@ export default function MobileBottomNav({
       return;
     }
     setIndicatorPosition(visualIndex);
-  }, [resetBarStretch, setIndicatorPosition, visualIndex, tabs.length]);
+  }, [setIndicatorPosition, visualIndex, tabs.length]);
 
   useEffect(() => {
     const onPageSwipeProgress = (event: Event) => {
@@ -244,28 +243,31 @@ export default function MobileBottomNav({
       const nav = navRef.current;
       if (!nav || !detail) return;
 
-      if (settleTimerRef.current !== null) {
-        window.clearTimeout(settleTimerRef.current);
-        settleTimerRef.current = null;
-      }
-
       const fromIndex = currentTabs.findIndex(
         (tab) => tab.href === detail.fromHref,
       );
-      const toIndex = currentTabs.findIndex(
-        (tab) => tab.href === detail.toHref,
-      );
+      const toIndex = detail.toHref
+        ? currentTabs.findIndex((tab) => tab.href === detail.toHref)
+        : -1;
 
-      if (
-        (detail.phase === "drag" || detail.phase === "commit") &&
-        fromIndex >= 0 &&
-        toIndex >= 0
-      ) {
+      if (detail.phase === "drag" || detail.phase === "commit") {
+        if (fromIndex < 0 || toIndex < 0) return;
+        if (settleTimerRef.current !== null) {
+          window.clearTimeout(settleTimerRef.current);
+          settleTimerRef.current = null;
+        }
         delete nav.dataset.settling;
         delete nav.dataset.pageSettling;
         nav.dataset.pageDragging = "true";
         setIndicatorBetween(fromIndex, toIndex, detail.progress);
         return;
+      }
+
+      if (detail.phase !== "settle") return;
+
+      if (settleTimerRef.current !== null) {
+        window.clearTimeout(settleTimerRef.current);
+        settleTimerRef.current = null;
       }
 
       delete nav.dataset.pageDragging;
@@ -340,54 +342,60 @@ export default function MobileBottomNav({
     const index = Number(item.dataset.navIndex);
     if (!Number.isInteger(index)) return;
 
-    pointerRef.current = {
-      id: event.pointerId,
-      startX: event.clientX,
-      index,
-      moved: false,
-      lastX: event.clientX,
-    };
-    setBarStretch(0, 0);
+    measureItems();
     if (settleTimerRef.current !== null) {
       window.clearTimeout(settleTimerRef.current);
       settleTimerRef.current = null;
     }
-    setPreview({ pathname, index });
-    navRef.current?.setPointerCapture?.(event.pointerId);
-    if (navRef.current) {
-      delete navRef.current.dataset.settling;
-      delete navRef.current.dataset.pageSettling;
-      delete navRef.current.dataset.pageDragging;
-      navRef.current.dataset.dragging = "true";
+    suppressClickRef.current = false;
+    if (suppressClickTimerRef.current !== null) {
+      window.clearTimeout(suppressClickTimerRef.current);
+      suppressClickTimerRef.current = null;
     }
-    setIndicatorPosition(index);
+
+    pointerRef.current = {
+      id: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY ?? 0,
+      index,
+      moved: false,
+    };
   };
 
   const onPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
     const pointer = pointerRef.current;
     if (!pointer || pointer.id !== event.pointerId) return;
 
+    const dx = event.clientX - pointer.startX;
+    const dy = (event.clientY ?? 0) - pointer.startY;
+
+    if (!pointer.moved) {
+      if (Math.abs(dy) > Math.abs(dx) * 1.5 && Math.abs(dy) > 12) {
+        pointerRef.current = null;
+        return;
+      }
+      if (Math.abs(dx) <= 8) return;
+
+      pointer.moved = true;
+      navRef.current?.setPointerCapture?.(event.pointerId);
+      if (navRef.current) {
+        delete navRef.current.dataset.settling;
+        delete navRef.current.dataset.pageSettling;
+        delete navRef.current.dataset.pageDragging;
+        navRef.current.dataset.dragging = "true";
+      }
+    }
+
     const index = findItemIndex(event.clientX);
     if (index < 0) return;
 
-    const distance = Math.abs(event.clientX - pointer.startX);
-    pointer.moved ||= distance > 8;
     pointer.index = index;
-    const movement = event.clientX - pointer.lastX;
-    const speed = Math.abs(movement);
-    pointer.lastX = event.clientX;
-    setBarStretch(event.clientX - pointer.startX, movement);
-
     setPreview((current) =>
       current?.pathname === pathname && current.index === index
         ? current
         : { pathname, index },
     );
-    setIndicatorPosition(
-      index,
-      event.clientX,
-      1 + Math.min(0.22, speed * 0.012),
-    );
+    setIndicatorPosition(index, event.clientX, 1);
   };
 
   const finishPointer = (
@@ -398,24 +406,50 @@ export default function MobileBottomNav({
     if (!pointer || pointer.id !== event.pointerId) return;
 
     pointerRef.current = null;
-    resetBarStretch();
-    if (navRef.current) {
-      delete navRef.current.dataset.dragging;
-      navRef.current.releasePointerCapture?.(event.pointerId);
-    }
-    setIndicatorPosition(pointer.index);
+    if (!pointer.moved) return;
 
-    if (cancelled || !pointer.moved) {
-      if (!cancelled) triggerHapticFeedback();
+    const nav = navRef.current;
+    if (nav) {
+      try {
+        nav.releasePointerCapture?.(event.pointerId);
+      } catch {
+        // Pointer capture may not have been active or already released.
+      }
+      delete nav.dataset.dragging;
+      nav.dataset.settling = "true";
+    }
+
+    if (settleTimerRef.current !== null) {
+      window.clearTimeout(settleTimerRef.current);
+    }
+    settleTimerRef.current = window.setTimeout(() => {
+      if (!pointerRef.current && navRef.current) {
+        delete navRef.current.dataset.settling;
+      }
+      settleTimerRef.current = null;
+    }, 240);
+
+    if (cancelled) {
       setPreview(null);
+      if (activeIndex >= 0) {
+        setIndicatorPosition(activeIndex);
+      } else {
+        nav?.style.setProperty("--shell-nav-width", "0px");
+      }
       return;
     }
 
     const destination = pointer.index;
+    setIndicatorPosition(destination);
+
     suppressClickRef.current = true;
-    window.setTimeout(() => {
+    if (suppressClickTimerRef.current !== null) {
+      window.clearTimeout(suppressClickTimerRef.current);
+    }
+    suppressClickTimerRef.current = window.setTimeout(() => {
       suppressClickRef.current = false;
-    }, 0);
+      suppressClickTimerRef.current = null;
+    }, 120);
 
     if (destination < tabs.length) {
       const target = tabs[destination];
@@ -425,8 +459,11 @@ export default function MobileBottomNav({
       if (!isTargetActive) {
         triggerHapticFeedback();
         router.push(target.href);
+      } else {
+        setPreview(null);
       }
     } else if (destination === tabs.length && action) {
+      setPreview(null);
       triggerHapticFeedback();
       action.onSelect();
     }
@@ -437,6 +474,10 @@ export default function MobileBottomNav({
     event.preventDefault();
     event.stopPropagation();
     suppressClickRef.current = false;
+    if (suppressClickTimerRef.current !== null) {
+      window.clearTimeout(suppressClickTimerRef.current);
+      suppressClickTimerRef.current = null;
+    }
   };
 
   return (

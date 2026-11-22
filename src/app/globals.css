@@ -190,8 +190,6 @@ html, body {
 
 .shell-bottomnav-inner {
   --shell-nav-count: 4;
-  --shell-nav-body-scale-x: 1;
-  --shell-nav-body-scale-y: 1;
   position: relative;
   isolation: isolate;
   display: grid;
@@ -202,23 +200,14 @@ html, body {
   overflow: hidden;
   border: 1px solid rgb(255 255 255 / 66%);
   border-radius: 9999px;
-  background: rgb(248 250 252 / 78%);
+  background: rgb(248 250 252 / 84%);
   box-shadow:
     0 14px 36px rgb(15 23 42 / 15%),
     inset 0 1px 0 rgb(255 255 255 / 72%);
-  -webkit-backdrop-filter: blur(28px) saturate(1.7);
-  backdrop-filter: blur(28px) saturate(1.7);
+  -webkit-backdrop-filter: blur(20px) saturate(1.6);
+  backdrop-filter: blur(20px) saturate(1.6);
   pointer-events: auto;
-  touch-action: pan-y;
-  transform: scaleX(var(--shell-nav-body-scale-x))
-    scaleY(var(--shell-nav-body-scale-y));
-  transform-origin: var(--shell-nav-body-origin, center center);
-  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
-  will-change: transform;
-}
-
-.shell-bottomnav-inner[data-dragging="true"] {
-  transition: none;
+  touch-action: none;
 }
 
 .shell-bottomnav-inner[data-dragging="true"] .shell-nav-item:active {
@@ -227,7 +216,7 @@ html, body {
 
 .dark .shell-bottomnav-inner {
   border-color: rgb(255 255 255 / 15%);
-  background: rgb(28 30 36 / 82%);
+  background: rgb(28 30 36 / 86%);
   box-shadow:
     0 14px 36px rgb(0 0 0 / 34%),
     inset 0 1px 0 rgb(255 255 255 / 14%);
@@ -274,9 +263,7 @@ html, body {
   box-shadow:
     inset 0 1px 0 rgb(255 255 255 / 72%),
     0 3px 12px color-mix(in srgb, var(--brand) 12%, transparent);
-  transition:
-    transform 360ms cubic-bezier(0.22, 1, 0.36, 1),
-    width 260ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition: none;
   will-change: transform;
   pointer-events: none;
 }
@@ -289,9 +276,14 @@ html, body {
     0 3px 14px color-mix(in srgb, var(--brand) 18%, transparent);
 }
 
+.shell-bottomnav-inner[data-ready="true"] .shell-nav-indicator {
+  transition:
+    transform 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    width 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
 .shell-bottomnav-inner[data-dragging="true"] .shell-nav-indicator {
-  transition-duration: 65ms, 120ms;
-  transition-timing-function: linear;
+  transition: none;
 }
 
 .shell-bottomnav-inner[data-page-dragging="true"] .shell-nav-indicator {
@@ -304,6 +296,11 @@ html, body {
 
 .shell-bottomnav-inner[data-page-settling="true"] .shell-nav-indicator {
   transition-duration: 220ms, 220ms;
+}
+
+.shell-bottomnav-inner,
+.shell-bottomnav-inner .shell-nav-item {
+  touch-action: none;
 }
 
 .shell-nav-item {
@@ -321,7 +318,6 @@ html, body {
   color: rgb(100 116 139);
   text-decoration: none;
   -webkit-tap-highlight-color: transparent;
-  touch-action: pan-y;
   transition:
     color 220ms ease,
     transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
@@ -382,8 +378,7 @@ html, body {
 }
 
 .swipe-pager-page {
-  content-visibility: auto;
-  contain-intrinsic-size: auto 100vh;
+  contain: layout style;
 }
 
 .swipe-pager-track[data-settling="true"] {
@@ -399,7 +394,6 @@ html, body {
   .shell-nav-item,
   .shell-nav-icon,
   .shell-nav-label,
-  .shell-bottomnav-inner,
   .swipe-pager-track,
   .mobile-menu-backdrop,
   .mobile-menu-sheet,
