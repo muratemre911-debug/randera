@@ -330,10 +330,6 @@ export default function BusinessPage() {
       });
   };
 
-  if (loading) {
-    return <BusinessPageSkeleton />;
-  }
-
   if (error || !tenant) {
     return (
       <div className="w-full max-w-4xl mx-auto h-64 flex items-center justify-center">
@@ -352,8 +348,17 @@ export default function BusinessPage() {
   return (
     <div className="brand-scope w-full max-w-4xl mx-auto space-y-8 pb-28 font-sans select-none relative lg:pb-16">
       {/* İşletmenin seçtiği palet (açık/koyu varyant müşterinin temasına göre) */}
-      <style>{paletteCss(getPalette(tenant.theme_palette))}</style>
+      <style>{paletteCss(getPalette(tenant?.theme_palette))}</style>
 
+      <Presence
+        swapKey={loading ? "loading" : "content"}
+        enterClassName="animate-fade-rise-in"
+        exitClassName="animate-fade-rise-out"
+      >
+      {loading ? (
+        <BusinessPageSkeleton />
+      ) : (
+      <>
       {/* Banner & Profile Container */}
       <div className="relative !mb-0">
         {/* Cover Image Banner */}
@@ -999,10 +1004,13 @@ export default function BusinessPage() {
         reviews={reviewsData.user_reviews || []}
         onSuccess={handleReviewSuccess}
       />
+      </>
+      )}
+      </Presence>
 
       {/* Mobil sabit alt CTA: native uygulama desenindeki "Randevu Al" çubuğu.
           Kaydırma kabı transform içerdiğinden portal ile body'ye taşınır. */}
-      {mounted &&
+      {mounted && !loading &&
         createPortal(
           <div className="brand-scope fixed inset-x-0 bottom-0 z-40 lg:hidden">
             <div className="border-t border-slate-200/80 bg-white/90 px-4 pb-[max(var(--safe-bottom),0.75rem)] pt-3 backdrop-blur-2xl dark:border-slate-800 dark:bg-slate-900/90">

@@ -159,7 +159,7 @@ export default function BookPage() {
   const advanceTimerRef = useRef<number | null>(null);
 
   /** Adım geçiş yönü: ileri mi geri mi (animasyon yönünü belirler). */
-  const stepDirectionRef = useRef<1 | -1>(1);
+  const [stepDirection, setStepDirection] = useState<1 | -1>(1);
 
   // Zamanlayıcıyı temizle: bileşen kapanırken ya da adım değişirken
   // yarım kalan ilerleme tetiklenmesin.
@@ -182,7 +182,7 @@ export default function BookPage() {
       window.clearTimeout(advanceTimerRef.current);
       advanceTimerRef.current = null;
     }
-    stepDirectionRef.current = next >= step ? 1 : -1;
+    setStepDirection(next >= step ? 1 : -1);
     setStep(next);
   };
 
@@ -817,12 +817,12 @@ export default function BookPage() {
       <Presence
         swapKey={step}
         enterClassName={
-          stepDirectionRef.current === 1
+          stepDirection === 1
             ? "animate-step-forward-in"
             : "animate-step-back-in"
         }
         exitClassName={
-          stepDirectionRef.current === 1
+          stepDirection === 1
             ? "animate-step-forward-out"
             : "animate-step-back-out"
         }
@@ -1189,7 +1189,7 @@ export default function BookPage() {
                           // düğmesine basarsa akış yine de 4. adıma atıyordu.
                           advanceTimerRef.current = window.setTimeout(() => {
                             advanceTimerRef.current = null;
-                            stepDirectionRef.current = 1;
+                            setStepDirection(1);
                             setStep(4);
                           }, 220);
                         }}

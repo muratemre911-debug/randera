@@ -24,7 +24,7 @@ describe("işletme sayfası tema paleti", () => {
   });
 
   it("işletmenin seçtiği paleti uygular", () => {
-    expect(source).toContain("paletteCss(getPalette(tenant.theme_palette))");
+    expect(source).toContain("paletteCss(getPalette(tenant?.theme_palette))");
   });
 
   it("işletme sayfasındaki modallar da palet değişkenlerini kullanır", () => {
@@ -42,10 +42,11 @@ describe("işletme sayfası tema paleti", () => {
     expect(booking).toContain("brand-scope");
     expect(booking).toContain("paletteCss(getPalette(tenant?.theme_palette))");
     expect(booking).toContain("bg-[var(--brand)]");
-    // palet her dönüş dalına (yükleniyor / hata / başarı / form) uygulanmalı
+    // palet her dönüş dalına (hata / başarı / form) uygulanmalı;
+    // yükleniyor durumu artık ana dal içinde Presence ile yönetilir.
     const roots = booking.match(/className="brand-scope/g) ?? [];
     const branches = booking.match(/^ {2,6}return \($/gm) ?? [];
-    expect(branches).toHaveLength(4);
+    expect(branches).toHaveLength(3);
     expect(roots).toHaveLength(branches.length);
   });
 });

@@ -378,15 +378,9 @@ export default function CustomerLayout({
         </SwipePager>
       </div>
 
-      {/* Mobil alt sekme çubuğu: ana sekmelerde görünür, detaylarda yumuşak
-          bir kaymayla çekilir (Presence çıkış animasyonu). */}
-      <Presence
-        swapKey={isDetailRoute ? "hidden" : "tabs"}
-        enterClassName="animate-bar-in"
-        exitClassName="animate-bar-out"
-      >
-        {!isDetailRoute && <CustomerBottomNav tabs={navItems} />}
-      </Presence>
+      {/* Mobil alt sekme çubuğu: ana sekmelerde görünür, detaylarda gizli.
+          Giriş animasyonu SHELL.bottomNav üzerindeki animate-bar-in ile gelir. */}
+      {!isDetailRoute && <CustomerBottomNav tabs={navItems} />}
 
       {userId && (
         <RequirePhoneModal
