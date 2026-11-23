@@ -15,8 +15,6 @@ import {
   CalendarPlus, 
   Download, 
   XCircle, 
-  CheckCircle2, 
-  AlertCircle, 
   Compass, 
   AlertTriangle, 
   ExternalLink,
@@ -33,6 +31,11 @@ import Link from "next/link";
 import ReviewModal from "@/components/ReviewModal";
 import Modal from "@/components/ui/Modal";
 import DropdownMenu from "@/components/ui/DropdownMenu";
+import SegmentedControl from "@/components/ui/SegmentedControl";
+import PullToRefresh from "@/components/layout/PullToRefresh";
+import { AppointmentsSkeleton } from "@/components/Skeleton";
+import { useToast } from "@/components/ui/Toast";
+import Presence from "@/components/ui/Presence";
 import {
   effectiveBookingRules,
   type BookingRulesInput,
@@ -104,7 +107,7 @@ export default function MyAppointmentsPage() {
   const [withdrawingAppt, setWithdrawingAppt] = useState<Appointment | null>(null);
   const [withdrawLoading, setWithdrawLoading] = useState(false);
   const [reviewAppt, setReviewAppt] = useState<Appointment | null>(null);
-  const [notification, setNotification] = useState<{ message: string; type: "success" | "error" } | null>(null);
+  const { toast } = useToast();
 
   const handleReviewSuccess = (review: { rating: number; comment: string }) => {
     if (!reviewAppt) return;
@@ -125,11 +128,10 @@ export default function MyAppointmentsPage() {
           : a
       )
     );
-    setNotification({
-      message: lang === "tr" ? "Değerlendirmeniz başarıyla kaydedildi!" : "Review submitted successfully!",
-      type: "success",
-    });
-    setTimeout(() => setNotification(null), 4000);
+    toast(
+      lang === "tr" ? "Değerlendirmeniz başarıyla kaydedildi!" : "Review submitted successfully!",
+      "success",
+    );
   };
 
   // İptal modu: süre dolmuşsa direkt iptal, dolmuşsa işletmeye istek gönderilir
@@ -256,21 +258,19 @@ export default function MyAppointmentsPage() {
       );
       notifyPanelChange("appointments");
 
-      setNotification({
-        message: lang === "tr" ? "Randevunuz başarıyla iptal edildi." : "Appointment cancelled successfully.",
-        type: "success",
-      });
+      toast(
+        lang === "tr" ? "Randevunuz başarıyla iptal edildi." : "Appointment cancelled successfully.",
+        "success",
+      );
       setCancellingAppt(null);
-
-      setTimeout(() => setNotification(null), 4000);
     } catch (err) {
-      setNotification({
-        message: errorMessage(
+      toast(
+        errorMessage(
           err,
           lang === "tr" ? "İptal sırasında bir hata oluştu." : "Failed to cancel appointment.",
         ),
-        type: "error",
-      });
+        "error",
+      );
     } finally {
       setCancelLoading(false);
     }
@@ -307,22 +307,20 @@ export default function MyAppointmentsPage() {
       );
       notifyPanelChange("appointments");
 
-      setNotification({
-        message: lang === "tr" ? "İptal isteğiniz işletmeye iletildi." : "Cancellation request sent to the business.",
-        type: "success",
-      });
+      toast(
+        lang === "tr" ? "İptal isteğiniz işletmeye iletildi." : "Cancellation request sent to the business.",
+        "success",
+      );
       setCancellingAppt(null);
       setCancelReason("");
-
-      setTimeout(() => setNotification(null), 4000);
     } catch (err) {
-      setNotification({
-        message: errorMessage(
+      toast(
+        errorMessage(
           err,
           lang === "tr" ? "İstek gönderilirken bir hata oluştu." : "Failed to send request.",
         ),
-        type: "error",
-      });
+        "error",
+      );
     } finally {
       setCancelLoading(false);
     }
@@ -354,21 +352,19 @@ export default function MyAppointmentsPage() {
       );
       notifyPanelChange("appointments");
 
-      setNotification({
-        message: lang === "tr" ? "İptal isteğiniz geri çekildi. Randevunuz geçerli." : "Request withdrawn. Your appointment is still valid.",
-        type: "success",
-      });
+      toast(
+        lang === "tr" ? "İptal isteğiniz geri çekildi. Randevunuz geçerli." : "Request withdrawn. Your appointment is still valid.",
+        "success",
+      );
       setWithdrawingAppt(null);
-
-      setTimeout(() => setNotification(null), 4000);
     } catch (err) {
-      setNotification({
-        message: errorMessage(
+      toast(
+        errorMessage(
           err,
           lang === "tr" ? "İşlem sırasında bir hata oluştu." : "Something went wrong.",
         ),
-        type: "error",
-      });
+        "error",
+      );
     } finally {
       setWithdrawLoading(false);
     }
@@ -488,37 +484,15 @@ export default function MyAppointmentsPage() {
   const nearestUpcoming = upcomingAppointments[0] || null;
 
   if (loading) {
-    return (
-      <div className="py-24 flex flex-col items-center justify-center gap-3">
-        <div className="w-10 h-10 border-3 border-[var(--brand)] border-t-transparent rounded-full animate-spin" />
-        <p className="text-sm font-semibold text-gray-500 dark:text-slate-400">
-          {lang === "tr" ? "Randevularınız yükleniyor..." : "Loading your appointments..."}
-        </p>
-      </div>
-    );
+    return <AppointmentsSkeleton />;
   }
 
   return (
-    <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 mx-auto max-w-5xl space-y-6 pb-16 font-sans sm:space-y-8">
-      {/* Toast Bildirimi */}
-      {notification && (
-        <div
-          className={`flex items-center justify-between gap-3 rounded-2xl border p-4 text-sm font-bold shadow-lg animate-in slide-in-from-top-2 duration-200 ${
-            notification.type === "success"
-              ? "border-emerald-400/30 bg-emerald-500 text-white"
-              : "border-rose-400/30 bg-rose-500 text-white"
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            {notification.type === "success" ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
-            <span>{notification.message}</span>
-          </div>
-          <button onClick={() => setNotification(null)} className="p-1 hover:opacity-80">
-            <XCircle size={18} />
-          </button>
-        </div>
-      )}
-
+    <PullToRefresh
+      onRefresh={() => fetchAppointments(true)}
+      refreshingLabel={lang === "tr" ? "Yenileniyor..." : "Refreshing..."}
+    >
+    <div className="mx-auto max-w-5xl space-y-6 pb-16 font-sans sm:space-y-8">
       {/* Header */}
       <div className="relative isolate overflow-hidden rounded-[28px] border border-slate-200/80 bg-white/80 px-5 py-5 shadow-[0_18px_50px_-28px_rgba(15,23,42,0.28)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/70 dark:shadow-[0_20px_55px_-30px_rgba(0,0,0,0.8)] sm:px-7 sm:py-7">
         <div className="pointer-events-none absolute -right-16 -top-24 h-64 w-64 rounded-full bg-indigo-400/10 blur-3xl dark:bg-indigo-500/15" />
@@ -620,53 +594,48 @@ export default function MyAppointmentsPage() {
         </div>
       )}
 
-      {/* Tabs */}
-      <div className="rounded-2xl border border-slate-200/80 bg-slate-100/80 p-1.5 shadow-inner dark:border-white/[0.06] dark:bg-slate-900/70">
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            aria-pressed={activeTab === "upcoming"}
-            onClick={() => setActiveTab("upcoming")}
-            className={`flex min-h-12 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-xl px-2 py-2.5 text-center text-[11px] font-bold leading-tight transition-all sm:gap-2 sm:px-4 sm:text-sm ${
-              activeTab === "upcoming"
-                ? "bg-white text-indigo-700 shadow-[0_3px_12px_rgba(15,23,42,0.08)] dark:bg-slate-800 dark:text-indigo-200 dark:shadow-black/20"
-                : "text-slate-500 hover:bg-white/60 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/[0.04] dark:hover:text-white"
-            }`}
-          >
-            <Calendar size={15} className="shrink-0" />
-            <span>{lang === "tr" ? "Yaklaşan Randevular" : "Upcoming"}</span>
-            <span className={`rounded-full px-1.5 py-0.5 text-[10px] sm:text-xs ${
-              activeTab === "upcoming"
-                ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-400/15 dark:text-indigo-200"
-                : "bg-slate-200/70 text-slate-500 dark:bg-white/[0.06] dark:text-slate-400"
-            }`}>
-              {upcomingAppointments.length}
-            </span>
-          </button>
-          <button
-            type="button"
-            aria-pressed={activeTab === "past"}
-            onClick={() => setActiveTab("past")}
-            className={`flex min-h-12 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-xl px-2 py-2.5 text-center text-[11px] font-bold leading-tight transition-all sm:gap-2 sm:px-4 sm:text-sm ${
-              activeTab === "past"
-                ? "bg-white text-indigo-700 shadow-[0_3px_12px_rgba(15,23,42,0.08)] dark:bg-slate-800 dark:text-indigo-200 dark:shadow-black/20"
-                : "text-slate-500 hover:bg-white/60 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/[0.04] dark:hover:text-white"
-            }`}
-          >
-            <Clock size={15} className="shrink-0" />
-            <span>{lang === "tr" ? "Geçmiş & İptaller" : "Past & Cancelled"}</span>
-            <span className={`rounded-full px-1.5 py-0.5 text-[10px] sm:text-xs ${
-              activeTab === "past"
-                ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-400/15 dark:text-indigo-200"
-                : "bg-slate-200/70 text-slate-500 dark:bg-white/[0.06] dark:text-slate-400"
-            }`}>
-              {pastAppointments.length}
-            </span>
-          </button>
-        </div>
-      </div>
+      {/* Sekmeler: iOS tarzı kayan kapsüllü segmented control */}
+      <SegmentedControl
+        value={activeTab}
+        onChange={setActiveTab}
+        options={[
+          {
+            value: "upcoming",
+            icon: Calendar,
+            badge: upcomingAppointments.length,
+            ariaLabel: lang === "tr" ? "Yaklaşan Randevular" : "Upcoming Appointments",
+            label: (
+              <>
+                <span className="sm:hidden">{lang === "tr" ? "Yaklaşan" : "Upcoming"}</span>
+                <span className="hidden sm:inline">
+                  {lang === "tr" ? "Yaklaşan Randevular" : "Upcoming"}
+                </span>
+              </>
+            ),
+          },
+          {
+            value: "past",
+            icon: Clock,
+            badge: pastAppointments.length,
+            ariaLabel: lang === "tr" ? "Geçmiş ve İptaller" : "Past and Cancelled",
+            label: (
+              <>
+                <span className="sm:hidden">{lang === "tr" ? "Geçmiş" : "Past"}</span>
+                <span className="hidden sm:inline">
+                  {lang === "tr" ? "Geçmiş & İptaller" : "Past & Cancelled"}
+                </span>
+              </>
+            ),
+          },
+        ]}
+      />
 
-      {/* Randevu Kartları Listesi */}
+      {/* Randevu Kartları Listesi: sekme değişimi yumuşak geçişle yaşanır. */}
+      <Presence
+        swapKey={activeTab}
+        enterClassName="animate-fade-rise-in"
+        exitClassName="animate-fade-rise-out"
+      >
       {activeTab === "upcoming" ? (
         upcomingAppointments.length === 0 ? (
           <div className="relative isolate overflow-hidden rounded-[30px] border border-indigo-100/80 bg-gradient-to-br from-white via-indigo-50/50 to-violet-50/70 px-5 py-10 text-center shadow-[0_18px_55px_-32px_rgba(79,70,229,0.28)] dark:border-white/10 dark:from-slate-900 dark:via-slate-900 dark:to-indigo-950/30 sm:px-8 sm:py-14">
@@ -710,7 +679,7 @@ export default function MyAppointmentsPage() {
                   {lang === "tr" ? "Onaylanmış randevunuz yok." : "No confirmed appointments."}
                 </p>
               ) : (
-                <div className="space-y-4">
+                <div className="stagger-list space-y-4">
                   {confirmedUpcoming.map((appt) => (
                     <BoardingPassCard
                       key={appt.id}
@@ -745,7 +714,7 @@ export default function MyAppointmentsPage() {
                   {lang === "tr" ? "Onay bekleyen randevunuz yok." : "No pending appointments."}
                 </p>
               ) : (
-                <div className="space-y-4">
+                <div className="stagger-list space-y-4">
                   {pendingUpcoming.map((appt) => (
                     <BoardingPassCard
                       key={appt.id}
@@ -779,7 +748,7 @@ export default function MyAppointmentsPage() {
             </p>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="stagger-list space-y-4">
             {pastAppointments.map((appt) => (
               <BoardingPassCard
                 key={appt.id}
@@ -796,6 +765,7 @@ export default function MyAppointmentsPage() {
           </div>
         )
       )}
+      </Presence>
 
       {/* İptal Onay Modalı */}
       {cancellingAppt && (() => {
@@ -968,6 +938,7 @@ export default function MyAppointmentsPage() {
         />
       )}
     </div>
+    </PullToRefresh>
   );
 }
 

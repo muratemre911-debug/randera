@@ -7,7 +7,6 @@ import { createClient } from "@/utils/supabase/client";
 import {
   Camera,
   Check,
-  CircleCheck,
   LayoutDashboard,
   LogOut,
   Phone,
@@ -21,6 +20,9 @@ import {
   trMobileErrorMessage,
   TR_MOBILE_PLACEHOLDER,
 } from "@/lib/phone";
+import { Skeleton } from "@/components/Skeleton";
+import { useToast } from "@/components/ui/Toast";
+import Presence from "@/components/ui/Presence";
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -34,7 +36,7 @@ export default function ProfilePage() {
   const [fetching, setFetching] = useState(true);
   const [saving, setSaving] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
-  const [message, setMessage] = useState({ type: "", text: "" });
+  const { toast } = useToast();
 
   const supabase = createClient();
 
@@ -80,17 +82,18 @@ export default function ProfilePage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
-    setMessage({ type: "", text: "" });
 
     const {
       data: { user },
     } = await supabase.auth.getUser();
 
     if (!user) {
-      setMessage({
-        type: "error",
-        text: "Kullanıcı bulunamadı. Lütfen tekrar giriş yapın.",
-      });
+      toast(
+        lang === "tr"
+          ? "Kullanıcı bulunamadı. Lütfen tekrar giriş yapın."
+          : "User not found. Please sign in again.",
+        "error",
+      );
       setSaving(false);
       return;
     }
@@ -102,14 +105,14 @@ export default function ProfilePage() {
 
     if (!phone.trim()) {
       if (role === "customer") {
-        setMessage({ type: "error", text: t("profile.phone_required") });
+        toast(t("profile.phone_required"), "error");
         setSaving(false);
         return;
       }
     } else {
       const check = inspectTrMobile(phone);
       if (!check.ok) {
-        setMessage({ type: "error", text: trMobileErrorMessage(check.issue, lang) });
+        toast(trMobileErrorMessage(check.issue, lang), "error");
         setSaving(false);
         return;
       }
@@ -122,10 +125,13 @@ export default function ProfilePage() {
       const phoneData = await phoneRes.json().catch(() => ({}));
 
       if (!phoneRes.ok) {
-        setMessage({
-          type: "error",
-          text: phoneData?.error || "Telefon numarası kaydedilemedi.",
-        });
+        toast(
+          phoneData?.error ||
+            (lang === "tr"
+              ? "Telefon numarası kaydedilemedi."
+              : "Could not save the phone number."),
+          "error",
+        );
         setSaving(false);
         return;
       }
@@ -148,10 +154,7 @@ export default function ProfilePage() {
 
       if (uploadError) {
         console.error("Avatar upload error:", uploadError);
-        setMessage({
-          type: "error",
-          text: t("profile.photo_failed"),
-        });
+        toast(t("profile.photo_failed"), "error");
         setSaving(false);
         return;
       }
@@ -167,18 +170,12 @@ export default function ProfilePage() {
 
     if (error) {
       console.error("Profile update error:", error);
-      setMessage({
-        type: "error",
-        text: t("profile.phone_failed"),
-      });
+      toast(t("profile.phone_failed"), "error");
     } else {
       setAvatarUrl(finalAvatarUrl);
       setAvatarFile(null);
       setAvatarPreview("");
-      setMessage({
-        type: "success",
-        text: t("profile.saved"),
-      });
+      toast(t("profile.saved"), "success");
 
       // Sidebar'daki isim + profil fotoğrafı anında güncellensin
       window.dispatchEvent(
@@ -227,12 +224,25 @@ export default function ProfilePage() {
           <div className="pointer-events-none absolute -bottom-16 right-9 h-32 w-32 rounded-full border border-white/10" />
         </div>
 
+        <Presence
+          swapKey={fetching ? "loading" : "form"}
+          enterClassName="animate-fade-rise-in"
+          exitClassName="animate-fade-rise-out"
+        >
         {fetching ? (
-          <div className="flex h-64 items-center justify-center">
-            <div className="h-9 w-9 animate-spin rounded-full border-[3px] border-indigo-100 border-t-indigo-600 dark:border-indigo-950 dark:border-t-indigo-400" />
+          <div className="px-5 pb-6 sm:px-8 sm:pb-8">
+            <div className="-mt-10 mb-7 flex items-end gap-4">
+              <Skeleton className="h-[92px] w-[92px] shrink-0 rounded-[28px] border-4 border-white dark:border-slate-900" />
+              <Skeleton className="mb-2 h-5 w-32" />
+            </div>
+            <div className="grid gap-5 sm:grid-cols-2">
+              <Skeleton className="h-14 w-full rounded-2xl" />
+              <Skeleton className="h-14 w-full rounded-2xl" />
+            </div>
+            <Skeleton className="mt-6 h-14 w-full rounded-2xl" />
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="px-5 pb-6 sm:px-8 sm:pb-8">
+        <form onSubmit={handleSubmit} className="px-5 pb-6 sm:px-8 sm:pb-8">
             <div className="-mt-10 mb-7 flex items-end gap-4">
               <div className="relative h-[92px] w-[92px] shrink-0">
                 <div className="flex h-[92px] w-[92px] items-center justify-center overflow-hidden rounded-[28px] border-4 border-white bg-gradient-to-br from-indigo-100 to-violet-200 text-3xl font-black text-indigo-700 shadow-xl shadow-slate-950/15 dark:border-slate-900 dark:from-indigo-400/30 dark:to-fuchsia-400/30 dark:text-white">
@@ -268,24 +278,6 @@ export default function ProfilePage() {
                 </p>
               </div>
             </div>
-
-            {message.text && (
-              <div
-                role="alert"
-                className={`mb-6 flex items-center gap-3 rounded-2xl border px-4 py-3.5 text-sm font-semibold ${
-                  message.type === "success"
-                    ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-300"
-                    : "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-400/20 dark:bg-rose-400/10 dark:text-rose-300"
-                }`}
-              >
-                {message.type === "success" ? (
-                  <CircleCheck size={18} className="shrink-0" />
-                ) : (
-                  <ShieldCheck size={18} className="shrink-0" />
-                )}
-                {message.text}
-              </div>
-            )}
 
             <div className="grid gap-5 sm:grid-cols-2">
               <div>
@@ -363,8 +355,9 @@ export default function ProfilePage() {
                 </>
               )}
             </button>
-          </form>
+        </form>
         )}
+        </Presence>
       </div>
 
       <div

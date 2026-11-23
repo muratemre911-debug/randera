@@ -12,6 +12,7 @@ import {
   LogOut,
   Heart,
   LayoutDashboard,
+  ChevronLeft,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import NotificationBell from "@/components/NotificationBell";
@@ -26,6 +27,8 @@ import CustomerBottomNav, {
   type BottomNavItem,
 } from "@/components/customer/CustomerBottomNav";
 import SwipePager from "@/components/layout/SwipePager";
+import Presence from "@/components/ui/Presence";
+import { triggerHapticFeedback } from "@/lib/haptics";
 import DiscoverPage from "./discover/page";
 import FavoritesPage from "./favorites/page";
 import MyAppointmentsPage from "./my-appointments/page";
@@ -66,6 +69,37 @@ export default function CustomerLayout({
   const supabase = createClient();
   const { t, lang, toggleLanguage } = useLanguage();
   const { theme, toggleTheme } = useTheme();
+
+  // Detay ekranları (işletme profili + randevu akışı): native uygulamalardaki
+  // gibi "push" edilen sayfalardır — alt sekme çubuğu gizlenir, header'da
+  // geri düğmesi ve ekran başlığı görünür.
+  const isDetailRoute = pathname.startsWith("/b/");
+  const detailTitle = pathname.includes("/randevu")
+    ? t("nav.book_appointment")
+    : t("nav.business_profile");
+
+  const handleBack = () => {
+    triggerHapticFeedback();
+    const state = window.history.state as { idx?: number } | null;
+    if (state && typeof state.idx === "number" && state.idx > 0) {
+      router.back();
+    } else {
+      router.push("/discover");
+    }
+  };
+
+  // Tema değişimi: destekleyen tarayıcılarda tüm ekran yumuşak bir
+  // çapraz geçişle (View Transition) renk değiştirir — iOS hissi.
+  const handleThemeToggle = () => {
+    const doc = document as Document & {
+      startViewTransition?: (cb: () => void) => unknown;
+    };
+    if (typeof doc.startViewTransition === "function") {
+      doc.startViewTransition(() => toggleTheme());
+    } else {
+      toggleTheme();
+    }
+  };
 
   // Dil değişince etiketler de değişsin.
   const navItems = useMemo(() => buildNavItems(t), [t]);
@@ -243,17 +277,40 @@ export default function CustomerLayout({
 
       <div ref={columnRef} className={SHELL.column}>
         <header className={SHELL.header}>
-          {/* Mobile Brand Logo on left */}
-          <div className="flex items-center gap-2 lg:hidden">
-            <DynamicLogoLink className="flex items-center gap-2">
-              <div className="relative flex h-8 w-8 items-center justify-center overflow-hidden rounded-xl shadow-xs border border-gray-200/50 dark:border-slate-700/50">
-                <BrandLogo className="h-full w-full object-cover" alt="" />
+          {/* Mobil: detay ekranlarında geri + başlık, sekmelerde marka.
+              Bağlam değişimi çapraz geçişle yumuşatılır (Presence). */}
+          <Presence
+            stacked
+            swapKey={isDetailRoute ? detailTitle : "brand"}
+            enterClassName="animate-swap-in"
+            exitClassName="animate-swap-out"
+            className="min-w-0 lg:hidden"
+          >
+            {isDetailRoute ? (
+              <div className="flex min-w-0 items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={handleBack}
+                  aria-label={t("nav.back")}
+                  className="-ml-1.5 flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full text-slate-700 transition-all hover:bg-black/5 active:scale-90 dark:text-slate-200 dark:hover:bg-white/10"
+                >
+                  <ChevronLeft size={22} strokeWidth={2.4} />
+                </button>
+                <span className="truncate text-[15px] font-bold tracking-tight text-slate-900 dark:text-white">
+                  {detailTitle}
+                </span>
               </div>
-              <span className="hidden sm:inline text-base font-black tracking-tight text-gray-800 dark:text-slate-100">
-                Randera
-              </span>
-            </DynamicLogoLink>
-          </div>
+            ) : (
+              <DynamicLogoLink className="flex items-center gap-2">
+                <div className="relative flex h-8 w-8 items-center justify-center overflow-hidden rounded-xl shadow-xs border border-gray-200/50 dark:border-slate-700/50">
+                  <BrandLogo className="h-full w-full object-cover" alt="" />
+                </div>
+                <span className="hidden sm:inline text-base font-black tracking-tight text-gray-800 dark:text-slate-100">
+                  Randera
+                </span>
+              </DynamicLogoLink>
+            )}
+          </Presence>
           <div className="hidden lg:block" />
 
           <div className="flex items-center gap-1.5 sm:gap-4">
@@ -270,17 +327,36 @@ export default function CustomerLayout({
               onClick={toggleLanguage}
               className="rounded-full px-2.5 sm:px-3 py-1 text-xs sm:text-sm font-bold text-gray-500 transition-all hover:bg-black/5 active:scale-90 dark:text-slate-400 dark:hover:bg-white/10"
             >
-              {lang === "tr" ? "TR" : "EN"}
+              <Presence
+                stacked
+                swapKey={lang}
+                enterClassName="animate-swap-in"
+                exitClassName="animate-swap-out"
+              >
+                <span className="block">{lang === "tr" ? "TR" : "EN"}</span>
+              </Presence>
             </button>
             <button
-              onClick={toggleTheme}
+              onClick={handleThemeToggle}
+              aria-label={
+                theme === "light"
+                  ? t("nav.dark_mode")
+                  : t("nav.light_mode")
+              }
               className="rounded-full p-2 sm:p-2.5 text-gray-500 transition-all hover:bg-black/5 active:scale-90 dark:text-slate-400 dark:hover:bg-white/10"
             >
-              {theme === "light" ? (
-                <Moon size={18} strokeWidth={2.5} />
-              ) : (
-                <Sun size={18} strokeWidth={2.5} />
-              )}
+              <Presence
+                stacked
+                swapKey={theme}
+                enterClassName="animate-icon-spin-in"
+                exitClassName="animate-swap-out"
+              >
+                {theme === "light" ? (
+                  <Moon size={18} strokeWidth={2.5} className="block" />
+                ) : (
+                  <Sun size={18} strokeWidth={2.5} className="block" />
+                )}
+              </Presence>
             </button>
             <NotificationBell />
           </div>
@@ -292,12 +368,25 @@ export default function CustomerLayout({
           className={SHELL.main}
           onMouseDown={preventFocusScroll}
         >
-          {children}
+          {/* Detay sayfaları her gezinmede "push" animasyonuyla girer. */}
+          <div
+            key={isDetailRoute ? pathname : "tabs"}
+            className={isDetailRoute ? "animate-push-in" : undefined}
+          >
+            {children}
+          </div>
         </SwipePager>
       </div>
 
-      {/* Mobile Bottom Navigation Bar (Instagram / TikTok / YouTube style) */}
-      {!pathname.includes("/randevu") && <CustomerBottomNav tabs={navItems} />}
+      {/* Mobil alt sekme çubuğu: ana sekmelerde görünür, detaylarda yumuşak
+          bir kaymayla çekilir (Presence çıkış animasyonu). */}
+      <Presence
+        swapKey={isDetailRoute ? "hidden" : "tabs"}
+        enterClassName="animate-bar-in"
+        exitClassName="animate-bar-out"
+      >
+        {!isDetailRoute && <CustomerBottomNav tabs={navItems} />}
+      </Presence>
 
       {userId && (
         <RequirePhoneModal

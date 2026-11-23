@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useState, useMemo } from "react";
+import { Fragment, useEffect, useState, useMemo, useCallback } from "react";
 import { createClient } from "@/utils/supabase/client";
 import SafeImage from "@/components/SafeImage";
 import { useRouter } from "next/navigation";
@@ -12,11 +12,13 @@ import {
   Star,
   ChevronRight,
   Compass,
-  Loader2,
   Calendar,
   Building2,
 } from "lucide-react";
 import { useFavorites } from "@/lib/useFavorites";
+import PullToRefresh from "@/components/layout/PullToRefresh";
+import { BusinessListSkeleton, Skeleton } from "@/components/Skeleton";
+import Presence from "@/components/ui/Presence";
 
 interface Tenant {
   id: string;
@@ -61,70 +63,73 @@ export default function FavoritesPage() {
   >({});
   const [loading, setLoading] = useState(true);
 
-  // Fetch favorited businesses and their real ratings
-  useEffect(() => {
-    const fetchFavoriteTenants = async () => {
-      setLoading(true);
-      try {
-        // Fetch all active tenants
-        const { data: tenantData } = await supabase
-          .from("tenants")
-          .select(
-            "id, name, sector, province, district, slug, profile_image_url, cover_image_url",
-          )
-          .eq("is_active", true);
+  // Favori işletmeleri ve gerçek puanlarını çek (PTR de aynı fonksiyonu kullanır).
+  const fetchFavoriteTenants = useCallback(async (quiet = false) => {
+    if (!quiet) setLoading(true);
+    try {
+      // Fetch all active tenants
+      const { data: tenantData } = await supabase
+        .from("tenants")
+        .select(
+          "id, name, sector, province, district, slug, profile_image_url, cover_image_url",
+        )
+        .eq("is_active", true);
 
-        if (tenantData) {
-          setTenants(tenantData as Tenant[]);
-        }
-
-        // Fetch prices
-        const { data: servicesData } = await supabase
-          .from("services")
-          .select("tenant_id, price")
-          .eq("is_active", true);
-
-        if (servicesData) {
-          const priceMap: Record<string, number> = {};
-          servicesData.forEach((s) => {
-            if (!priceMap[s.tenant_id] || s.price < priceMap[s.tenant_id]) {
-              priceMap[s.tenant_id] = s.price;
-            }
-          });
-          setTenantPrices(priceMap);
-        }
-
-        // Fetch real ratings
-        const revRes = await fetch("/api/reviews?summary=true");
-        const revData = await revRes.json();
-        if (revData && !revData.error) {
-          setRatingSummary(revData);
-        }
-
-        // Gerçek müsaitlik (bugün boş slot var mı) — tek toplu istek.
-        if (tenantData && tenantData.length > 0) {
-          try {
-            const ids = tenantData.map((t) => t.id).join(",");
-            const availRes = await fetch(`/api/availability?ids=${ids}`);
-            if (availRes.ok) {
-              const availData = await availRes.json();
-              if (availData && !availData.error) {
-                setAvailability(availData);
-              }
-            }
-          } catch (err) {
-            console.error("Availability fetch error:", err);
-          }
-        }
-      } catch (err) {
-        console.error("Failed to load favorites data:", err);
-      } finally {
-        setLoading(false);
+      if (tenantData) {
+        setTenants(tenantData as Tenant[]);
       }
-    };
 
+      // Fetch prices
+      const { data: servicesData } = await supabase
+        .from("services")
+        .select("tenant_id, price")
+        .eq("is_active", true);
+
+      if (servicesData) {
+        const priceMap: Record<string, number> = {};
+        servicesData.forEach((s) => {
+          if (!priceMap[s.tenant_id] || s.price < priceMap[s.tenant_id]) {
+            priceMap[s.tenant_id] = s.price;
+          }
+        });
+        setTenantPrices(priceMap);
+      }
+
+      // Fetch real ratings
+      const revRes = await fetch("/api/reviews?summary=true");
+      const revData = await revRes.json();
+      if (revData && !revData.error) {
+        setRatingSummary(revData);
+      }
+
+      // Gerçek müsaitlik (bugün boş slot var mı) — tek toplu istek.
+      if (tenantData && tenantData.length > 0) {
+        try {
+          const ids = tenantData.map((t) => t.id).join(",");
+          const availRes = await fetch(`/api/availability?ids=${ids}`);
+          if (availRes.ok) {
+            const availData = await availRes.json();
+            if (availData && !availData.error) {
+              setAvailability(availData);
+            }
+          }
+        } catch (err) {
+          console.error("Availability fetch error:", err);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to load favorites data:", err);
+    } finally {
+      setLoading(false);
+    }
+    // supabase istemcisi oturum boyunca aynıdır; setter'lar kararlıdır.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- ilk yükleme
     fetchFavoriteTenants();
-  }, [supabase]);
+  }, [fetchFavoriteTenants]);
 
   const favoriteTenants = useMemo(() => {
     return tenants.filter((t) => favorites.includes(t.id));
@@ -150,8 +155,30 @@ export default function FavoritesPage() {
     return price != null ? price : null;
   };
 
+  const loadingSkeleton = (
+    <div className="w-full max-w-6xl mx-auto space-y-6 pb-20">
+      <div className="space-y-2">
+        <Skeleton className="h-8 w-52 max-w-full" />
+        <Skeleton className="h-4 w-72 max-w-full" />
+      </div>
+      <BusinessListSkeleton />
+    </div>
+  );
+
   return (
-    <div className="w-full max-w-6xl mx-auto space-y-6 pb-20 font-sans select-none animate-in fade-in duration-300">
+    <PullToRefresh
+      onRefresh={() => fetchFavoriteTenants(true)}
+      refreshingLabel={lang === "tr" ? "Yenileniyor..." : "Refreshing..."}
+    >
+    <Presence
+      swapKey={loading ? "loading" : "content"}
+      enterClassName="animate-fade-rise-in"
+      exitClassName="animate-fade-rise-out"
+    >
+    {loading ? (
+      loadingSkeleton
+    ) : (
+    <div className="w-full max-w-6xl mx-auto space-y-6 pb-20 font-sans select-none">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
         <div>
@@ -175,11 +202,7 @@ export default function FavoritesPage() {
         </button>
       </div>
 
-      {loading ? (
-        <div className="flex justify-center py-32">
-          <Loader2 size={40} className="animate-spin text-slate-400" />
-        </div>
-      ) : favoriteTenants.length === 0 ? (
+      {favoriteTenants.length === 0 ? (
         /* Empty State */
         <div className="mx-auto max-w-lg space-y-4 rounded-3xl border border-slate-200/80 bg-white p-8 text-center shadow-[0_1px_2px_rgb(15,23,42,0.04),0_10px_30px_rgb(15,23,42,0.05)] dark:border-slate-800 dark:bg-slate-900 dark:shadow-[0_1px_2px_rgb(0,0,0,0.35),0_10px_30px_rgb(0,0,0,0.4)] lg:rounded-[32px] lg:border-slate-200/70 lg:bg-white/60 lg:py-32 lg:shadow-sm lg:backdrop-blur-3xl dark:lg:bg-slate-900/60 lg:dark:border-slate-800">
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-rose-50 text-rose-500 shadow-lg shadow-rose-500/10 dark:bg-rose-950/50">
@@ -214,7 +237,7 @@ export default function FavoritesPage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-3 lg:gap-6">
+          <div className="stagger-list grid grid-cols-1 gap-3 lg:grid-cols-3 lg:gap-6">
             {favoriteTenants.map((tenant) => {
               const coverImage = getCoverImage(tenant);
               const price = getTenantPrice(tenant);
@@ -225,7 +248,7 @@ export default function FavoritesPage() {
                   {/* ------------------------------------------- */}
                   {/* MOBİL: liste satırı (72x72 görsel + bilgi + eylem) */}
                   {/* ------------------------------------------- */}
-                  <div className="relative flex items-center gap-3 rounded-2xl border border-slate-200/80 bg-white p-3 shadow-[0_1px_2px_rgb(15,23,42,0.04),0_10px_30px_rgb(15,23,42,0.05)] dark:border-slate-800 dark:bg-slate-900 dark:shadow-[0_1px_2px_rgb(0,0,0,0.35),0_10px_30px_rgb(0,0,0,0.4)] lg:hidden">
+                  <div className="pressable relative flex items-center gap-3 rounded-2xl border border-slate-200/80 bg-white p-3 shadow-[0_1px_2px_rgb(15,23,42,0.04),0_10px_30px_rgb(15,23,42,0.05)] dark:border-slate-800 dark:bg-slate-900 dark:shadow-[0_1px_2px_rgb(0,0,0,0.35),0_10px_30px_rgb(0,0,0,0.4)] lg:hidden">
                     {/* Satırın tamamı gerçek bağlantı (stretched link) */}
                     <Link
                       href={`/b/${tenant.slug}`}
@@ -499,5 +522,8 @@ export default function FavoritesPage() {
         </div>
       )}
     </div>
+    )}
+    </Presence>
+    </PullToRefresh>
   );
 }

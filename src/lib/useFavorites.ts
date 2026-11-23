@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { triggerHapticFeedback } from "@/lib/haptics";
 
 const STORAGE_KEY = "randera_favorites";
 const CHANGE_EVENT = "randera:favorites-updated";
@@ -71,6 +72,7 @@ export function useFavorites() {
   const toggleFavorite = useCallback(
     (id: string) => {
       const current = favoriteIdsRef.current;
+      triggerHapticFeedback();
       update(
         current.includes(id)
           ? current.filter((favoriteId) => favoriteId !== id)
@@ -82,6 +84,7 @@ export function useFavorites() {
 
   const removeFavorite = useCallback(
     (id: string) => {
+      triggerHapticFeedback();
       update(favoriteIdsRef.current.filter((favoriteId) => favoriteId !== id));
     },
     [update],

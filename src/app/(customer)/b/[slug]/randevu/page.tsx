@@ -19,6 +19,7 @@ import {
   Info,
   Crown,
   AlertCircle,
+  CheckCircle2,
 } from "lucide-react";
 import { format, addDays, isSameDay } from "date-fns";
 import { tr, enUS } from "date-fns/locale";
@@ -33,6 +34,9 @@ import {
 } from "@/lib/staff";
 import { isTrMobile } from "@/lib/phone";
 import { notifyPanelChange } from "@/lib/panelEvents";
+import { BookingSkeleton } from "@/components/Skeleton";
+import { triggerHapticFeedback } from "@/lib/haptics";
+import Presence from "@/components/ui/Presence";
 
 /** Hizmetin süresini dakika cinsinden döner (kolon adı iki biçimde olabilir). */
 function getServiceDuration(svc: ServiceItem): number {
@@ -154,6 +158,9 @@ export default function BookPage() {
   /** Saat seçimi sonrası otomatik ilerleme zamanlayıcısı (temizlenebilir). */
   const advanceTimerRef = useRef<number | null>(null);
 
+  /** Adım geçiş yönü: ileri mi geri mi (animasyon yönünü belirler). */
+  const stepDirectionRef = useRef<1 | -1>(1);
+
   // Zamanlayıcıyı temizle: bileşen kapanırken ya da adım değişirken
   // yarım kalan ilerleme tetiklenmesin.
   useEffect(() => {
@@ -165,11 +172,17 @@ export default function BookPage() {
     };
   }, []);
 
+  // Başarı ekranı açıldığında kutlama hissi için haptik geri bildirim.
+  useEffect(() => {
+    if (bookingSuccess) triggerHapticFeedback();
+  }, [bookingSuccess]);
+
   const goToStep = (next: number) => {
     if (advanceTimerRef.current !== null) {
       window.clearTimeout(advanceTimerRef.current);
       advanceTimerRef.current = null;
     }
+    stepDirectionRef.current = next >= step ? 1 : -1;
     setStep(next);
   };
 
@@ -599,18 +612,6 @@ export default function BookPage() {
     <style>{paletteCss(getPalette(tenant?.theme_palette))}</style>
   );
 
-  if (loading) {
-    return (
-      <div className="brand-scope w-full h-80 flex flex-col items-center justify-center gap-3">
-        {paletteStyle}
-        <Loader2 className="animate-spin text-[var(--brand)] h-9 w-9" />
-        <p className="text-xs font-medium text-slate-500 dark:text-slate-400 lg:text-gray-400">
-          {t("booking.loading")}
-        </p>
-      </div>
-    );
-  }
-
   if (error || !tenant) {
     // `error` ya sunucudan gelen bir mesaj ya da "not_found" işareti.
     const errorText =
@@ -633,11 +634,11 @@ export default function BookPage() {
 
   if (bookingSuccess) {
     return (
-      <div className="brand-scope w-full max-w-lg mx-auto flex flex-col items-center justify-center py-12 px-4 font-sans animate-in fade-in zoom-in-95 duration-500">
+      <div className="brand-scope w-full max-w-lg mx-auto flex flex-col items-center justify-center py-12 px-4 font-sans animate-rise-in">
         {paletteStyle}
         <div className="w-full rounded-3xl border border-slate-200/80 bg-white p-6 text-center shadow-[0_1px_2px_rgb(15,23,42,0.04),0_10px_30px_rgb(15,23,42,0.05)] dark:border-slate-800 dark:bg-slate-900 dark:shadow-[0_1px_2px_rgb(0,0,0,0.35),0_10px_30px_rgb(0,0,0,0.4)] lg:rounded-[36px] lg:border-white/60 lg:bg-white/80 lg:backdrop-blur-3xl lg:p-8 lg:shadow-xl sm:p-10 dark:lg:border-slate-800/80 dark:lg:bg-slate-900/80">
-          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 mb-6 ring-8 ring-amber-50 dark:ring-amber-950/30">
-            <Clock className="h-10 w-10" />
+          <div className="success-ring animate-success-pop mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400">
+            <CheckCircle2 className="h-10 w-10" strokeWidth={2.2} />
           </div>
 
           <span className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-amber-700 dark:bg-amber-950/50 dark:text-amber-300 lg:px-3 lg:text-xs">
@@ -726,6 +727,15 @@ export default function BookPage() {
   return (
     <div className="brand-scope w-full max-w-3xl mx-auto space-y-5 px-4 pb-4 font-sans lg:space-y-6 lg:px-2 lg:pb-12">
       {paletteStyle}
+      <Presence
+        swapKey={loading ? "loading" : "wizard"}
+        enterClassName="animate-fade-rise-in"
+        exitClassName="animate-fade-rise-out"
+      >
+      {loading ? (
+        <BookingSkeleton />
+      ) : (
+      <>
       {/* Mini Business Banner */}
       <div className="flex items-center gap-3 rounded-3xl border border-slate-200/80 bg-white p-3 shadow-[0_1px_2px_rgb(15,23,42,0.04),0_10px_30px_rgb(15,23,42,0.05)] dark:border-slate-800 dark:bg-slate-900 dark:shadow-[0_1px_2px_rgb(0,0,0,0.35),0_10px_30px_rgb(0,0,0,0.4)] sm:gap-4 sm:p-4 lg:border-white/60 lg:bg-white/70 lg:shadow-sm lg:backdrop-blur-2xl dark:lg:border-slate-800/80 dark:lg:bg-slate-900/60">
         <div className="flex h-12 w-12 sm:h-14 sm:w-14 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-white dark:border-slate-800 shadow-sm bg-[var(--brand-soft)] text-[var(--brand-text)] font-black text-lg sm:text-xl">
@@ -803,6 +813,20 @@ export default function BookPage() {
         })}
       </div>
 
+      {/* Adım içerikleri: ileri/geri yönlü yumuşak kayma geçişi. */}
+      <Presence
+        swapKey={step}
+        enterClassName={
+          stepDirectionRef.current === 1
+            ? "animate-step-forward-in"
+            : "animate-step-back-in"
+        }
+        exitClassName={
+          stepDirectionRef.current === 1
+            ? "animate-step-forward-out"
+            : "animate-step-back-out"
+        }
+      >
       {/* STEP 1: STAFF SELECTION — işletme sahibi vurgulu kart */}
       {step === 1 && hasStaffStep && (
         <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
@@ -815,7 +839,7 @@ export default function BookPage() {
             </p>
           </div>
 
-          <div className="grid gap-3">
+          <div className="stagger-list grid gap-3">
             {staffList.map((staff) => {
               const isOwner = staff.role === "owner";
               const displayName =
@@ -931,7 +955,7 @@ export default function BookPage() {
             </div>
           </div>
 
-          <div className="grid gap-3">
+          <div className="stagger-list grid gap-3">
             {filteredServices.map((svc) => {
               const isSelected = selectedService?.id === svc.id;
               const duration = getServiceDuration(svc);
@@ -1165,6 +1189,7 @@ export default function BookPage() {
                           // düğmesine basarsa akış yine de 4. adıma atıyordu.
                           advanceTimerRef.current = window.setTimeout(() => {
                             advanceTimerRef.current = null;
+                            stepDirectionRef.current = 1;
                             setStep(4);
                           }, 220);
                         }}
@@ -1407,6 +1432,12 @@ export default function BookPage() {
           </div>
         </div>
       )}
+
+      </Presence>
+
+      </>
+      )}
+      </Presence>
 
       {currentUserId && (
         <RequirePhoneModal

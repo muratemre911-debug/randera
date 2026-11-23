@@ -9,7 +9,6 @@ import {
   Building2,
   MapPin,
   Search,
-  Loader2,
   ChevronRight,
   X,
   SlidersHorizontal,
@@ -29,6 +28,10 @@ import { useFavorites } from "@/lib/useFavorites";
 import DiscoverMap, {
   TenantWithDetails,
 } from "@/components/discover/DiscoverMap";
+import SegmentedControl from "@/components/ui/SegmentedControl";
+import PullToRefresh from "@/components/layout/PullToRefresh";
+import { DiscoverSkeleton } from "@/components/Skeleton";
+import Presence from "@/components/ui/Presence";
 
 export const dynamic = "force-dynamic";
 
@@ -374,6 +377,18 @@ export default function DiscoverPage() {
   ]);
 
   return (
+    <PullToRefresh
+      onRefresh={fetchData}
+      refreshingLabel={lang === "tr" ? "Yenileniyor..." : "Refreshing..."}
+    >
+    <Presence
+      swapKey={loading ? "loading" : "content"}
+      enterClassName="animate-fade-rise-in"
+      exitClassName="animate-fade-rise-out"
+    >
+    {loading ? (
+      <DiscoverSkeleton />
+    ) : (
     <div className="w-full max-w-6xl mx-auto space-y-6 pb-20 font-sans select-none">
       {/* Üst Başlık & Arama / Filtre Bölümü */}
       <div className="flex flex-col gap-4">
@@ -389,37 +404,33 @@ export default function DiscoverPage() {
             </p>
           </div>
 
-          {/* Segmented Control (Apple Maps Style) */}
-          <div className="inline-flex w-full self-stretch gap-1.5 rounded-2xl bg-slate-100 p-1 dark:bg-slate-800 sm:w-auto sm:self-auto lg:gap-0 lg:border lg:border-slate-300/40 lg:bg-slate-200/70 lg:shadow-inner lg:backdrop-blur-2xl lg:dark:border-slate-700/50 lg:dark:bg-slate-800/80">
-            <button
-              type="button"
-              onClick={() => setViewMode("list")}
-              className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-bold transition-all duration-200 cursor-pointer sm:flex-none sm:rounded-xl sm:px-4 sm:text-sm ${
-                viewMode === "list"
-                  ? "bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white lg:dark:bg-slate-900"
-                  : "text-slate-500 dark:text-slate-400 lg:text-slate-600 lg:dark:text-slate-400 lg:hover:text-slate-900 lg:dark:hover:text-white"
-              }`}
-            >
-              <List size={16} strokeWidth={2.4} />
-              <span>{lang === "tr" ? "Liste Görünümü" : "List View"}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode("map")}
-              className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-bold transition-all duration-200 cursor-pointer sm:flex-none sm:rounded-xl sm:px-4 sm:text-sm ${
-                viewMode === "map"
-                  ? "bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white lg:dark:bg-slate-900"
-                  : "text-slate-500 dark:text-slate-400 lg:text-slate-600 lg:dark:text-slate-400 lg:hover:text-slate-900 lg:dark:hover:text-white"
-              }`}
-            >
-              <MapIcon size={16} strokeWidth={2.4} />
-              <span>{lang === "tr" ? "Harita Görünümü" : "Map View"}</span>
-            </button>
-          </div>
+          {/* Segmented Control (iOS tarzı kayan kapsül) */}
+          <SegmentedControl
+            className="w-full sm:w-auto sm:min-w-72"
+            value={viewMode}
+            onChange={setViewMode}
+            options={[
+              {
+                value: "list",
+                icon: List,
+                label: lang === "tr" ? "Liste" : "List",
+                ariaLabel: lang === "tr" ? "Liste Görünümü" : "List View",
+              },
+              {
+                value: "map",
+                icon: MapIcon,
+                label: lang === "tr" ? "Harita" : "Map",
+                ariaLabel: lang === "tr" ? "Harita Görünümü" : "Map View",
+              },
+            ]}
+          />
         </div>
+      </div>
 
-        {/* Minimalist Apple Maps Tarzı Arama Çubuğu + Tek Oval Filtre Butonu */}
-        <div className="flex items-center gap-2.5 sm:gap-3">
+      {/* Arama çubuğu kaydırma sırasında üstte sabitlenir (native his).
+          Kök içeriğin doğrudan çocuğu olmalı: sticky, ancak ebeveynin sınırları
+          içinde çalışır; başlık grubunun içinde olsaydı liste kayarken kaybolurdu. */}
+      <div className="sticky -top-3 z-20 -mx-3 -mt-2 flex items-center gap-2.5 bg-white/90 px-3 py-2 backdrop-blur-xl sm:-top-6 sm:-mx-6 sm:gap-3 sm:px-6 md:-top-8 md:-mx-8 md:px-8 dark:bg-slate-900/90">
           {/* Arama Kutusu */}
           <div className="relative flex-1 group min-w-0">
             <div className="pointer-events-none absolute left-2.5 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-xl text-slate-400 transition-all lg:bg-indigo-50 lg:text-indigo-600 lg:dark:bg-indigo-950/70 lg:dark:text-indigo-400 lg:group-focus-within:bg-indigo-600 lg:group-focus-within:text-white lg:group-focus-within:shadow-md lg:group-focus-within:shadow-indigo-500/20">
@@ -495,6 +506,7 @@ export default function DiscoverPage() {
           )}
         </div>
 
+      <div className="-mt-2 flex flex-col gap-4">
         {/* Kategori Çipleri */}
         <div className="w-full">
           <div className="flex items-center gap-2 overflow-x-auto overscroll-x-contain py-1 scrollbar-none">
@@ -575,11 +587,7 @@ export default function DiscoverPage() {
       </div>
 
       {/* Ana İçerik: Harita veya Liste Görünümü */}
-      {loading ? (
-        <div className="flex justify-center py-32">
-          <Loader2 size={40} className="animate-spin text-slate-400" />
-        </div>
-      ) : viewMode === "map" ? (
+      {viewMode === "map" ? (
         /* HARİTA GÖRÜNÜMÜ (Apple Maps Deneyimi) */
         <div className="space-y-4 animate-in fade-in duration-300">
           <DiscoverMap
@@ -629,7 +637,7 @@ export default function DiscoverPage() {
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 gap-3 lg:grid-cols-3 lg:gap-7">
+              <div className="stagger-list grid grid-cols-1 gap-3 lg:grid-cols-3 lg:gap-7">
                 {filtered.map((tenant) => {
                   const sectorLabel = getSectorLabel(tenant.sector);
                   const price = getTenantPrice(tenant);
@@ -643,7 +651,7 @@ export default function DiscoverPage() {
                       {/* ---------------------------------------------- */}
                       {/* MOBİL: liste satırı (72x72 görsel + bilgi + eylem) */}
                       {/* ---------------------------------------------- */}
-                      <div className="relative flex items-center gap-3 rounded-2xl border border-slate-200/80 bg-white p-3 shadow-[0_1px_2px_rgb(15,23,42,0.04),0_10px_30px_rgb(15,23,42,0.05)] dark:border-slate-800 dark:bg-slate-900 dark:shadow-[0_1px_2px_rgb(0,0,0,0.35),0_10px_30px_rgb(0,0,0,0.4)] lg:hidden">
+                      <div className="pressable relative flex items-center gap-3 rounded-2xl border border-slate-200/80 bg-white p-3 shadow-[0_1px_2px_rgb(15,23,42,0.04),0_10px_30px_rgb(15,23,42,0.05)] dark:border-slate-800 dark:bg-slate-900 dark:shadow-[0_1px_2px_rgb(0,0,0,0.35),0_10px_30px_rgb(0,0,0,0.4)] lg:hidden">
                         {/* Satırın tamamı gerçek bağlantı (stretched link) */}
                         <Link
                           href={`/b/${tenant.slug}`}
@@ -688,10 +696,11 @@ export default function DiscoverPage() {
                             className="absolute -right-1.5 -top-1.5 z-10 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-white text-slate-400 shadow-sm ring-1 ring-slate-200/80 transition-transform active:scale-90 dark:bg-slate-800 dark:ring-slate-700"
                           >
                             <Heart
+                              key={isFavorited ? "on" : "off"}
                               size={14}
                               className={`transition-colors ${
                                 isFavorited
-                                  ? "fill-rose-500 text-rose-500 stroke-rose-500"
+                                  ? "animate-heart-pop fill-rose-500 text-rose-500 stroke-rose-500"
                                   : "text-slate-400 stroke-[2.2]"
                               }`}
                             />
@@ -818,10 +827,11 @@ export default function DiscoverPage() {
                           }
                         >
                           <Heart
+                            key={isFavorited ? "on" : "off"}
                             size={18}
                             className={`transition-colors ${
                               isFavorited
-                                ? "fill-rose-500 text-rose-500 stroke-rose-500"
+                                ? "animate-heart-pop fill-rose-500 text-rose-500 stroke-rose-500"
                                 : "text-white stroke-[2.2]"
                             }`}
                           />
@@ -1282,5 +1292,8 @@ export default function DiscoverPage() {
           document.body,
         )}
     </div>
+    )}
+    </Presence>
+    </PullToRefresh>
   );
 }

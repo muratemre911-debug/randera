@@ -6,6 +6,7 @@ import { ThemeProvider } from "@/context/ThemeContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import HapticFeedback from "@/components/HapticFeedback";
 import PwaManager from "@/components/pwa/PwaManager";
+import { ToastProvider } from "@/components/ui/Toast";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -93,7 +94,9 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col bg-white dark:bg-slate-950">
         <LanguageProvider>
           <ThemeProvider>
-            <ErrorBoundary>{children}</ErrorBoundary>
+            <ToastProvider>
+              <ErrorBoundary>{children}</ErrorBoundary>
+            </ToastProvider>
             <HapticFeedback />
             <PwaManager />
           </ThemeProvider>

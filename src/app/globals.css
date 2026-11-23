@@ -729,3 +729,403 @@ pre,
   --brand-text: oklch(78.5% 0.115 274.713);
   --brand-border: oklch(39.8% 0.195 277.366);
 }
+
+/* Tema değişimi View Transition'ı: varsayılan tam ekran snapshot geçişi
+   yerine kısa ve yumuşak bir çapraz solma (iOS tema geçişi hissi). */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.4s;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none;
+  }
+}
+
+/* ==========================================================================
+   Native uygulama hissi: yükleme iskeletleri, sayfa geçişleri ve
+   mikro etkileşimler.
+   ========================================================================== */
+
+/* Shimmer'lı iskelet: spinner yerine içerik biçiminde yükleme durumu.
+   Tailwind `rounded-*` sınıfları katmanlı (utilities) olduğu için burada
+   border-radius TANIMLANMIYOR; biçimi çağıran sınıf belirler. */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background-color: rgb(226 232 240 / 0.85);
+}
+
+.dark .skeleton {
+  background-color: rgb(51 65 85 / 0.55);
+}
+
+.skeleton::after {
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgb(255 255 255 / 0.6),
+    transparent
+  );
+  animation: skeleton-sweep 1.4s ease-in-out infinite;
+  content: "";
+}
+
+.dark .skeleton::after {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgb(255 255 255 / 0.09),
+    transparent
+  );
+}
+
+@keyframes skeleton-sweep {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* Detay sayfalarının (işletme profili, randevu akışı) giriş animasyonu:
+   sekme swipe'ı ile aynı hareket dilini kullanır. */
+@theme inline {
+  --animate-push-in: pushIn 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-heart-pop: heartPop 0.34s cubic-bezier(0.22, 1, 0.36, 1);
+  --animate-toast-in: toastIn 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-toast-out: toastOut 0.18s ease-in both;
+  --animate-success-pop: successPop 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-rise-in: riseIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+
+  /* İçerik değişimleri (Presence): header bağlamı, tema/dil ikonu, paneller */
+  --animate-swap-in: swapIn 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-swap-out: swapOut 0.22s ease-in both;
+  --animate-fade-rise-in: fadeRiseIn 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-fade-rise-out: fadeRiseOut 0.18s ease-in both;
+
+  /* Sihirbaz adımları: ileri/geri yönlü kayma */
+  --animate-step-forward-in: stepForwardIn 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-step-forward-out: stepForwardOut 0.2s ease-in both;
+  --animate-step-back-in: stepBackIn 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-step-back-out: stepBackOut 0.2s ease-in both;
+
+  /* Alt çubuk / CTA giriş-çıkışı */
+  --animate-bar-in: barIn 0.36s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-bar-out: barOut 0.24s cubic-bezier(0.4, 0, 1, 1) both;
+
+  /* Liste satırlarının kademeli girişi */
+  --animate-stagger-in: staggerIn 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+
+  /* Tema ikonu dönüşü */
+  --animate-icon-spin-in: iconSpinIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+
+  @keyframes pushIn {
+    from {
+      transform: translate3d(26%, 0, 0);
+      opacity: 0.3;
+    }
+    to {
+      transform: translate3d(0, 0, 0);
+      opacity: 1;
+    }
+  }
+
+  @keyframes heartPop {
+    0% {
+      transform: scale(1);
+    }
+    35% {
+      transform: scale(1.32);
+    }
+    60% {
+      transform: scale(0.92);
+    }
+    100% {
+      transform: scale(1);
+    }
+  }
+
+  @keyframes toastIn {
+    from {
+      transform: translate3d(0, -18px, 0) scale(0.94);
+      opacity: 0;
+    }
+    to {
+      transform: translate3d(0, 0, 0) scale(1);
+      opacity: 1;
+    }
+  }
+
+  @keyframes toastOut {
+    from {
+      transform: translate3d(0, 0, 0) scale(1);
+      opacity: 1;
+    }
+    to {
+      transform: translate3d(0, -12px, 0) scale(0.96);
+      opacity: 0;
+    }
+  }
+
+  @keyframes successPop {
+    0% {
+      transform: scale(0.4);
+      opacity: 0;
+    }
+    60% {
+      transform: scale(1.12);
+      opacity: 1;
+    }
+    100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+
+  @keyframes riseIn {
+    from {
+      transform: translate3d(0, 14px, 0);
+      opacity: 0;
+    }
+    to {
+      transform: translate3d(0, 0, 0);
+      opacity: 1;
+    }
+  }
+
+  @keyframes swapIn {
+    from {
+      transform: translate3d(0, 7px, 0) scale(0.98);
+      opacity: 0;
+    }
+    to {
+      transform: translate3d(0, 0, 0) scale(1);
+      opacity: 1;
+    }
+  }
+
+  @keyframes swapOut {
+    from {
+      transform: translate3d(0, 0, 0) scale(1);
+      opacity: 1;
+    }
+    to {
+      transform: translate3d(0, -7px, 0) scale(0.98);
+      opacity: 0;
+    }
+  }
+
+  @keyframes fadeRiseIn {
+    from {
+      transform: translate3d(0, 10px, 0);
+      opacity: 0;
+    }
+    to {
+      transform: translate3d(0, 0, 0);
+      opacity: 1;
+    }
+  }
+
+  @keyframes fadeRiseOut {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+    }
+  }
+
+  @keyframes stepForwardIn {
+    from {
+      transform: translate3d(34px, 0, 0);
+      opacity: 0;
+    }
+    to {
+      transform: translate3d(0, 0, 0);
+      opacity: 1;
+    }
+  }
+
+  @keyframes stepForwardOut {
+    from {
+      transform: translate3d(0, 0, 0);
+      opacity: 1;
+    }
+    to {
+      transform: translate3d(-26px, 0, 0);
+      opacity: 0;
+    }
+  }
+
+  @keyframes stepBackIn {
+    from {
+      transform: translate3d(-34px, 0, 0);
+      opacity: 0;
+    }
+    to {
+      transform: translate3d(0, 0, 0);
+      opacity: 1;
+    }
+  }
+
+  @keyframes stepBackOut {
+    from {
+      transform: translate3d(0, 0, 0);
+      opacity: 1;
+    }
+    to {
+      transform: translate3d(26px, 0, 0);
+      opacity: 0;
+    }
+  }
+
+  @keyframes barIn {
+    from {
+      transform: translate3d(0, 110%, 0);
+      opacity: 0.6;
+    }
+    to {
+      transform: translate3d(0, 0, 0);
+      opacity: 1;
+    }
+  }
+
+  @keyframes barOut {
+    from {
+      transform: translate3d(0, 0, 0);
+      opacity: 1;
+    }
+    to {
+      transform: translate3d(0, 110%, 0);
+      opacity: 0.4;
+    }
+  }
+
+  @keyframes staggerIn {
+    from {
+      transform: translate3d(0, 16px, 0);
+      opacity: 0;
+    }
+    to {
+      transform: translate3d(0, 0, 0);
+      opacity: 1;
+    }
+  }
+
+  @keyframes iconSpinIn {
+    from {
+      transform: rotate(-100deg) scale(0.5);
+      opacity: 0;
+    }
+    to {
+      transform: rotate(0deg) scale(1);
+      opacity: 1;
+    }
+  }
+}
+
+/* Kademeli liste girişi: satırlar 45ms arayla, en fazla 10 satır gecikmeli.
+   Animasyon bitince `both` doldurması transform'u serbest bırakmaz; bu yüzden
+   .pressable:active ölçeği animation-fill-mode ile çakışmasın diye gecikme
+   yalnızca ilk 10 öğeye uygulanır ve süre kısadır. */
+.stagger-list > * {
+  animation: staggerIn 0.42s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+.stagger-list > *:nth-child(1) { animation-delay: 0ms; }
+.stagger-list > *:nth-child(2) { animation-delay: 45ms; }
+.stagger-list > *:nth-child(3) { animation-delay: 90ms; }
+.stagger-list > *:nth-child(4) { animation-delay: 135ms; }
+.stagger-list > *:nth-child(5) { animation-delay: 180ms; }
+.stagger-list > *:nth-child(6) { animation-delay: 225ms; }
+.stagger-list > *:nth-child(7) { animation-delay: 270ms; }
+.stagger-list > *:nth-child(8) { animation-delay: 315ms; }
+.stagger-list > *:nth-child(9) { animation-delay: 360ms; }
+.stagger-list > *:nth-child(n + 10) { animation-delay: 400ms; }
+
+/* Başarı halkası: onay ekranındaki ikonun etrafında tek seferlik dalga. */
+.success-ring {
+  animation: successRing 1.1s cubic-bezier(0.22, 1, 0.36, 1) 0.15s both;
+}
+
+@keyframes successRing {
+  from {
+    box-shadow: 0 0 0 0 rgb(16 185 129 / 0.35);
+  }
+  to {
+    box-shadow: 0 0 0 26px rgb(16 185 129 / 0);
+  }
+}
+
+/* Dokunmatik kart geri bildirimi: parmak basınca hafifçe küçülür. */
+.pressable {
+  transition:
+    transform 160ms cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.pressable:active {
+  transform: scale(0.985);
+}
+
+/* Kenar swipe-geri jesti sırasında detay sayfasının görünümü. */
+.swipe-back-dragging {
+  will-change: transform;
+  border-radius: 20px 0 0 20px;
+  box-shadow: -18px 0 44px rgb(2 6 23 / 0.22);
+}
+
+.dark .swipe-back-dragging {
+  box-shadow: -18px 0 44px rgb(0 0 0 / 0.55);
+}
+
+.swipe-back-settling {
+  transition:
+    transform 240ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 240ms ease,
+    border-radius 240ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after,
+  .success-ring,
+  .stagger-list > * {
+    animation: none;
+  }
+
+  .pressable:active {
+    transform: none;
+  }
+
+  .animate-push-in,
+  .animate-heart-pop,
+  .animate-toast-in,
+  .animate-toast-out,
+  .animate-success-pop,
+  .animate-rise-in,
+  .animate-swap-in,
+  .animate-swap-out,
+  .animate-fade-rise-in,
+  .animate-fade-rise-out,
+  .animate-step-forward-in,
+  .animate-step-forward-out,
+  .animate-step-back-in,
+  .animate-step-back-out,
+  .animate-bar-in,
+  .animate-bar-out,
+  .animate-stagger-in,
+  .animate-icon-spin-in {
+    animation: none;
+  }
+
+  .swipe-back-settling {
+    transition: none;
+  }
+}

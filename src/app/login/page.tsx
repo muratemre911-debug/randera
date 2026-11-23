@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { LogIn, Loader2 } from "lucide-react";
+import { Eye, EyeOff, LogIn, Loader2 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useLanguage } from "@/context/LanguageContext";
 import {
@@ -11,6 +11,7 @@ import {
   trMobileErrorMessage,
   TR_MOBILE_PLACEHOLDER,
 } from "@/lib/phone";
+import SegmentedControl from "@/components/ui/SegmentedControl";
 
 function GoogleIcon({ className = "h-5 w-5" }: { className?: string }) {
   return (
@@ -41,32 +42,31 @@ function LoginForm() {
   const supabase = createClient();
   const { t, lang } = useLanguage();
 
+  // URL parametrelerinden ilk durum: OAuth hatası mesajı ve kayıt modu.
+  // (Effect içinde setState yerine state başlatıcıda okunur — cascading
+  // render üretmez.)
+  const urlError = (() => {
+    const errorParam = searchParams.get("error");
+    if (!errorParam) return null;
+    if (errorParam === "auth_callback_failed") {
+      return t("login.google_error") || "Giriş işlemi tamamlanamadı. Lütfen tekrar deneyin.";
+    }
+    return decodeURIComponent(errorParam);
+  })();
+  const urlMode = searchParams.get("mode") || searchParams.get("register");
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(urlError);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
-  const [isRegister, setIsRegister] = useState(false);
+  const [isRegister, setIsRegister] = useState(
+    urlMode === "register" || urlMode === "true" || urlMode === "1",
+  );
   const [fullName, setFullName] = useState("");
   const [nickname, setNickname] = useState("");
   const [phone, setPhone] = useState("");
-
-  // Check URL params for errors or register mode
-  useEffect(() => {
-    const errorParam = searchParams.get("error");
-    if (errorParam) {
-      if (errorParam === "auth_callback_failed") {
-        setError(t("login.google_error") || "Giriş işlemi tamamlanamadı. Lütfen tekrar deneyin.");
-      } else {
-        setError(decodeURIComponent(errorParam));
-      }
-    }
-
-    const mode = searchParams.get("mode") || searchParams.get("register");
-    if (mode === "register" || mode === "true" || mode === "1") {
-      setIsRegister(true);
-    }
-  }, [searchParams, t]);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleGoogleLogin = async () => {
     setError(null);
@@ -92,8 +92,12 @@ function LoginForm() {
       if (oauthError) {
         throw oauthError;
       }
-    } catch (err: any) {
-      setError(err.message || t("login.google_error") || "Google ile bağlanırken bir sorun oluştu.");
+    } catch (err) {
+      setError(
+        err instanceof Error && err.message
+          ? err.message
+          : t("login.google_error") || "Google ile bağlanırken bir sorun oluştu.",
+      );
       setGoogleLoading(false);
     }
   };
@@ -172,26 +176,31 @@ function LoginForm() {
       } else {
         router.push("/dashboard");
       }
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(err instanceof Error && err.message ? err.message : t("login.error"));
     } finally {
       setLoading(false);
     }
   };
 
+  const inputClass =
+    "h-12 w-full rounded-xl border border-slate-200/80 bg-white/70 px-4 text-[15px] font-medium text-slate-900 placeholder:font-normal placeholder:text-slate-400 backdrop-blur-xl transition-all focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-indigo-500/10 dark:border-white/10 dark:bg-slate-900/60 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-indigo-400 dark:focus:bg-slate-900";
+  const labelClass =
+    "mb-1.5 block text-[13px] font-semibold text-slate-600 dark:text-slate-300";
+
   return (
-    <div className="page-fill relative flex items-center justify-center px-4">
-      {/* Background gradient */}
-      <div className="absolute inset-0 bg-gradient-to-br from-indigo-100 via-white to-purple-100" />
+    <div className="page-fill relative flex items-center justify-center px-4 py-8">
+      {/* Background gradient (açık + koyu) */}
+      <div className="absolute inset-0 bg-gradient-to-br from-indigo-100 via-white to-purple-100 dark:from-[#0B0D14] dark:via-[#0d1020] dark:to-[#14102a]" />
 
       {/* Decorative circles */}
-      <div className="absolute -left-32 -top-32 h-96 w-96 rounded-full bg-gradient-to-br from-indigo-300/30 to-purple-300/30 blur-3xl" />
-      <div className="absolute -bottom-32 -right-32 h-96 w-96 rounded-full bg-gradient-to-br from-purple-300/30 to-pink-300/30 blur-3xl" />
+      <div className="absolute -left-32 -top-32 h-96 w-96 rounded-full bg-gradient-to-br from-indigo-300/30 to-purple-300/30 blur-3xl dark:from-indigo-600/15 dark:to-purple-600/15" />
+      <div className="absolute -bottom-32 -right-32 h-96 w-96 rounded-full bg-gradient-to-br from-purple-300/30 to-pink-300/30 blur-3xl dark:from-purple-600/15 dark:to-pink-600/10" />
 
-      <div className="relative w-full max-w-sm">
+      <div className="animate-rise-in relative w-full max-w-sm">
         {/* Logo */}
-        <div className="mb-8 text-center">
-          <div className="relative mx-auto flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl shadow-lg shadow-indigo-200 border border-gray-100">
+        <div className="mb-7 text-center">
+          <div className="relative mx-auto flex h-16 w-16 items-center justify-center overflow-hidden rounded-[20px] border border-gray-100 shadow-lg shadow-indigo-200/60 dark:border-white/10 dark:shadow-indigo-950/40">
             <img
               src="/logo/logo-light-160.png"
               alt="Randera Logo"
@@ -202,25 +211,39 @@ function LoginForm() {
               className="h-full w-full object-cover bg-white"
             />
           </div>
-          <h1 className="mt-4 text-2xl font-semibold text-gray-800">
+          <h1 className="mt-4 text-[26px] font-black tracking-tight text-slate-900 dark:text-white">
             {isRegister ? (lang === "tr" ? "Kayıt Ol" : "Sign Up") : t("login.title")}
           </h1>
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
             {t("login.subtitle")}
           </p>
         </div>
 
         {/* Card */}
-        <div className="rounded-2xl border border-white/40 bg-white/70 p-6 shadow-xl shadow-black/5 backdrop-blur-2xl">
+        <div className="rounded-[24px] border border-white/50 bg-white/75 p-5 shadow-xl shadow-black/5 backdrop-blur-2xl dark:border-white/10 dark:bg-slate-900/70 dark:shadow-black/30 sm:p-6">
+          {/* Giriş / Kayıt modu: iOS segmented control */}
+          <SegmentedControl
+            className="mb-5"
+            value={isRegister ? "register" : "login"}
+            onChange={(v) => {
+              setIsRegister(v === "register");
+              setError(null);
+            }}
+            options={[
+              { value: "login", label: lang === "tr" ? "Giriş Yap" : "Sign In" },
+              { value: "register", label: lang === "tr" ? "Kayıt Ol" : "Sign Up" },
+            ]}
+          />
+
           {/* Google Auth Button */}
           <button
             type="button"
             onClick={handleGoogleLogin}
             disabled={googleLoading || loading}
-            className="flex w-full items-center justify-center gap-3 rounded-lg border border-gray-200 bg-white/90 px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition-all hover:bg-white hover:border-gray-300 hover:shadow-md active:scale-[0.99] disabled:opacity-50"
+            className="flex h-12 w-full cursor-pointer items-center justify-center gap-3 rounded-xl border border-slate-200/80 bg-white/90 px-4 text-sm font-semibold text-slate-700 shadow-sm transition-all hover:bg-white hover:border-slate-300 active:scale-[0.98] disabled:opacity-50 dark:border-white/10 dark:bg-slate-800/80 dark:text-slate-200 dark:hover:bg-slate-800"
           >
             {googleLoading ? (
-              <Loader2 className="h-5 w-5 animate-spin text-indigo-600" />
+              <Loader2 className="h-5 w-5 animate-spin text-indigo-600 dark:text-indigo-400" />
             ) : (
               <GoogleIcon className="h-5 w-5" />
             )}
@@ -236,10 +259,10 @@ function LoginForm() {
           {/* Divider */}
           <div className="relative my-4">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-200/80" />
+              <div className="w-full border-t border-slate-200/80 dark:border-white/10" />
             </div>
             <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-white/90 px-2 text-gray-500 rounded-full font-medium">
+              <span className="rounded-full bg-white/90 px-2.5 py-0.5 font-medium text-slate-400 dark:bg-slate-900 dark:text-slate-500">
                 {t("login.or_email") || (lang === "tr" ? "veya e-posta ile" : "or with email")}
               </span>
             </div>
@@ -247,52 +270,59 @@ function LoginForm() {
 
           <form onSubmit={handleLogin} className="space-y-4">
             {isRegister && (
-              <div>
-                <label className="block text-sm font-medium text-gray-600">
+              <div className="animate-rise-in">
+                <label htmlFor="fullName" className={labelClass}>
                   {lang === "tr" ? "Ad Soyad" : "Full Name"}
                 </label>
                 <input
+                  id="fullName"
                   type="text"
                   required
+                  autoComplete="name"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                   placeholder="Ahmet Yılmaz"
-                  className="mt-1 block w-full rounded-lg border border-white/40 bg-white/60 px-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 backdrop-blur-xl focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/30"
+                  className={inputClass}
                 />
               </div>
             )}
 
             {isRegister && (
-              <div>
-                <label className="block text-sm font-medium text-gray-600">
+              <div className="animate-rise-in">
+                <label htmlFor="nickname" className={labelClass}>
                   {lang === "tr" ? "Kullanıcı Adı" : "Username"}
                 </label>
                 <input
+                  id="nickname"
                   type="text"
                   required
+                  autoComplete="username"
                   value={nickname}
                   onChange={(e) => setNickname(e.target.value)}
                   placeholder="ahmet_yilmaz"
-                  className="mt-1 block w-full rounded-lg border border-white/40 bg-white/60 px-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 backdrop-blur-xl focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/30"
+                  className={inputClass}
                 />
               </div>
             )}
 
             {isRegister && (
-              <div>
-                <label className="block text-sm font-medium text-gray-600">
+              <div className="animate-rise-in">
+                <label htmlFor="phone" className={labelClass}>
                   {lang === "tr" ? "Telefon Numarası" : "Phone Number"}{" "}
-                  <span className="text-red-500 font-bold">*</span>
+                  <span className="font-bold text-rose-500">*</span>
                 </label>
                 <input
+                  id="phone"
                   type="tel"
                   required
+                  inputMode="tel"
+                  autoComplete="tel"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder={TR_MOBILE_PLACEHOLDER}
-                  className="mt-1 block w-full rounded-lg border border-white/40 bg-white/60 px-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 backdrop-blur-xl focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/30"
+                  className={inputClass}
                 />
-                <p className="mt-1 text-[11px] text-gray-500">
+                <p className="mt-1.5 text-[11px] text-slate-400 dark:text-slate-500">
                   {lang === "tr"
                     ? "Aynı numara yalnızca bir hesapta kullanılabilir."
                     : "A number can only be used by one account."}
@@ -301,37 +331,57 @@ function LoginForm() {
             )}
 
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-600">
+              <label htmlFor="email" className={labelClass}>
                 {t("login.email")}
               </label>
               <input
                 id="email"
                 type="email"
                 required
+                autoComplete="email"
+                inputMode="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="ornek@email.com"
-                className="mt-1 block w-full rounded-lg border border-white/40 bg-white/60 px-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 backdrop-blur-xl focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/30"
+                className={inputClass}
               />
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-600">
+              <label htmlFor="password" className={labelClass}>
                 {t("login.password")}
               </label>
-              <input
-                id="password"
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="mt-1 block w-full rounded-lg border border-white/40 bg-white/60 px-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 backdrop-blur-xl focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/30"
-              />
+              <div className="relative">
+                <input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  required
+                  autoComplete={isRegister ? "new-password" : "current-password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className={`${inputClass} pr-12`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-label={
+                    showPassword
+                      ? lang === "tr" ? "Şifreyi gizle" : "Hide password"
+                      : lang === "tr" ? "Şifreyi göster" : "Show password"
+                  }
+                  className="absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 cursor-pointer items-center justify-center rounded-lg text-slate-400 transition-colors hover:text-slate-600 dark:hover:text-slate-200"
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
             </div>
 
             {error && (
-              <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-600 border border-red-200/50 backdrop-blur-xl">
+              <p
+                role="alert"
+                className="animate-rise-in rounded-xl border border-rose-200/60 bg-rose-500/10 px-3.5 py-2.5 text-sm font-medium text-rose-600 dark:border-rose-500/25 dark:text-rose-400"
+              >
                 {error}
               </p>
             )}
@@ -339,7 +389,7 @@ function LoginForm() {
             <button
               type="submit"
               disabled={loading || googleLoading}
-              className="flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-indigo-500 to-purple-600 px-4 py-2.5 text-sm font-medium text-white shadow-lg shadow-indigo-200 transition-all hover:from-indigo-600 hover:to-purple-700 hover:shadow-xl disabled:opacity-50"
+              className="flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 px-4 text-sm font-bold text-white shadow-lg shadow-indigo-500/25 transition-all hover:from-indigo-600 hover:to-purple-700 active:scale-[0.98] disabled:opacity-50 dark:shadow-indigo-950/40"
             >
               {loading ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -352,48 +402,16 @@ function LoginForm() {
                 ? (lang === "tr" ? "Hesap Oluştur" : "Create Account")
                 : t("login.signin")}
             </button>
-            
-            <div className="text-center mt-4 text-sm text-gray-500">
-              {isRegister ? (
-                <>
-                  {lang === "tr" ? "Zaten hesabınız var mı?" : "Already have an account?"}{" "}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsRegister(false);
-                      setError(null);
-                    }}
-                    className="text-indigo-600 font-semibold underline"
-                  >
-                    {lang === "tr" ? "Giriş Yap" : "Log In"}
-                  </button>
-                </>
-              ) : (
-                <>
-                  {lang === "tr" ? "Hesabınız yok mu?" : "Don't have an account?"}{" "}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsRegister(true);
-                      setError(null);
-                    }}
-                    className="inline-flex min-h-6 items-center px-1 font-semibold text-indigo-600 underline"
-                  >
-                    {lang === "tr" ? "Kayıt Ol" : "Sign Up"}
-                  </button>
-                </>
-              )}
-            </div>
           </form>
         </div>
 
         {/* Legal Links */}
-        <div className="mt-6 flex items-center justify-center gap-3 text-center text-xs text-gray-500">
-          <Link href="/privacy" className="flex min-h-6 items-center px-1 hover:text-indigo-600 transition-colors underline underline-offset-2">
+        <div className="mt-6 flex items-center justify-center gap-3 text-center text-xs text-slate-400 dark:text-slate-500">
+          <Link href="/privacy" className="flex min-h-6 items-center px-1 underline underline-offset-2 transition-colors hover:text-indigo-600 dark:hover:text-indigo-400">
             {lang === "tr" ? "Gizlilik Politikası" : "Privacy Policy"}
           </Link>
           <span>•</span>
-          <Link href="/terms" className="flex min-h-6 items-center px-1 hover:text-indigo-600 transition-colors underline underline-offset-2">
+          <Link href="/terms" className="flex min-h-6 items-center px-1 underline underline-offset-2 transition-colors hover:text-indigo-600 dark:hover:text-indigo-400">
             {lang === "tr" ? "Kullanım Koşulları" : "Terms of Service"}
           </Link>
         </div>
@@ -406,8 +424,8 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="page-fill flex items-center justify-center bg-gradient-to-br from-indigo-100 via-white to-purple-100">
-          <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+        <div className="page-fill flex items-center justify-center bg-gradient-to-br from-indigo-100 via-white to-purple-100 dark:from-[#0B0D14] dark:via-[#0d1020] dark:to-[#14102a]">
+          <Loader2 className="h-8 w-8 animate-spin text-indigo-600 dark:text-indigo-400" />
         </div>
       }
     >

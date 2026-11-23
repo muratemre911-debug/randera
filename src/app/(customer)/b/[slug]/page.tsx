@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
 import { createClient } from "@/utils/supabase/client";
 import { useParams, useRouter } from "next/navigation";
 import { useLanguage } from "@/context/LanguageContext";
@@ -32,6 +33,13 @@ import ReviewModal from "@/components/ReviewModal";
 import ManageReviewsModal, {
   UserReviewItem,
 } from "@/components/ManageReviewsModal";
+import { triggerHapticFeedback } from "@/lib/haptics";
+import Presence from "@/components/ui/Presence";
+
+/** Portal (mobil sabit CTA) yalnızca hydration sonrası oluşturulur. */
+const emptySubscribe = () => () => {};
+const getClientSnapshot = () => true;
+const getServerSnapshot = () => false;
 
 interface PostWithTenant extends Post {
   tenant?: Pick<Tenant, "id" | "name" | "profile_image_url">;
@@ -116,6 +124,13 @@ export default function BusinessPage() {
 
   // Favorites state
   const [isFavorited, setIsFavorited] = useState(false);
+
+  /** Mobil sabit CTA çubuğu portalı yalnızca istemcide kurulur. */
+  const mounted = useSyncExternalStore(
+    emptySubscribe,
+    getClientSnapshot,
+    getServerSnapshot,
+  );
 
   const minPrice =
     services.length > 0 ? Math.min(...services.map((s) => s.price)) : null;
@@ -219,6 +234,7 @@ export default function BusinessPage() {
 
   const toggleFavorite = () => {
     if (!tenant) return;
+    triggerHapticFeedback();
     try {
       const saved = localStorage.getItem("randera_favorites");
       let favs: string[] = saved ? JSON.parse(saved) : [];
@@ -300,13 +316,6 @@ export default function BusinessPage() {
     setModalOpen(true);
   };
 
-  const openSection = (tab: "services" | "reviews" | "posts" | "location") => {
-    setActiveTab(tab);
-    document
-      .getElementById("business-tabs")
-      ?.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
-
   const handlePostNavigate = (postId: string) => {
     const nextPost = posts.find((item) => item.id === postId);
     if (nextPost) setSelectedPost(nextPost);
@@ -341,7 +350,7 @@ export default function BusinessPage() {
   }
 
   return (
-    <div className="brand-scope w-full max-w-4xl mx-auto space-y-8 pb-16 font-sans select-none relative">
+    <div className="brand-scope w-full max-w-4xl mx-auto space-y-8 pb-28 font-sans select-none relative lg:pb-16">
       {/* İşletmenin seçtiği palet (açık/koyu varyant müşterinin temasına göre) */}
       <style>{paletteCss(getPalette(tenant.theme_palette))}</style>
 
@@ -366,10 +375,11 @@ export default function BusinessPage() {
             title={isFavorited ? "Favorilerden Çıkar" : "Favorilere Ekle"}
           >
             <Heart
+              key={isFavorited ? "on" : "off"}
               size={20}
               className={`transition-colors ${
                 isFavorited
-                  ? "fill-rose-500 text-rose-500 stroke-rose-500"
+                  ? "animate-heart-pop fill-rose-500 text-rose-500 stroke-rose-500"
                   : "text-white stroke-[2.2]"
               }`}
             />
@@ -509,39 +519,6 @@ export default function BusinessPage() {
         </div>
       </div>
 
-      {/* Mobil: birincil aksiyonlar sekmelerin üstünde, sabitlenmez */}
-      <div className="!mb-3 flex items-stretch gap-2 lg:hidden">
-        <button
-          type="button"
-          onClick={() => router.push(`/b/${slug}/randevu`)}
-          className="flex min-h-12 flex-1 items-center justify-between gap-2 rounded-2xl bg-[var(--brand)] px-4 text-sm font-extrabold text-white shadow-[0_10px_24px_var(--brand-shadow)] transition-all active:scale-[0.98]"
-        >
-          <span className="flex items-center gap-2">
-            <CalendarIcon size={17} strokeWidth={2.4} />
-            <span>{lang === "tr" ? "Randevu Al" : "Book now"}</span>
-          </span>
-          {minPrice !== null && (
-            <span className="text-[11px] font-semibold text-white/80">
-              {lang === "tr" ? `₺${minPrice}'den` : `From ₺${minPrice}`}
-            </span>
-          )}
-        </button>
-        <button
-          type="button"
-          onClick={() => openSection("reviews")}
-          aria-label={lang === "tr" ? "Değerlendirmeleri gör" : "View reviews"}
-          className="flex min-h-12 shrink-0 items-center gap-1.5 rounded-2xl border border-amber-200/80 bg-amber-50 px-3.5 text-sm font-extrabold text-amber-700 transition-all active:scale-[0.98] dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-400"
-        >
-          <Star size={15} className="fill-amber-400 text-amber-400" />
-          <span>{reviewsData.average_rating ?? (lang === "tr" ? "Yeni" : "New")}</span>
-          {reviewsData.average_rating !== null && (
-            <span className="text-[11px] font-semibold opacity-70">
-              ({reviewsData.total_reviews})
-            </span>
-          )}
-        </button>
-      </div>
-
       {/* İşletme aksiyonları ve bölüm navigasyonu */}
       <div
         id="business-tabs"
@@ -627,6 +604,12 @@ export default function BusinessPage() {
         </div>
       </div>
 
+      {/* Sekme panelleri: içerik değişimi yumuşak geçişle yaşanır. */}
+      <Presence
+        swapKey={activeTab}
+        enterClassName="animate-fade-rise-in"
+        exitClassName="animate-fade-rise-out"
+      >
       {/* 1. SEKME: HİZMETLER MENÜSÜ */}
       {activeTab === "services" && (
         <div className="space-y-5 animate-in fade-in duration-200">
@@ -653,7 +636,7 @@ export default function BusinessPage() {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 sm:gap-4">
+            <div className="stagger-list grid grid-cols-1 md:grid-cols-2 gap-3.5 sm:gap-4">
               {services.map((s) => {
                 const duration = s.duration || s.duration_minutes || 30;
                 return (
@@ -829,7 +812,7 @@ export default function BusinessPage() {
               </div>
 
               {/* Müşteri Yorum Kartları Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
+              <div className="stagger-list grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
                 {reviewsData.reviews.map((rev) => (
                   <div
                     key={rev.appointment_id}
@@ -984,6 +967,7 @@ export default function BusinessPage() {
           </div>
         </div>
       )}
+      </Presence>
 
       {/* Post Modal */}
       <PostModal
@@ -1015,6 +999,64 @@ export default function BusinessPage() {
         reviews={reviewsData.user_reviews || []}
         onSuccess={handleReviewSuccess}
       />
+
+      {/* Mobil sabit alt CTA: native uygulama desenindeki "Randevu Al" çubuğu.
+          Kaydırma kabı transform içerdiğinden portal ile body'ye taşınır. */}
+      {mounted &&
+        createPortal(
+          <div className="brand-scope fixed inset-x-0 bottom-0 z-40 lg:hidden">
+            <div className="border-t border-slate-200/80 bg-white/90 px-4 pb-[max(var(--safe-bottom),0.75rem)] pt-3 backdrop-blur-2xl dark:border-slate-800 dark:bg-slate-900/90">
+              <div className="mx-auto flex max-w-4xl items-center gap-3">
+                <button
+                  type="button"
+                  onClick={toggleFavorite}
+                  aria-label={
+                    isFavorited
+                      ? lang === "tr"
+                        ? "Favorilerden Çıkar"
+                        : "Remove from favorites"
+                      : lang === "tr"
+                        ? "Favorilere Ekle"
+                        : "Add to favorites"
+                  }
+                  className="flex h-12 w-12 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-slate-200/80 bg-white text-slate-400 transition-all active:scale-90 dark:border-slate-700 dark:bg-slate-800"
+                >
+                  <Heart
+                    key={isFavorited ? "on" : "off"}
+                    size={19}
+                    className={
+                      isFavorited
+                        ? "animate-heart-pop fill-rose-500 text-rose-500 stroke-rose-500"
+                        : "stroke-[2.2]"
+                    }
+                  />
+                </button>
+                {minPrice !== null && (
+                  <div className="min-w-0 shrink-0">
+                    <p className="text-[10px] font-medium text-slate-500 dark:text-slate-400">
+                      {lang === "tr" ? "Başlangıç" : "From"}
+                    </p>
+                    <p className="text-base font-black tabular-nums text-slate-900 dark:text-white">
+                      ₺{minPrice}
+                    </p>
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerHapticFeedback();
+                    router.push(`/b/${slug}/randevu`);
+                  }}
+                  className="inline-flex h-12 flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl bg-[var(--brand)] px-4 text-sm font-extrabold text-white shadow-[0_6px_16px_var(--brand-shadow)] transition-all active:scale-[0.98]"
+                >
+                  <CalendarIcon size={18} strokeWidth={2.4} />
+                  <span>{lang === "tr" ? "Randevu Al" : "Book Now"}</span>
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

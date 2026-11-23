@@ -20,6 +20,13 @@ const COMMIT_RATIO = 0.18;
 const MAX_DRAG_RATIO = 0.32;
 const DAMPING = 0.55;
 
+/* Kenar swipe-geri (detay sayfaları): iOS'taki gibi ekranın sol kenarından
+   başlayan sağa sürükleme sayfayı parmakla taşır, bırakınca geri gider. */
+const BACK_EDGE_WIDTH = 32;
+const BACK_COMMIT_RATIO = 0.32;
+const BACK_MIN_DISTANCE = 64;
+const BACK_QUICK_MS = 450;
+
 export interface SwipeTab {
   href: string;
   content: ReactNode;
@@ -80,6 +87,7 @@ const SwipePager = forwardRef<HTMLElement, SwipePagerProps>(
     const router = useRouter();
     const mainRef = useRef<HTMLElement | null>(null);
     const trackRef = useRef<HTMLDivElement | null>(null);
+    const detailRef = useRef<HTMLDivElement | null>(null);
     const gestureRef = useRef<{
       tracking: boolean;
       axis: "x" | "y" | null;
@@ -90,6 +98,16 @@ const SwipePager = forwardRef<HTMLElement, SwipePagerProps>(
       hScroller: HTMLElement | null;
       handedOff: boolean;
       didDragHorizontal: boolean;
+    } | null>(null);
+    const backGestureRef = useRef<{
+      tracking: boolean;
+      axis: "x" | "y" | null;
+      startX: number;
+      startY: number;
+      startTime: number;
+      deltaX: number;
+      hScroller: HTMLElement | null;
+      handedOff: boolean;
     } | null>(null);
     const activeIndex = tabs.findIndex((tab) => tab.href === pathname);
     const activeTab = activeIndex >= 0;
@@ -120,7 +138,63 @@ const SwipePager = forwardRef<HTMLElement, SwipePagerProps>(
         delete trackRef.current.dataset.settling;
         delete trackRef.current.dataset.committing;
       }
+      // Swipe-geri sonrası detay kabı başka bir detay sayfasında kalabilir
+      // (ör. randevu → işletme profili): dönüşüm ve sınıfları sıfırla.
+      const detail = detailRef.current;
+      if (detail) {
+        detail.classList.remove("swipe-back-dragging", "swipe-back-settling");
+        detail.style.transform = "";
+      }
+      backGestureRef.current = null;
     }, [basePercent, pathname]);
+
+    /** Uygulama içi geçmiş varsa geri, yoksa keşfete (paylaşılan linkle
+        doğrudan gelen kullanıcı uygulamadan düşmesin). */
+    const goBack = useCallback(() => {
+      const state = window.history.state as { idx?: number } | null;
+      if (state && typeof state.idx === "number" && state.idx > 0) {
+        router.back();
+      } else {
+        router.push("/discover");
+      }
+    }, [router]);
+
+    const settleBack = useCallback(
+      (commit: boolean) => {
+        const detail = detailRef.current;
+        backGestureRef.current = null;
+        if (!detail) return;
+
+        const reduced = window.matchMedia(
+          "(prefers-reduced-motion: reduce)",
+        ).matches;
+        if (commit && reduced) {
+          detail.style.transform = "";
+          detail.classList.remove("swipe-back-dragging");
+          triggerHapticFeedback();
+          goBack();
+          return;
+        }
+
+        const width = mainRef.current?.clientWidth || window.innerWidth;
+        detail.classList.remove("swipe-back-dragging");
+        detail.classList.add("swipe-back-settling");
+        detail.style.transform = commit
+          ? `translate3d(${width}px, 0, 0)`
+          : "translate3d(0, 0, 0)";
+
+        if (commit) {
+          triggerHapticFeedback();
+          window.setTimeout(goBack, 190);
+        } else {
+          window.setTimeout(() => {
+            detail.classList.remove("swipe-back-settling");
+            detail.style.transform = "";
+          }, 260);
+        }
+      },
+      [goBack],
+    );
 
     const publishProgress = (
       phase: "drag" | "settle" | "commit",
@@ -133,10 +207,30 @@ const SwipePager = forwardRef<HTMLElement, SwipePagerProps>(
     };
 
     const onTouchStart = (event: TouchEvent) => {
-      if (!activeTab || !isMobileViewport()) return;
+      if (!isMobileViewport()) return;
       if (event.touches.length !== 1 || hasSwipeBlocker(event.target)) return;
 
       const touch = event.touches[0];
+
+      // Detay sayfası: yalnızca sol kenardan başlayan swipe-geri jesti.
+      if (!activeTab) {
+        const main = mainRef.current;
+        if (!main) return;
+        if (touch.clientX - main.getBoundingClientRect().left > BACK_EDGE_WIDTH)
+          return;
+        backGestureRef.current = {
+          tracking: true,
+          axis: null,
+          startX: touch.clientX,
+          startY: touch.clientY,
+          startTime: Date.now(),
+          deltaX: 0,
+          hScroller: findHorizontalScroller(event.target),
+          handedOff: false,
+        };
+        return;
+      }
+
       gestureRef.current = {
         tracking: true,
         axis: null,
@@ -151,6 +245,52 @@ const SwipePager = forwardRef<HTMLElement, SwipePagerProps>(
     };
 
     const onTouchMove = (event: TouchEvent) => {
+      // Swipe-geri: detay sayfasını parmakla sağa taşı.
+      const back = backGestureRef.current;
+      if (back?.tracking) {
+        if (event.touches.length !== 1) {
+          back.tracking = false;
+          if (back.deltaX > 0) settleBack(false);
+          else backGestureRef.current = null;
+          return;
+        }
+        const touch = event.touches[0];
+        const moveX = touch.clientX - back.startX;
+        const moveY = touch.clientY - back.startY;
+
+        if (!back.axis) {
+          if (Math.abs(moveX) < AXIS_SLOP && Math.abs(moveY) < AXIS_SLOP)
+            return;
+          if (moveX > 0 && Math.abs(moveX) > Math.abs(moveY) * AXIS_RATIO) {
+            back.axis = "x";
+          } else {
+            back.tracking = false;
+            backGestureRef.current = null;
+            return;
+          }
+        }
+
+        if (back.hScroller && !back.handedOff) {
+          // Yatay bir şerit (ör. sekme çubuğu) sola kayabiliyorsa jest ona
+          // bırakılır; ancak şerit en baştaysa swipe-geri devralır.
+          if (back.hScroller.scrollLeft > 0) {
+            back.tracking = false;
+            backGestureRef.current = null;
+            return;
+          }
+          back.handedOff = true;
+        }
+
+        back.deltaX = Math.max(0, moveX);
+        const detail = detailRef.current;
+        if (detail) {
+          detail.classList.remove("swipe-back-settling");
+          detail.classList.add("swipe-back-dragging");
+          detail.style.transform = `translate3d(${back.deltaX}px, 0, 0)`;
+        }
+        return;
+      }
+
       const gesture = gestureRef.current;
       if (!gesture?.tracking) return;
       if (event.touches.length !== 1) {
@@ -220,6 +360,22 @@ const SwipePager = forwardRef<HTMLElement, SwipePagerProps>(
     };
 
     const onTouchEnd = () => {
+      const back = backGestureRef.current;
+      if (back?.tracking) {
+        back.tracking = false;
+        if (back.axis !== "x" || back.deltaX <= 0) {
+          backGestureRef.current = null;
+          return;
+        }
+        const width = mainRef.current?.clientWidth || window.innerWidth;
+        const elapsed = Date.now() - back.startTime;
+        const commit =
+          back.deltaX > width * BACK_COMMIT_RATIO ||
+          (elapsed < BACK_QUICK_MS && back.deltaX > BACK_MIN_DISTANCE);
+        settleBack(commit);
+        return;
+      }
+
       const gesture = gestureRef.current;
       if (!gesture?.tracking) return;
       gesture.tracking = false;
@@ -270,6 +426,13 @@ const SwipePager = forwardRef<HTMLElement, SwipePagerProps>(
       move: onTouchMove,
       end: onTouchEnd,
       cancel: () => {
+        const back = backGestureRef.current;
+        if (back?.tracking) {
+          back.tracking = false;
+          if (back.deltaX > 0) settleBack(false);
+          else backGestureRef.current = null;
+          return;
+        }
         const gesture = gestureRef.current;
         gestureRef.current = null;
         if (!gesture?.didDragHorizontal) return;
@@ -356,7 +519,11 @@ const SwipePager = forwardRef<HTMLElement, SwipePagerProps>(
           </div>
         </div>
         {!activeTab && (
-          <div className="absolute inset-0 h-full min-h-0 w-full overflow-y-auto overflow-x-hidden overscroll-y-contain custom-scrollbar p-3 sm:p-6 md:p-8 pb-24 sm:pb-24 lg:pb-8 pr-2.5 sm:pr-4">
+          <div
+            ref={detailRef}
+            className="absolute inset-0 h-full min-h-0 w-full overflow-y-auto overflow-x-hidden overscroll-y-contain custom-scrollbar p-3 sm:p-6 md:p-8 pb-24 sm:pb-24 lg:pb-8 pr-2.5 sm:pr-4"
+            style={{ touchAction: "pan-y" }}
+          >
             {children}
           </div>
         )}
