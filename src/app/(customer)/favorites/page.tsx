@@ -181,17 +181,6 @@ export default function FavoritesPage() {
     <div className="w-full max-w-6xl mx-auto space-y-6 pb-20 font-sans select-none">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white sm:text-3xl lg:text-4xl lg:font-extrabold lg:tracking-normal">
-            {lang === "tr" ? "Favori İşletmelerim" : "My Favorites"}
-          </h1>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400 lg:text-base">
-            {lang === "tr"
-              ? "Beğendiğiniz işletmeleri buradan takip edin ve anında randevu alın."
-              : "Keep track of your favorite places and book with a single tap."}
-          </p>
-        </div>
-
         <button
           type="button"
           onClick={() => router.push("/discover")}

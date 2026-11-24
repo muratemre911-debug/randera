@@ -394,20 +394,6 @@ export default function DiscoverPage() {
       <DiscoverSkeleton />
     ) : (
     <div className="w-full max-w-6xl mx-auto space-y-6 pb-20 font-sans select-none">
-      {/* Üst Başlık & Arama / Filtre Bölümü */}
-      <div className="flex flex-col gap-4">
-        <div>
-          <h1 className="text-3xl font-black tracking-tight text-slate-950 dark:text-white sm:text-4xl">
-            {lang === "tr" ? "Keşfet" : "Discover"}
-          </h1>
-          <p className="mt-1 text-sm font-medium text-slate-500 dark:text-slate-400">
-            {lang === "tr"
-              ? "Anında onaylı randevu"
-              : "Instantly confirmed appointments"}
-          </p>
-        </div>
-      </div>
-
       {/* Arama çubuğu kaydırma sırasında üstte sabitlenir (native his).
           Kök içeriğin doğrudan çocuğu olmalı: sticky, ancak ebeveynin sınırları
           içinde çalışır; başlık grubunun içinde olsaydı liste kayarken kaybolurdu. */}

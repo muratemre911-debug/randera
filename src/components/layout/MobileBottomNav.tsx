@@ -219,6 +219,7 @@ export default function MobileBottomNav({
       delete nav.dataset.settling;
       delete nav.dataset.pageDragging;
       delete nav.dataset.pageSettling;
+      delete nav.dataset.pageCommitting;
     }
     if (settleTimerRef.current !== null) {
       window.clearTimeout(settleTimerRef.current);
@@ -254,7 +255,13 @@ export default function MobileBottomNav({
         }
         delete nav.dataset.settling;
         delete nav.dataset.pageSettling;
-        nav.dataset.pageDragging = "true";
+        if (detail.phase === "commit") {
+          delete nav.dataset.pageDragging;
+          nav.dataset.pageCommitting = "true";
+        } else {
+          delete nav.dataset.pageCommitting;
+          nav.dataset.pageDragging = "true";
+        }
         setIndicatorBetween(fromIndex, toIndex, detail.progress);
         return;
       }

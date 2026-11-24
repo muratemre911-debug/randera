@@ -135,47 +135,67 @@ html, body {
   pointer-events: none;
 }
 
+/*
+ * Karartma yalnızca opacity ile geçer; renk ve blur sabit kalır. Aksi halde
+ * kapanışta arka plan ve blur anında sıfırlanıp perde bir anda kaybolur.
+ */
 .mobile-menu-backdrop {
   opacity: 0;
-  background-color: rgb(2 6 23 / 0%);
-  -webkit-backdrop-filter: blur(0);
-  backdrop-filter: blur(0);
+  background-color: rgb(2 6 23 / 58%);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
   transition: opacity 300ms ease;
 }
 
 .mobile-menu-overlay[data-open="true"] .mobile-menu-backdrop {
   opacity: 1;
-  background-color: rgb(2 6 23 / 58%);
-  -webkit-backdrop-filter: blur(4px);
-  backdrop-filter: blur(4px);
 }
 
+/*
+ * Panel, alt çubuktaki "Menü" kapsülünden büyür ve oraya küçülür. Kapalı hal,
+ * JS'in ölçtüğü kapsülün konum ve boyutuna (--mobile-menu-*) birebir oturur;
+ * sol üst köşeden ölçeklendiği için küçülen panel kapsülün tam üstüne iner.
+ * Kapanış, açılıştan kısa ve yumuşak ivmelenen bir eğriyle yapılır.
+ */
 .mobile-menu-sheet {
-  transform: scale(0.15, 0.085);
-  transform-origin:
-    var(--mobile-menu-origin-x, 93%) var(--mobile-menu-origin-y, 100%);
-  border-radius: 9999px;
-  opacity: 0.98;
-  background-color: color-mix(in srgb, var(--brand) 42%, white);
+  transform-origin: 0 0;
+  transform:
+    translate3d(var(--mobile-menu-x, 0px), var(--mobile-menu-y, 0px), 0)
+    scale(var(--mobile-menu-sx, 0.15), var(--mobile-menu-sy, 0.085));
+  border-radius: 50%;
+  opacity: 1;
+  background-color: color-mix(in srgb, var(--brand) 12%, rgb(255 255 255 / 76%));
   transition:
-    transform 460ms cubic-bezier(0.22, 1, 0.36, 1),
-    border-radius 460ms cubic-bezier(0.22, 1, 0.36, 1),
-    background-color 360ms ease;
+    transform 360ms cubic-bezier(0.4, 0, 0.2, 1),
+    border-radius 360ms cubic-bezier(0.4, 0, 0.2, 1),
+    background-color 360ms ease,
+    opacity 120ms ease 240ms;
   will-change: transform, border-radius;
 }
 
 .dark .mobile-menu-sheet {
-  background-color: color-mix(in srgb, var(--brand) 24%, rgb(35 37 44 / 96%));
+  background-color: color-mix(in srgb, var(--brand) 24%, rgb(35 37 44 / 88%));
 }
 
 .mobile-menu-overlay[data-open="true"] .mobile-menu-sheet {
-  transform: scale(1);
+  transform: translate3d(0px, 0px, 0) scale(1, 1);
   border-radius: 32px 32px 0 0;
+  opacity: 1;
   background-color: rgb(255 255 255 / 96%);
+  transition:
+    transform 460ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-radius 460ms cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 360ms ease,
+    opacity 160ms ease;
 }
 
 .dark .mobile-menu-overlay[data-open="true"] .mobile-menu-sheet {
   background-color: rgb(15 23 42 / 96%);
+}
+
+/* Panel kapsüle oturduktan sonra erir; altındaki seçili gösterge görünür kalır. */
+.mobile-menu-overlay[data-phase="closing"] .mobile-menu-sheet {
+  opacity: 0;
 }
 
 .mobile-menu-sheet > * {
@@ -298,6 +318,10 @@ html, body {
   transition-duration: 220ms, 220ms;
 }
 
+.shell-bottomnav-inner[data-page-committing="true"] .shell-nav-indicator {
+  transition-duration: 260ms, 260ms;
+}
+
 .shell-bottomnav-inner,
 .shell-bottomnav-inner .shell-nav-item {
   touch-action: none;
@@ -386,7 +410,7 @@ html, body {
 }
 
 .swipe-pager-track[data-committing="true"] {
-  transition: transform 170ms ease-out;
+  transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 @media (prefers-reduced-motion: reduce) {

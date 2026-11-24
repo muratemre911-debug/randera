@@ -2,7 +2,14 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import {
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useCallback,
+  useMemo,
+} from "react";
 import {
   LayoutDashboard,
   Calendar,
@@ -148,25 +155,42 @@ export default function DashboardLayoutClient({
   const columnRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLElement>(null);
 
-  const updateMobileMenuOrigin = useCallback(() => {
+  /**
+   * Panelin kapalı halini alt çubuktaki "Menü" göstergesinin (kapsülün) tam
+   * üstüne oturtur. Düğmenin offset ölçüleri transform'dan etkilenmediği için
+   * basılı (scale) hal veya geçiş anı ölçümü bozmaz.
+   */
+  const updateMobileMenuGeometry = useCallback(() => {
     const sheet = mobileMenuSheetRef.current;
     const trigger = document.querySelector<HTMLElement>("[data-nav-action]");
-    if (!sheet || !trigger) return;
+    const nav = trigger?.offsetParent;
+    if (!sheet || !trigger || !(nav instanceof HTMLElement)) return;
 
-    const triggerRect = trigger.getBoundingClientRect();
-    const sheetTop = window.innerHeight - sheet.offsetHeight;
+    const sheetWidth = sheet.offsetWidth;
+    const sheetHeight = sheet.offsetHeight;
+    if (!sheetWidth || !sheetHeight) return;
+
+    const navRect = nav.getBoundingClientRect();
+    const left = navRect.left + nav.clientLeft + trigger.offsetLeft + 4;
+    const top = navRect.top + nav.clientTop + trigger.offsetTop;
+    const sheetTop = window.innerHeight - sheetHeight;
+
+    sheet.style.setProperty("--mobile-menu-x", `${left}px`);
+    sheet.style.setProperty("--mobile-menu-y", `${top - sheetTop}px`);
     sheet.style.setProperty(
-      "--mobile-menu-origin-x",
-      `${triggerRect.left + triggerRect.width / 2}px`,
+      "--mobile-menu-sx",
+      String((trigger.offsetWidth - 8) / sheetWidth),
     );
     sheet.style.setProperty(
-      "--mobile-menu-origin-y",
-      `${Math.max(
-        0,
-        triggerRect.top + triggerRect.height / 2 - sheetTop,
-      )}px`,
+      "--mobile-menu-sy",
+      String(trigger.offsetHeight / sheetHeight),
     );
   }, []);
+
+  // Açılış boyası başlamadan kapsül konumu hazır olsun diye layout effect kullanılır.
+  useLayoutEffect(() => {
+    if (mobileMenuPhase === "opening") updateMobileMenuGeometry();
+  }, [mobileMenuPhase, updateMobileMenuGeometry]);
 
   const openMobileMenu = useCallback(() => {
     if (mobileMenuCloseTimerRef.current !== null) {
@@ -179,13 +203,12 @@ export default function DashboardLayoutClient({
     mobileMenuMountedRef.current = true;
     setMobileMenuPhase("opening");
     mobileMenuFrameRef.current = window.requestAnimationFrame(() => {
-      updateMobileMenuOrigin();
       mobileMenuFrameRef.current = window.requestAnimationFrame(() => {
         mobileMenuFrameRef.current = null;
         setMobileMenuPhase("open");
       });
     });
-  }, [updateMobileMenuOrigin]);
+  }, []);
 
   const finishMobileMenuClose = useCallback(() => {
     if (mobileMenuCloseTimerRef.current !== null) {
@@ -208,6 +231,7 @@ export default function DashboardLayoutClient({
       window.cancelAnimationFrame(mobileMenuFrameRef.current);
       mobileMenuFrameRef.current = null;
     }
+    updateMobileMenuGeometry();
     setMobileMenuPhase("closing");
     const reducedMotion = window.matchMedia(
       "(prefers-reduced-motion: reduce)",
@@ -218,9 +242,9 @@ export default function DashboardLayoutClient({
     }
     mobileMenuCloseTimerRef.current = window.setTimeout(
       finishMobileMenuClose,
-      480,
+      440,
     );
-  }, [finishMobileMenuClose]);
+  }, [finishMobileMenuClose, updateMobileMenuGeometry]);
 
   useEffect(
     () => () => {
@@ -708,6 +732,7 @@ export default function DashboardLayoutClient({
       {mobileMenuPhase !== "closed" && (
         <div
           data-no-swipe
+          data-phase={mobileMenuPhase}
           data-open={mobileMenuPhase === "open" ? "true" : "false"}
           aria-hidden={mobileMenuPhase === "closing"}
           className={`mobile-menu-overlay fixed inset-0 z-50 lg:hidden ${

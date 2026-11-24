@@ -215,17 +215,6 @@ export default function ProfilePage() {
 
   return (
     <div className="mx-auto w-full max-w-3xl px-1 py-4 sm:px-2 sm:py-7">
-      <header className="mb-6 sm:mb-7">
-        <h1 className="text-3xl font-black tracking-tight text-slate-950 dark:text-white sm:text-4xl">
-          {t("profile.title")}
-        </h1>
-        <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400 sm:text-base">
-          {lang === "tr"
-            ? "Hesap bilgilerini ve tercihlerini yönet."
-            : "Manage your account details and preferences."}
-        </p>
-      </header>
-
       <form onSubmit={handleSubmit} className="space-y-4">
         <Presence
           swapKey={fetching ? "loading" : "form"}

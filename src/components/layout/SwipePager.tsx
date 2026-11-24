@@ -14,18 +14,27 @@ import { triggerHapticFeedback } from "@/lib/haptics";
 
 const AXIS_RATIO = 1.5;
 const AXIS_SLOP = 12;
-const MIN_DISTANCE = 48;
-const QUICK_MS = 500;
-const COMMIT_RATIO = 0.18;
+const COMMIT_RATIO = 0.3;
 const MAX_DRAG_RATIO = 0.32;
 const DAMPING = 0.55;
+
+/* Hızlı kaydırma (flick): kısa bir dokunma/titreme geçiş yapmasın diye hem
+   mesafe hem hız aranır. */
+const FLICK_MIN_DISTANCE = 80;
+const FLICK_VELOCITY = 0.5;
 
 /* Kenar swipe-geri (detay sayfaları): iOS'taki gibi ekranın sol kenarından
    başlayan sağa sürükleme sayfayı parmakla taşır, bırakınca geri gider. */
 const BACK_EDGE_WIDTH = 32;
 const BACK_COMMIT_RATIO = 0.32;
-const BACK_MIN_DISTANCE = 64;
-const BACK_QUICK_MS = 450;
+
+/** Parmak yeterince uzağa ve yeterince hızlı gittiyse (px, px/ms). */
+function isFlick(distance: number, elapsedMs: number) {
+  return (
+    distance >= FLICK_MIN_DISTANCE &&
+    distance / Math.max(1, elapsedMs) >= FLICK_VELOCITY
+  );
+}
 
 export interface SwipeTab {
   href: string;
@@ -38,6 +47,11 @@ interface SwipePagerProps
   tabs: SwipeTab[];
   /** Ana sekmeler dışındaki rotalar (örn. /b/[slug]) burada gösterilir. */
   children: ReactNode;
+}
+
+/** n. sekmenin track içindeki yüzde konumu (sekme sayısına göre). */
+function pagePercent(index: number, count: number) {
+  return (index * 100) / Math.max(1, count);
 }
 
 /** Modal, harita ve düzenlenen alanlarda sayfa kaydırmasını devre dışı bırak. */
@@ -88,6 +102,8 @@ const SwipePager = forwardRef<HTMLElement, SwipePagerProps>(
     const mainRef = useRef<HTMLElement | null>(null);
     const trackRef = useRef<HTMLDivElement | null>(null);
     const detailRef = useRef<HTMLDivElement | null>(null);
+    // Parmakla tamamlanan geçişin hedefi; route bu hedefe gelince animasyon kesilmez.
+    const committedHrefRef = useRef<string | null>(null);
     const gestureRef = useRef<{
       tracking: boolean;
       axis: "x" | "y" | null;
@@ -112,7 +128,7 @@ const SwipePager = forwardRef<HTMLElement, SwipePagerProps>(
     const activeIndex = tabs.findIndex((tab) => tab.href === pathname);
     const activeTab = activeIndex >= 0;
     const basePercent =
-      activeIndex >= 0 ? (activeIndex * 100) / Math.max(1, tabs.length) : 0;
+      activeIndex >= 0 ? pagePercent(activeIndex, tabs.length) : 0;
     const touchHandlersRef = useRef<{
       start: (event: TouchEvent) => void;
       move: (event: TouchEvent) => void;
@@ -132,11 +148,19 @@ const SwipePager = forwardRef<HTMLElement, SwipePagerProps>(
     // Route değişince paneli yeni sekme konumunda, animasyonsuz hizala. Aynı
     // DOM ağacı kaldığı için her sekmenin formu, scroll'u ve harita durumu yaşar.
     useLayoutEffect(() => {
-      if (trackRef.current) {
-        trackRef.current.style.transform = `translate3d(-${basePercent}%, 0, 0)`;
-        delete trackRef.current.dataset.dragging;
-        delete trackRef.current.dataset.settling;
-        delete trackRef.current.dataset.committing;
+      const track = trackRef.current;
+      // Route, parmağın bıraktığı hedefe geldiyse track zaten o konumda. Geçişi
+      // yarıda kesmemek için sınıf transitionend'e kadar kalır; aksi halde
+      // (ör. alt çubuktan başka sekmeye geçiş) konum doğrudan sıfırlanır.
+      const finishingCommit =
+        track?.dataset.committing === "true" &&
+        committedHrefRef.current === pathname;
+      committedHrefRef.current = null;
+      if (track && !finishingCommit) {
+        track.style.transform = `translate3d(-${basePercent}%, 0, 0)`;
+        delete track.dataset.dragging;
+        delete track.dataset.settling;
+        delete track.dataset.committing;
       }
       // Swipe-geri sonrası detay kabı başka bir detay sayfasında kalabilir
       // (ör. randevu → işletme profili): dönüşüm ve sınıfları sıfırla.
@@ -371,7 +395,7 @@ const SwipePager = forwardRef<HTMLElement, SwipePagerProps>(
         const elapsed = Date.now() - back.startTime;
         const commit =
           back.deltaX > width * BACK_COMMIT_RATIO ||
-          (elapsed < BACK_QUICK_MS && back.deltaX > BACK_MIN_DISTANCE);
+          isFlick(back.deltaX, elapsed);
         settleBack(commit);
         return;
       }
@@ -389,9 +413,8 @@ const SwipePager = forwardRef<HTMLElement, SwipePagerProps>(
       const travelled = Math.abs(deltaX);
       const elapsed = Date.now() - gesture.startTime;
       const width = mainRef.current?.clientWidth || window.innerWidth;
-      const farEnough =
-        travelled > Math.max(MIN_DISTANCE, width * COMMIT_RATIO);
-      const quickFlick = elapsed < QUICK_MS && travelled > MIN_DISTANCE;
+      const farEnough = travelled > width * COMMIT_RATIO;
+      const quickFlick = isFlick(travelled, elapsed);
 
       if (!wasHorizontal || !target || (!farEnough && !quickFlick)) {
         publishProgress("settle", target?.href ?? null, 0);
@@ -407,15 +430,17 @@ const SwipePager = forwardRef<HTMLElement, SwipePagerProps>(
         return;
       }
 
-      // Komşu panel gerçek DOM'da zaten hazırdır; track parmağın yönünde
-      // tamamlanırken Next URL'si de güncellenir.
+      // Komşu panel gerçek DOM'da zaten hazırdır. Track doğrudan hedef sekmenin
+      // yüzdesine kayar: route geldiğinde yazılan değerle aynıdır, geçiş bölünmez.
       publishProgress("commit", target.href, 1);
+      committedHrefRef.current = target.href;
       if (trackRef.current) {
         delete trackRef.current.dataset.dragging;
         trackRef.current.dataset.committing = "true";
-        trackRef.current.style.transform = `translate3d(calc(-${basePercent}% + ${
-          deltaX < 0 ? -width : width
-        }px), 0, 0)`;
+        trackRef.current.style.transform = `translate3d(-${pagePercent(
+          targetIndex,
+          tabs.length,
+        )}%, 0, 0)`;
       }
       triggerHapticFeedback();
       router.push(target.href);
@@ -496,6 +521,7 @@ const SwipePager = forwardRef<HTMLElement, SwipePagerProps>(
                 event.propertyName === "transform"
               ) {
                 delete event.currentTarget.dataset.settling;
+                delete event.currentTarget.dataset.committing;
               }
             }}
             style={{

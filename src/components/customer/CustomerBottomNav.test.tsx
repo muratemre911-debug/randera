@@ -375,4 +375,40 @@ describe("CustomerBottomNav", () => {
       Number.parseFloat(navBar.style.getPropertyValue("--shell-nav-x")),
     ).toBe(4);
   });
+
+  it("sayfa swipe commit'inde gösterge sayfayla aynı sürede hedefe kayar", () => {
+    nav.pathname = "/discover";
+    const { container } = render(<CustomerBottomNav tabs={tabs} />);
+    const navBar = container.querySelector(
+      ".shell-bottomnav-inner",
+    ) as HTMLDivElement;
+    mockNavGeometry(navBar, links(container));
+
+    window.dispatchEvent(
+      new CustomEvent(PAGE_SWIPE_PROGRESS_EVENT, {
+        detail: {
+          fromHref: "/discover",
+          toHref: "/favorites",
+          progress: 0.5,
+          phase: "drag",
+        },
+      }),
+    );
+    window.dispatchEvent(
+      new CustomEvent(PAGE_SWIPE_PROGRESS_EVENT, {
+        detail: {
+          fromHref: "/discover",
+          toHref: "/favorites",
+          progress: 1,
+          phase: "commit",
+        },
+      }),
+    );
+
+    expect(navBar).toHaveAttribute("data-page-committing", "true");
+    expect(navBar).not.toHaveAttribute("data-page-dragging");
+    expect(
+      Number.parseFloat(navBar.style.getPropertyValue("--shell-nav-x")),
+    ).toBe(104);
+  });
 });
