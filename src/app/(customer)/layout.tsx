@@ -196,13 +196,6 @@ export default function CustomerLayout({
 
   return (
     <div ref={rootRef} className={SHELL.root}>
-      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-purple-400/20 mix-blend-multiply filter blur-3xl opacity-70 animate-blob dark:bg-purple-900/20 dark:mix-blend-screen" />
-      <div
-        className="absolute top-[20%] right-[-10%] w-[40%] h-[40%] rounded-full bg-indigo-400/20 mix-blend-multiply filter blur-3xl opacity-70 animate-blob dark:bg-indigo-900/20 dark:mix-blend-screen"
-        style={{ animationDelay: "2s" }}
-      />
-      <div className="absolute bottom-[-20%] left-[20%] w-[40%] h-[40%] rounded-full bg-pink-400/20 mix-blend-multiply filter blur-3xl opacity-70 animate-blob-slow dark:bg-pink-900/20 dark:mix-blend-screen" />
-
       {/* Desktop Floating Sidebar */}
       <aside className={SHELL.sidebar}>
         <div className="flex h-20 items-center justify-between px-6 pt-2">

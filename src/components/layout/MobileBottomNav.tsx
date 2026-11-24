@@ -7,7 +7,6 @@ import {
   useEffect,
   useLayoutEffect,
   useRef,
-  useState,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react";
@@ -81,10 +80,6 @@ export default function MobileBottomNav({
   const navWidthRef = useRef(0);
   const tabsRef = useRef(tabs);
   const pathnameRef = useRef(pathname);
-  const [preview, setPreview] = useState<{
-    pathname: string;
-    index: number;
-  } | null>(null);
 
   const routeIndex = tabs.findIndex((item) =>
     item.isActive
@@ -96,8 +91,9 @@ export default function MobileBottomNav({
     : routeIndex >= 0
       ? routeIndex
       : -1;
-  const visualIndex =
-    preview?.pathname === pathname ? preview.index : activeIndex;
+  // Seçim daima gerçek URL'den türetilir; sürükleme göstergesi doğrudan DOM
+  // ölçüsüyle taşınır, böylece React render'ı parmak konumunu geri alamaz.
+  const visualIndex = activeIndex;
   const visualIndexRef = useRef(visualIndex);
 
   useLayoutEffect(() => {
@@ -390,11 +386,6 @@ export default function MobileBottomNav({
     if (index < 0) return;
 
     pointer.index = index;
-    setPreview((current) =>
-      current?.pathname === pathname && current.index === index
-        ? current
-        : { pathname, index },
-    );
     setIndicatorPosition(index, event.clientX, 1);
   };
 
@@ -430,7 +421,6 @@ export default function MobileBottomNav({
     }, 240);
 
     if (cancelled) {
-      setPreview(null);
       if (activeIndex >= 0) {
         setIndicatorPosition(activeIndex);
       } else {
@@ -459,11 +449,8 @@ export default function MobileBottomNav({
       if (!isTargetActive) {
         triggerHapticFeedback();
         router.push(target.href);
-      } else {
-        setPreview(null);
       }
     } else if (destination === tabs.length && action) {
-      setPreview(null);
       triggerHapticFeedback();
       action.onSelect();
     }

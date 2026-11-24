@@ -12,8 +12,6 @@ import {
   MapPin, 
   Building2, 
   Phone, 
-  CalendarPlus, 
-  Download, 
   XCircle, 
   Compass, 
   AlertTriangle, 
@@ -21,7 +19,6 @@ import {
   RotateCcw,
   Undo2,
   Loader2,
-  ChevronDown,
   Star,
   ArrowUpRight,
   CalendarDays,
@@ -30,7 +27,6 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import ReviewModal from "@/components/ReviewModal";
 import Modal from "@/components/ui/Modal";
-import DropdownMenu from "@/components/ui/DropdownMenu";
 import SegmentedControl from "@/components/ui/SegmentedControl";
 import PullToRefresh from "@/components/layout/PullToRefresh";
 import { AppointmentsSkeleton } from "@/components/Skeleton";
@@ -370,94 +366,6 @@ export default function MyAppointmentsPage() {
     }
   };
 
-  // Google Calendar URL üretici
-  const createGoogleCalendarUrl = (appt: Appointment) => {
-    const title = encodeURIComponent(`${appt.services?.name || "Randevu"} - ${appt.tenants?.name || "Randera"}`);
-    const location = encodeURIComponent(appt.tenants?.address || "");
-    const details = encodeURIComponent(
-      `Randera üzerinden oluşturulmuş randevu.\nİşletme: ${appt.tenants?.name || ""}\nTelefon: ${appt.tenants?.phone || ""}`
-    );
-
-    const formatToCal = (d: Date) => d.toISOString().replace(/-|:|\.\d\d\d/g, "");
-    const startCal = formatToCal(new Date(appt.start_time));
-    const duration = appt.services?.duration_minutes || appt.services?.duration || 45;
-    const endCal = formatToCal(
-      appt.end_time
-        ? new Date(appt.end_time)
-        : new Date(new Date(appt.start_time).getTime() + duration * 60000)
-    );
-
-    return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${startCal}/${endCal}&details=${details}&location=${location}`;
-  };
-
-  // Apple / Outlook .ics Takvim Dosyası İndirici
-  const downloadIcsFile = (appt: Appointment) => {
-    const formatToIcs = (d: Date) => d.toISOString().replace(/-|:|\.\d\d\d/g, "");
-    const startIcs = formatToIcs(new Date(appt.start_time));
-    const duration = appt.services?.duration_minutes || appt.services?.duration || 45;
-    const endIcs = formatToIcs(
-      appt.end_time
-        ? new Date(appt.end_time)
-        : new Date(new Date(appt.start_time).getTime() + duration * 60000)
-    );
-    const title = `${appt.services?.name || "Randevu"} - ${appt.tenants?.name || "Randera"}`;
-    const location = appt.tenants?.address || "";
-    const description = `Randera Randevusu. İşletme: ${appt.tenants?.name || ""}`;
-
-    const icsContent = [
-      "BEGIN:VCALENDAR",
-      "VERSION:2.0",
-      "PRODID:-//Randera//Appointment Booking//TR",
-      "CALSCALE:GREGORIAN",
-      "METHOD:PUBLISH",
-      "BEGIN:VEVENT",
-      `UID:${appt.id}@randera.com`,
-      `DTSTAMP:${startIcs}`,
-      `DTSTART:${startIcs}`,
-      `DTEND:${endIcs}`,
-      `SUMMARY:${title}`,
-      `DESCRIPTION:${description}`,
-      `LOCATION:${location}`,
-      "STATUS:CONFIRMED",
-      "END:VEVENT",
-      "END:VCALENDAR",
-    ].join("\r\n");
-
-    const blob = new Blob([icsContent], { type: "text/calendar;charset=utf-8" });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute("download", `randevu-${appt.id.slice(0, 8)}.ics`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
-  };
-
-  // Kalan Süre Metni (Countdown)
-  // Anlık zaman dışarıdan verilir: bileşen gövdesinde doğrudan saat okumak
-  // (Date.now) render'ı düzensiz kılar. Çağıran, render'daki "now" değerini geçer.
-  const getCountdownText = (startTime: string, currentTime: number) => {
-    const target = new Date(startTime);
-    const diffMs = target.getTime() - currentTime;
-    if (diffMs <= 0) return lang === "tr" ? "Randevu vakti geldi" : "Appointment time";
-
-    const diffMins = Math.floor(diffMs / (1000 * 60));
-    const diffHours = Math.floor(diffMins / 60);
-    const diffDays = Math.floor(diffHours / 24);
-
-    if (diffDays > 1) {
-      return lang === "tr" ? `${diffDays} gün kaldı` : `In ${diffDays} days`;
-    }
-    if (diffDays === 1) {
-      return lang === "tr" ? "Yarın" : "Tomorrow";
-    }
-    if (diffHours >= 1) {
-      return lang === "tr" ? `${diffHours} saat kaldı` : `In ${diffHours} hours`;
-    }
-    return lang === "tr" ? `${diffMins} dakika kaldı` : `In ${diffMins} minutes`;
-  };
-
   // Yaklaşan ve Geçmiş Gruplaması
   const now = new Date();
   const upcomingAppointments = useMemo(() => {
@@ -481,8 +389,6 @@ export default function MyAppointmentsPage() {
     return upcomingAppointments.filter((a) => a.status === "pending");
   }, [upcomingAppointments]);
 
-  const nearestUpcoming = upcomingAppointments[0] || null;
-
   if (loading) {
     return <AppointmentsSkeleton />;
   }
@@ -499,10 +405,6 @@ export default function MyAppointmentsPage() {
         <div className="pointer-events-none absolute -bottom-28 right-1/3 h-48 w-48 rounded-full bg-fuchsia-400/10 blur-3xl dark:bg-fuchsia-500/10" />
         <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
-            <p className="mb-2 flex items-center gap-2 text-[11px] font-extrabold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-300">
-              <CalendarDays size={14} />
-              {lang === "tr" ? "Randevu takvimi" : "Appointment calendar"}
-            </p>
             <div className="flex flex-wrap items-center gap-3">
               <h1 className="text-3xl font-black tracking-tight text-slate-950 dark:text-white sm:text-4xl">
                 {lang === "tr" ? "Randevularım" : "My Appointments"}
@@ -514,8 +416,8 @@ export default function MyAppointmentsPage() {
             </div>
             <p className="mt-2 max-w-xl text-sm leading-6 text-slate-500 dark:text-slate-400 sm:text-base">
               {lang === "tr"
-                ? "Tüm randevularınızı görüntüleyin, takviminize kaydedin veya kolayca yönetin."
-                : "Track all your appointments, add to calendar, or manage booking status."}
+                ? "Yaklaşan ve geçmiş randevularınızı buradan görüntüleyip yönetin."
+                : "View and manage your upcoming and past appointments here."}
             </p>
           </div>
 
@@ -529,70 +431,6 @@ export default function MyAppointmentsPage() {
           </Link>
         </div>
       </div>
-
-      {/* Hero Spotlight: En Yakın Randevu Kartı (Varsa) */}
-      {nearestUpcoming && (
-        <div className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white p-5 shadow-[0_1px_2px_rgb(15,23,42,0.04),0_10px_30px_rgb(15,23,42,0.05)] dark:border-slate-800 dark:bg-slate-900 dark:shadow-[0_1px_2px_rgb(0,0,0,0.35),0_10px_30px_rgb(0,0,0,0.4)]">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div className="min-w-0 space-y-1.5">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--brand-soft)] px-3 py-1 text-[11px] font-extrabold uppercase tracking-wider text-[var(--brand-text)]">
-                <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-500 animate-pulse" />
-                <span>
-                  {lang === "tr"
-                    ? "Sıradaki Randevunuz"
-                    : "Next Upcoming Appointment"}{" "}
-                  • {getCountdownText(nearestUpcoming.start_time, now.getTime())}
-                </span>
-              </span>
-              <h2 className="text-xl font-black tracking-tight text-slate-900 dark:text-white md:text-2xl">
-                {nearestUpcoming.services?.name || (lang === "tr" ? "Hizmet" : "Service")}
-              </h2>
-              <p className="flex items-center gap-1.5 text-sm font-medium text-slate-500 dark:text-slate-400">
-                <Building2 size={15} className="shrink-0" />
-                <span>
-                  {nearestUpcoming.tenants?.name || (lang === "tr" ? "İşletme" : "Business")}
-                </span>
-              </p>
-            </div>
-
-            <div className="flex flex-col items-stretch gap-2.5 sm:flex-row sm:items-center">
-              <div className="rounded-2xl bg-slate-50 p-3 text-left dark:bg-slate-800/60">
-                <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">
-                  {format(parseISO(nearestUpcoming.start_time), "EEEE", { locale })}
-                </div>
-                <div className="text-base font-black text-slate-900 dark:text-white">
-                  {format(parseISO(nearestUpcoming.start_time), "d MMMM yyyy", { locale })}
-                </div>
-                <div className="mt-0.5 flex items-center gap-1 text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                  <Clock size={13} className="shrink-0" />
-                  <span>
-                    {format(parseISO(nearestUpcoming.start_time), "HH:mm")}
-                  </span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <a
-                  href={createGoogleCalendarUrl(nearestUpcoming)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-slate-100 px-3 py-2.5 text-xs font-bold text-slate-700 transition-all active:scale-[0.98] dark:bg-slate-800 dark:text-slate-200"
-                >
-                  <CalendarPlus size={14} className="shrink-0" />
-                  <span className="truncate">Google Takvim</span>
-                </a>
-                <button
-                  onClick={() => downloadIcsFile(nearestUpcoming)}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-slate-100 px-3 py-2.5 text-xs font-bold text-slate-700 transition-all active:scale-[0.98] dark:bg-slate-800 dark:text-slate-200"
-                >
-                  <Download size={14} className="shrink-0" />
-                  <span className="truncate">Apple Takvim</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Sekmeler: iOS tarzı kayan kapsüllü segmented control */}
       <SegmentedControl
@@ -688,8 +526,6 @@ export default function MyAppointmentsPage() {
                       lang={lang}
                       locale={locale}
                       cancelMode={getCancelMode(appt, now.getTime())}
-                      onDownloadIcs={downloadIcsFile}
-                      onGoogleCal={createGoogleCalendarUrl}
                       onCancelPrompt={() => setCancellingAppt(appt)}
                       onWithdrawPrompt={() => setWithdrawingAppt(appt)}
                     />
@@ -723,8 +559,6 @@ export default function MyAppointmentsPage() {
                       lang={lang}
                       locale={locale}
                       cancelMode={getCancelMode(appt, now.getTime())}
-                      onDownloadIcs={downloadIcsFile}
-                      onGoogleCal={createGoogleCalendarUrl}
                       onCancelPrompt={() => setCancellingAppt(appt)}
                       onWithdrawPrompt={() => setWithdrawingAppt(appt)}
                     />
@@ -756,8 +590,6 @@ export default function MyAppointmentsPage() {
                 isPast={true}
                 lang={lang}
                 locale={locale}
-                onDownloadIcs={downloadIcsFile}
-                onGoogleCal={createGoogleCalendarUrl}
                 onCancelPrompt={() => {}}
                 onReviewPrompt={() => setReviewAppt(appt)}
               />
@@ -949,8 +781,6 @@ function BoardingPassCard({
   lang,
   locale,
   cancelMode = "direct",
-  onDownloadIcs,
-  onGoogleCal,
   onCancelPrompt,
   onWithdrawPrompt,
   onReviewPrompt,
@@ -960,8 +790,6 @@ function BoardingPassCard({
   lang: string;
   locale: Locale;
   cancelMode?: "direct" | "request";
-  onDownloadIcs: (a: Appointment) => void;
-  onGoogleCal: (a: Appointment) => string;
   onCancelPrompt: () => void;
   onWithdrawPrompt?: () => void;
   onReviewPrompt?: () => void;
@@ -975,7 +803,6 @@ function BoardingPassCard({
   )}`;
 
   const bookingSlug = appt.tenants?.slug || appt.tenant_id;
-  const [calendarMenuOpen, setCalendarMenuOpen] = useState(false);
 
   return (
     <div
@@ -1118,56 +945,7 @@ function BoardingPassCard({
       {/* Sağ Alt: Aksiyon Butonları (Yaklaşan randevularda zengin aksiyonlar) */}
       {!isPast && !isCancelled && (
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
-          {/* Sol: Şık Takvime Ekle Açılır Menüsü.
-              Portal ile açılır: eski hâli sayfa kaydırma kabının içinde
-              konumlandığı için yukarı açıldığında kırpılıyordu. */}
-          <DropdownMenu
-            open={calendarMenuOpen}
-            onOpenChange={setCalendarMenuOpen}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-slate-100 px-3 py-2 text-xs font-bold text-slate-700 transition-all active:scale-[0.98] hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
-            trigger={
-              <>
-                <CalendarPlus size={13} className="text-[var(--brand-text)]" />
-                <span>
-                  {lang === "tr" ? "Takvime Ekle" : "Add to Calendar"}
-                </span>
-                <ChevronDown
-                  size={12}
-                  className={`text-slate-400 transition-transform duration-200 ${
-                    calendarMenuOpen ? "rotate-180" : ""
-                  }`}
-                />
-              </>
-            }
-          >
-            <a
-              href={onGoogleCal(appt)}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() => setCalendarMenuOpen(false)}
-              className="flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 transition-colors hover:bg-[var(--brand-soft)] hover:text-[var(--brand-text)] dark:text-slate-200"
-            >
-              <CalendarPlus size={14} className="shrink-0 text-blue-500" />
-              <span>{lang === "tr" ? "Google Takvim" : "Google Calendar"}</span>
-            </a>
-            <button
-              type="button"
-              onClick={() => {
-                onDownloadIcs(appt);
-                setCalendarMenuOpen(false);
-              }}
-              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-bold text-slate-700 transition-colors hover:bg-[var(--brand-soft)] hover:text-[var(--brand-text)] dark:text-slate-200"
-            >
-              <Download size={14} className="shrink-0 text-[var(--brand-text)]" />
-              <span>
-                {lang === "tr" ? "Apple Takvim (.ics)" : "Apple Calendar (.ics)"}
-              </span>
-            </button>
-          </DropdownMenu>
-
-          {/* Sağ: Yol Tarifi ve İptal / Vazgeç Butonları.
-              360px'te üç buton yan yana sığmadığı için satır kaydırma
-              (flex-wrap) açık; aksi halde yatay taşma oluyordu. */}
+          {/* Yol Tarifi ve İptal / Vazgeç Butonları dar ekranlarda sarılabilir. */}
           <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
             {appt.tenants?.address && (
               <a

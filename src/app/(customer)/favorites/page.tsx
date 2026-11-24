@@ -219,7 +219,7 @@ export default function FavoritesPage() {
           <button
             type="button"
             onClick={() => router.push("/discover")}
-            className="mt-2 inline-flex cursor-pointer items-center gap-2 rounded-xl bg-[var(--brand)] px-4 py-3 text-sm font-extrabold text-white shadow-[0_6px_16px_var(--brand-shadow)] transition-all active:scale-[0.98] lg:rounded-full lg:bg-slate-900 lg:px-6 lg:font-bold lg:shadow-md lg:hover:bg-slate-800 lg:active:scale-95 lg:dark:bg-white lg:dark:text-slate-900 lg:dark:hover:bg-slate-100 lg:sm:text-sm"
+            className="mt-2 inline-flex cursor-pointer items-center gap-2 rounded-xl bg-[var(--brand)] px-4 py-3 text-sm font-extrabold text-white shadow-[0_6px_16px_var(--brand-shadow)] transition-all active:scale-[0.98] lg:rounded-full lg:bg-[var(--brand)] lg:px-6 lg:font-bold lg:shadow-md lg:hover:bg-[var(--brand-strong)] lg:active:scale-95 lg:dark:bg-[var(--brand)] lg:dark:text-white lg:dark:hover:bg-[var(--brand-strong)] lg:sm:text-sm"
           >
             <Compass size={16} />
             <span>
@@ -246,27 +246,42 @@ export default function FavoritesPage() {
               return (
                 <Fragment key={tenant.id}>
                   {/* ------------------------------------------- */}
-                  {/* MOBİL: liste satırı (72x72 görsel + bilgi + eylem) */}
+                  {/* MOBİL: görsel ağırlıklı favori kartı */}
                   {/* ------------------------------------------- */}
-                  <div className="pressable relative flex items-center gap-3 rounded-2xl border border-slate-200/80 bg-white p-3 shadow-[0_1px_2px_rgb(15,23,42,0.04),0_10px_30px_rgb(15,23,42,0.05)] dark:border-slate-800 dark:bg-slate-900 dark:shadow-[0_1px_2px_rgb(0,0,0,0.35),0_10px_30px_rgb(0,0,0,0.4)] lg:hidden">
-                    {/* Satırın tamamı gerçek bağlantı (stretched link) */}
+                  <div className="pressable relative overflow-hidden rounded-[28px] border border-slate-200/80 bg-white shadow-[0_8px_28px_-18px_rgba(15,23,42,0.34)] dark:border-slate-800 dark:bg-slate-900 lg:hidden">
                     <Link
                       href={`/b/${tenant.slug}`}
                       aria-label={tenant.name}
-                      className="absolute inset-0 z-[1] rounded-2xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand)]"
+                      className="absolute inset-0 z-[1] rounded-[28px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand)]"
                     />
 
-                    {/* 72x72 kare görsel + favoriden kaldır butonu */}
-                    <div className="relative flex h-[72px] w-[72px] shrink-0 items-center justify-center">
+                    <div className="relative aspect-video w-full overflow-hidden bg-slate-100 dark:bg-slate-800">
                       <SafeImage
                         src={coverImage}
                         alt={tenant.name}
                         fallbackSrc={getSectorImage(tenant)}
                         fallbackIcon={
-                          <Building2 size={26} className="text-[var(--brand-text)]" />
+                          <Building2 size={36} className="text-[var(--brand-text)]" />
                         }
-                        className="h-[72px] w-[72px] rounded-xl object-cover"
+                        className="absolute inset-0 h-full w-full object-cover"
                       />
+                      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-950/55 via-transparent to-slate-950/10" />
+
+                      {availability[tenant.id]?.hasFreeSlot && (
+                        <div className="absolute left-4 top-3 z-10 inline-flex items-center gap-2 rounded-full border border-white/75 bg-white/95 px-3.5 py-2 text-[13px] font-extrabold text-slate-900 shadow-sm backdrop-blur">
+                          <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                          <span>
+                            {availability[tenant.id].nextSlot
+                              ? lang === "tr"
+                                ? `Bugün ${availability[tenant.id].nextSlot} müsait`
+                                : `Today ${availability[tenant.id].nextSlot} available`
+                              : lang === "tr"
+                                ? "Bugün müsait"
+                                : "Available today"}
+                          </span>
+                        </div>
+                      )}
+
                       <button
                         type="button"
                         onClick={(e) => {
@@ -275,87 +290,89 @@ export default function FavoritesPage() {
                         }}
                         aria-label={
                           lang === "tr"
-                            ? "Favorilerden Çıkar"
+                            ? "Favorilerden çıkar"
                             : "Remove from favorites"
                         }
                         title={
                           lang === "tr"
-                            ? "Favorilerden Çıkar"
+                            ? "Favorilerden çıkar"
                             : "Remove from favorites"
                         }
-                        className="absolute -right-1.5 -top-1.5 z-10 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-white text-slate-400 shadow-sm ring-1 ring-slate-200/80 transition-transform active:scale-90 dark:bg-slate-800 dark:ring-slate-700"
+                        className="absolute right-4 top-3 z-10 flex h-12 w-12 cursor-pointer items-center justify-center rounded-full border border-white/70 bg-white/95 text-rose-500 shadow-sm backdrop-blur transition-transform active:scale-90"
                       >
-                        <Heart
-                          size={14}
-                          className="fill-rose-500 text-rose-500 stroke-rose-500"
-                        />
+                        <Heart size={24} className="fill-rose-500 stroke-rose-500" />
                       </button>
-                    </div>
 
-                    {/* Ad, konum, puan ve fiyat */}
-                    <div className="min-w-0 flex-1">
-                      <h3 className="truncate text-[15px] font-bold text-slate-900 dark:text-white">
-                        {tenant.name}
-                      </h3>
-                      <p className="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400">
-                        {tenant.sector
-                          ? `${tenant.sector} · `
-                          : ""}
-                        {[tenant.district, tenant.province].filter(Boolean).join(", ") ||
-                          (lang === "tr"
-                            ? "Konum belirtilmedi"
-                            : "No location")}
-                      </p>
-                      <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                        {ratingInfo?.average_rating ? (
-                          <>
-                            <span className="inline-flex items-center gap-1 text-xs font-bold text-slate-700 dark:text-slate-200">
-                              <Star
-                                size={12}
-                                className="fill-amber-400 text-amber-400"
-                              />
-                              {ratingInfo.average_rating}
-                            </span>
-                            <span className="text-[11px] text-slate-400">
-                              ({ratingInfo.total_reviews})
-                            </span>
-                          </>
-                        ) : (
-                          <span className="text-[11px] font-semibold text-slate-400">
-                            {lang === "tr" ? "Yeni İşletme" : "New"}
-                          </span>
-                        )}
-                        {price != null && (
-                          <span className="text-xs font-extrabold tabular-nums text-[var(--brand-text)]">
-                            ₺{price}
-                            {lang === "tr" ? "'den" : ""}
-                          </span>
-                        )}
-                      </div>
-                      {availability[tenant.id]?.hasFreeSlot && (
-                        <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400">
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                          {availability[tenant.id].nextSlot
-                            ? lang === "tr"
-                              ? `Bugün ${availability[tenant.id].nextSlot} müsait`
-                              : `Today ${availability[tenant.id].nextSlot}`
-                            : lang === "tr"
-                              ? "Bugün Müsait"
-                              : "Available Today"}
+                      {price != null && (
+                        <span className="absolute bottom-4 left-4 z-10 rounded-xl bg-slate-950/90 px-4 py-2 text-sm font-extrabold text-white shadow-sm backdrop-blur">
+                          ₺{price}
+                          {lang === "tr" ? "'den" : " from"}
                         </span>
                       )}
                     </div>
 
-                    {/* Randevu butonu */}
-                    <Link
-                      href={`/b/${tenant.slug}/randevu`}
-                      aria-label={`${tenant.name} — ${
-                        lang === "tr" ? "Randevu Al" : "Book"
-                      }`}
-                      className="relative z-10 shrink-0 rounded-xl bg-[var(--brand)] px-3 py-2 text-xs font-extrabold text-white shadow-[0_4px_12px_var(--brand-shadow)] transition-all active:scale-[0.98]"
-                    >
-                      {lang === "tr" ? "Randevu" : "Book"}
-                    </Link>
+                    <div className="relative px-5 pb-5 pt-5">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <h3 className="truncate text-[21px] font-black tracking-tight text-slate-950 dark:text-white">
+                            {tenant.name}
+                          </h3>
+                          <p className="mt-1 truncate text-[15px] font-medium text-slate-600 dark:text-slate-300">
+                            {[tenant.sector, tenant.district, tenant.province]
+                              .filter(Boolean)
+                              .join(" · ") ||
+                              (lang === "tr"
+                                ? "Konum belirtilmedi"
+                                : "No location")}
+                          </p>
+                        </div>
+
+                        <div className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-amber-50 px-3 py-2 text-sm font-extrabold text-slate-900 dark:bg-amber-400/10 dark:text-amber-200">
+                          <Star
+                            size={17}
+                            className="fill-amber-500 text-amber-500"
+                          />
+                          {ratingInfo?.average_rating ? (
+                            <span>
+                              {ratingInfo.average_rating}{" "}
+                              <span className="font-medium text-slate-500 dark:text-slate-400">
+                                ({ratingInfo.total_reviews})
+                              </span>
+                            </span>
+                          ) : (
+                            <span className="text-xs">
+                              {lang === "tr" ? "Yeni" : "New"}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="my-5 border-t border-slate-200 dark:border-slate-700" />
+
+                      <div className="flex items-center justify-between gap-3">
+                        {availability[tenant.id]?.hasFreeSlot &&
+                        availability[tenant.id].nextSlot ? (
+                          <span className="inline-flex min-h-12 items-center rounded-2xl border border-slate-200 bg-slate-100 px-4 text-sm font-extrabold tabular-nums text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white">
+                            {availability[tenant.id].nextSlot}
+                          </span>
+                        ) : (
+                          <span className="text-xs font-semibold text-slate-400">
+                            {lang === "tr"
+                              ? "Uygun saatler için"
+                              : "See available times"}
+                          </span>
+                        )}
+                        <Link
+                          href={`/b/${tenant.slug}/randevu`}
+                          aria-label={`${tenant.name} — ${
+                            lang === "tr" ? "Randevu al" : "Book"
+                          }`}
+                          className="relative z-10 inline-flex min-h-12 min-w-32 items-center justify-center rounded-2xl bg-[var(--brand)] px-6 text-[15px] font-extrabold text-white shadow-[0_6px_16px_var(--brand-shadow)] transition hover:bg-[var(--brand-strong)] active:scale-[0.98]"
+                        >
+                          {lang === "tr" ? "Randevu" : "Book"}
+                        </Link>
+                      </div>
+                    </div>
                   </div>
 
                   {/* ------------------------------------------- */}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   Plus,
   Minus,
@@ -51,6 +51,7 @@ interface DiscoverMapProps {
   };
   getSectorLabel: (sector: string | null) => string;
   getCoverImage: (tenant: TenantWithDetails) => string;
+  areaLabel?: string;
   lang: string;
 }
 
@@ -82,8 +83,8 @@ function pinElement(price: number | null, isSelected: boolean, name: string) {
   button.type = "button";
   button.className = `flex items-center gap-1.5 px-3 py-1.5 rounded-full font-bold text-xs shadow-md border whitespace-nowrap transition-all ${
     isSelected
-      ? "bg-indigo-600 text-white border-indigo-500 ring-4 ring-indigo-500/25"
-      : "bg-white/95 dark:bg-slate-900/95 text-slate-900 dark:text-white border-slate-200/90 dark:border-slate-700 hover:border-indigo-400"
+      ? "bg-[var(--brand)] text-white border-[var(--brand)] ring-4 ring-[var(--brand)]/25"
+      : "bg-white/95 dark:bg-slate-900/95 text-slate-900 dark:text-white border-slate-200/90 dark:border-slate-700 hover:border-[var(--brand-border)]"
   }`;
 
   const labelEl = document.createElement("span");
@@ -91,18 +92,13 @@ function pinElement(price: number | null, isSelected: boolean, name: string) {
   labelEl.textContent = label;
   button.appendChild(labelEl);
 
-  if (isSelected) {
-    const dot = document.createElement("span");
-    dot.className =
-      "w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0";
-    button.appendChild(dot);
-  }
-
   root.appendChild(button);
 
   const arrow = document.createElement("div");
   arrow.className = `w-0 h-0 mx-auto border-x-4 border-x-transparent border-t-4 ${
-    isSelected ? "border-t-indigo-600" : "border-t-white/95 dark:border-t-slate-900/95"
+    isSelected
+      ? "border-t-[var(--brand)]"
+      : "border-t-white/95 dark:border-t-slate-900/95"
   }`;
   root.appendChild(arrow);
 
@@ -117,9 +113,9 @@ export default function DiscoverMap({
   getTenantRating,
   getSectorLabel,
   getCoverImage,
+  areaLabel,
   lang,
 }: DiscoverMapProps) {
-  const router = useRouter();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<LeafletMap | null>(null);
   const layerRef = useRef<LayerGroup | null>(null);
@@ -238,7 +234,7 @@ export default function DiscoverMap({
   return (
     <div
       data-no-swipe
-      className="relative w-full h-[62svh] min-h-[380px] sm:h-[580px] rounded-3xl overflow-hidden border border-slate-200/80 dark:border-slate-800/80 shadow-sm bg-[#f4f3f0] dark:bg-[#12141c]"
+      className="discover-map relative h-[62svh] min-h-[380px] w-full overflow-hidden rounded-[28px] border border-slate-200/80 bg-[#eef1f5] shadow-sm dark:border-slate-800/80 dark:bg-[#12141c] sm:h-[580px]"
     >
       {/* Gerçek harita (Leaflet + OpenStreetMap) */}
       <div ref={containerRef} className="absolute inset-0 z-0" />
@@ -277,11 +273,11 @@ export default function DiscoverMap({
 
       {/* Map Header Status Badge */}
       <div className="absolute top-4 left-4 z-20">
-        <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/85 dark:bg-slate-900/85 backdrop-blur-2xl border border-slate-200/70 dark:border-slate-800 shadow-md text-xs font-semibold text-slate-700 dark:text-slate-200">
-          <MapPin size={14} className="text-indigo-600 dark:text-indigo-400" />
+        <div className="flex items-center gap-2 rounded-full border border-slate-200/70 bg-white/90 px-3.5 py-2 text-xs font-bold text-slate-700 shadow-md backdrop-blur-2xl dark:border-slate-800 dark:bg-slate-900/90 dark:text-slate-200">
+          <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" />
           <span>
-            {tenants.length}{" "}
-            {lang === "tr" ? "işletme haritada" : "businesses on map"}
+            {areaLabel ||
+              (lang === "tr" ? "Türkiye genelinde" : "Across Türkiye")}
           </span>
         </div>
         {tenants.length > 0 && approximateCount > 0 && (
@@ -317,9 +313,13 @@ export default function DiscoverMap({
       {selectedTenant && (
         <div className="absolute bottom-4 inset-x-4 max-w-sm sm:max-w-md mx-auto z-30 animate-in fade-in slide-in-from-bottom-4 duration-300">
           <div
-            onClick={() => router.push(`/b/${selectedTenant.slug}`)}
-            className="group relative bg-white/95 dark:bg-slate-900/95 backdrop-blur-3xl rounded-3xl p-3 sm:p-4 border border-slate-200/90 dark:border-slate-800 shadow-2xl hover:shadow-indigo-500/10 transition-all cursor-pointer flex gap-3.5 items-center"
+            className="group relative flex items-center gap-3.5 rounded-3xl border border-slate-200/90 bg-white/95 p-3 shadow-2xl backdrop-blur-3xl transition-all hover:shadow-[0_20px_50px_var(--brand-shadow)] dark:border-slate-800 dark:bg-slate-900/95 sm:p-4"
           >
+            <Link
+              href={`/b/${selectedTenant.slug}`}
+              aria-label={selectedTenant.name}
+              className="absolute inset-0 z-[1] rounded-3xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand)]"
+            />
             {/* Thumbnail */}
             <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden shrink-0 bg-slate-100 dark:bg-slate-800">
               <img
@@ -327,10 +327,6 @@ export default function DiscoverMap({
                 alt={selectedTenant.name}
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
               />
-              <div className="absolute top-1.5 left-1.5 flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-black/50 backdrop-blur-md text-white text-[9px] font-bold">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                <span>{lang === "tr" ? "Müsait" : "Open"}</span>
-              </div>
 
               {/* Profil fotoğrafı */}
               <div className="absolute bottom-1.5 left-1.5 flex h-7 w-7 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-white shadow-sm dark:border-slate-900 dark:bg-slate-800">
@@ -343,7 +339,7 @@ export default function DiscoverMap({
                 ) : (
                   <Building2
                     size={14}
-                    className="text-indigo-600 dark:text-indigo-400"
+                    className="text-[var(--brand)]"
                   />
                 )}
               </div>
@@ -365,7 +361,7 @@ export default function DiscoverMap({
                 </span>
               </div>
 
-              <h4 className="font-bold text-slate-900 dark:text-white text-sm sm:text-base leading-tight truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+              <h4 className="font-bold text-slate-900 dark:text-white text-sm sm:text-base leading-tight truncate group-hover:text-[var(--brand-text)] transition-colors">
                 {selectedTenant.name}
               </h4>
 
@@ -402,7 +398,7 @@ export default function DiscoverMap({
                   )}
                 </span>
 
-                <span className="inline-flex items-center gap-0.5 text-xs font-bold text-indigo-600 dark:text-indigo-400 group-hover:translate-x-0.5 transition-transform">
+                <span className="inline-flex items-center gap-0.5 text-xs font-bold text-[var(--brand-text)] group-hover:translate-x-0.5 transition-transform">
                   <span>{lang === "tr" ? "Randevu Al" : "Book"}</span>
                   <ChevronRight size={14} />
                 </span>
@@ -413,10 +409,11 @@ export default function DiscoverMap({
             <button
               type="button"
               onClick={(e) => {
+                e.preventDefault();
                 e.stopPropagation();
                 onSelectTenant(null);
               }}
-              className="absolute top-2.5 right-2.5 p-1.5 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+              className="absolute top-2.5 right-2.5 z-10 p-1.5 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
               title={lang === "tr" ? "Kapat" : "Close"}
             >
               <X size={14} />

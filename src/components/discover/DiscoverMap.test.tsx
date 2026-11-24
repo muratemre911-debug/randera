@@ -1,9 +1,18 @@
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, waitFor } from "@testing-library/react";
+import type { AnchorHTMLAttributes } from "react";
 import DiscoverMap, { type TenantWithDetails } from "./DiscoverMap";
 
-vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: vi.fn() }),
+vi.mock("next/link", () => ({
+  default: ({
+    href,
+    children,
+    ...props
+  }: AnchorHTMLAttributes<HTMLAnchorElement> & { href: string }) => (
+    <a href={href} {...props}>
+      {children}
+    </a>
+  ),
 }));
 
 const baseProps = {
@@ -87,7 +96,7 @@ describe("DiscoverMap", () => {
       ),
     );
     const pin = container.querySelector(".leaflet-marker-icon button");
-    expect(pin?.className).toContain("bg-indigo-600");
+    expect(pin?.className).toContain("bg-[var(--brand)]");
     expect(container.textContent).toContain(istanbul.name);
   });
 

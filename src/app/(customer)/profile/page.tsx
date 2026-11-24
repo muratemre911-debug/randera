@@ -5,13 +5,15 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import {
+  CalendarDays,
   Camera,
   Check,
+  ChevronRight,
+  Heart,
   LayoutDashboard,
   LogOut,
   Phone,
   ShieldCheck,
-  Sparkles,
   UserRound,
 } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
@@ -23,6 +25,7 @@ import {
 import { Skeleton } from "@/components/Skeleton";
 import { useToast } from "@/components/ui/Toast";
 import Presence from "@/components/ui/Presence";
+import { useFavorites } from "@/lib/useFavorites";
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -33,9 +36,11 @@ export default function ProfilePage() {
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState("");
   const [role, setRole] = useState<string | null>(null);
+  const [appointmentCount, setAppointmentCount] = useState(0);
   const [fetching, setFetching] = useState(true);
   const [saving, setSaving] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  const { favoriteIds } = useFavorites();
   const { toast } = useToast();
 
   const supabase = createClient();
@@ -52,11 +57,17 @@ export default function ProfilePage() {
         data: { user },
       } = await supabase.auth.getUser();
       if (user) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("full_name, phone, avatar_url, role")
-          .eq("id", user.id)
-          .single();
+        const [{ data: profile }, { count }] = await Promise.all([
+          supabase
+            .from("profiles")
+            .select("full_name, phone, avatar_url, role")
+            .eq("id", user.id)
+            .single(),
+          supabase
+            .from("appointments")
+            .select("id", { count: "exact", head: true })
+            .eq("customer_id", user.id),
+        ]);
 
         if (profile) {
           setFullName(profile.full_name || "");
@@ -64,6 +75,7 @@ export default function ProfilePage() {
           setAvatarUrl(profile.avatar_url || "");
           setRole(profile.role || null);
         }
+        setAppointmentCount(count ?? 0);
       }
       setFetching(false);
     };
@@ -188,190 +200,233 @@ export default function ProfilePage() {
     setSaving(false);
   };
 
+  const roleLabel =
+    role === "owner"
+      ? lang === "tr"
+        ? "İşletme sahibi"
+        : "Business owner"
+      : role === "staff"
+        ? lang === "tr"
+          ? "Ekip üyesi"
+          : "Team member"
+        : lang === "tr"
+          ? "Randera üyesi"
+          : "Randera member";
+
   return (
-    <div className="mx-auto max-w-3xl px-1 py-4 sm:px-2 sm:py-7">
-      <header className="mb-6 flex items-end justify-between gap-4 sm:mb-8">
-        <div>
-          <p className="mb-2 flex items-center gap-2 text-[11px] font-extrabold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-300">
-            <Sparkles size={14} />
-            {lang === "tr" ? "Hesap merkezi" : "Account center"}
-          </p>
-          <h1 className="text-3xl font-black tracking-tight text-slate-950 dark:text-white sm:text-4xl">
-            {t("profile.title")}
-          </h1>
-          <p className="mt-2 max-w-lg text-sm leading-6 text-slate-500 dark:text-slate-400 sm:text-base">
-            {lang === "tr"
-              ? "Bilgilerini güncel tut, randevu deneyimini kişiselleştir."
-              : "Keep your details up to date and personalize your booking experience."}
-          </p>
-        </div>
-        <div className="mb-1 hidden h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-indigo-100 bg-indigo-50 text-indigo-600 shadow-sm dark:border-indigo-400/20 dark:bg-indigo-400/10 dark:text-indigo-300 sm:flex">
-          <UserRound size={22} strokeWidth={2.2} />
-        </div>
+    <div className="mx-auto w-full max-w-3xl px-1 py-4 sm:px-2 sm:py-7">
+      <header className="mb-6 sm:mb-7">
+        <h1 className="text-3xl font-black tracking-tight text-slate-950 dark:text-white sm:text-4xl">
+          {t("profile.title")}
+        </h1>
+        <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400 sm:text-base">
+          {lang === "tr"
+            ? "Hesap bilgilerini ve tercihlerini yönet."
+            : "Manage your account details and preferences."}
+        </p>
       </header>
 
-      <div className="overflow-hidden rounded-[30px] border border-slate-200/80 bg-white/85 shadow-[0_18px_50px_-24px_rgba(15,23,42,0.24)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/75 dark:shadow-[0_24px_70px_-30px_rgba(0,0,0,0.8)]">
-        <div className="relative overflow-hidden bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-600 px-5 py-6 text-white sm:px-8 sm:py-7">
-          <div className="pointer-events-none absolute -right-10 -top-24 h-56 w-56 rounded-full bg-white/10 blur-2xl" />
-          <div className="pointer-events-none absolute -bottom-28 right-1/3 h-48 w-48 rounded-full bg-fuchsia-300/20 blur-3xl" />
-          <div className="relative flex items-start justify-between gap-4">
-            <div className="hidden shrink-0 items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 py-2 text-xs font-semibold text-white/90 backdrop-blur sm:flex">
-              <ShieldCheck size={15} />
-              {lang === "tr" ? "Güvenli hesap" : "Secure account"}
-            </div>
-          </div>
-          <div className="pointer-events-none absolute -bottom-12 -right-5 h-32 w-32 rounded-full border border-white/10" />
-          <div className="pointer-events-none absolute -bottom-16 right-9 h-32 w-32 rounded-full border border-white/10" />
-        </div>
-
+      <form onSubmit={handleSubmit} className="space-y-4">
         <Presence
           swapKey={fetching ? "loading" : "form"}
           enterClassName="animate-fade-rise-in"
           exitClassName="animate-fade-rise-out"
         >
-        {fetching ? (
-          <div className="px-5 pb-6 sm:px-8 sm:pb-8">
-            <div className="-mt-10 mb-7 flex items-end gap-4">
-              <Skeleton className="h-[92px] w-[92px] shrink-0 rounded-[28px] border-4 border-white dark:border-slate-900" />
-              <Skeleton className="mb-2 h-5 w-32" />
+          {fetching ? (
+            <div className="space-y-4">
+              <section className="flex items-center gap-4 rounded-[30px] border border-slate-200/80 bg-white p-5 shadow-[0_8px_24px_-18px_rgba(15,23,42,0.3)] dark:border-white/10 dark:bg-slate-900">
+                <Skeleton className="h-24 w-24 shrink-0 rounded-[26px]" />
+                <div className="flex-1 space-y-3">
+                  <Skeleton className="h-6 w-40 max-w-full" />
+                  <Skeleton className="h-4 w-48 max-w-full" />
+                  <Skeleton className="h-4 w-36 max-w-full" />
+                </div>
+              </section>
+              <section className="space-y-5 rounded-[30px] border border-slate-200/80 bg-white p-5 sm:p-6 dark:border-white/10 dark:bg-slate-900">
+                <Skeleton className="h-4 w-40" />
+                <Skeleton className="h-14 w-full rounded-2xl" />
+                <Skeleton className="h-14 w-full rounded-2xl" />
+                <Skeleton className="h-14 w-full rounded-2xl" />
+              </section>
             </div>
-            <div className="grid gap-5 sm:grid-cols-2">
-              <Skeleton className="h-14 w-full rounded-2xl" />
-              <Skeleton className="h-14 w-full rounded-2xl" />
-            </div>
-            <Skeleton className="mt-6 h-14 w-full rounded-2xl" />
-          </div>
-        ) : (
-        <form onSubmit={handleSubmit} className="px-5 pb-6 sm:px-8 sm:pb-8">
-            <div className="-mt-10 mb-7 flex items-end gap-4">
-              <div className="relative h-[92px] w-[92px] shrink-0">
-                <div className="flex h-[92px] w-[92px] items-center justify-center overflow-hidden rounded-[28px] border-4 border-white bg-gradient-to-br from-indigo-100 to-violet-200 text-3xl font-black text-indigo-700 shadow-xl shadow-slate-950/15 dark:border-slate-900 dark:from-indigo-400/30 dark:to-fuchsia-400/30 dark:text-white">
-                  {avatarPreview || avatarUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={avatarPreview || avatarUrl}
-                      alt={t("profile.photo_alt")}
-                      className="h-full w-full object-cover"
+          ) : (
+            <div className="space-y-4">
+              <section className="rounded-[30px] border border-slate-200/80 bg-white p-5 shadow-[0_8px_24px_-18px_rgba(15,23,42,0.3)] sm:p-6 dark:border-white/10 dark:bg-slate-900">
+                <div className="flex items-center gap-4">
+                  <div className="relative h-24 w-24 shrink-0">
+                    <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-[26px] bg-slate-100 text-3xl font-black text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+                      {avatarPreview || avatarUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={avatarPreview || avatarUrl}
+                          alt={t("profile.photo_alt")}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        fullName.charAt(0).toUpperCase() || "U"
+                      )}
+                    </div>
+                    <label
+                      htmlFor="avatar"
+                      aria-label={t("profile.photo_add")}
+                      className="absolute -bottom-1.5 -right-1.5 flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border-[3px] border-white bg-[var(--brand)] text-white shadow-md transition hover:scale-105 dark:border-slate-900"
+                    >
+                      <Camera size={17} strokeWidth={2.3} />
+                    </label>
+                    <input
+                      id="avatar"
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFileChange}
+                      className="hidden"
                     />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-xl font-black tracking-tight text-slate-950 dark:text-white sm:text-2xl">
+                      {fullName || (lang === "tr" ? "Adını ekle" : "Add your name")}
+                    </p>
+                    <p className="mt-1 truncate text-sm font-medium text-slate-500 dark:text-slate-400">
+                      {roleLabel}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-5 flex items-center gap-3 border-t border-slate-200 pt-4 text-sm font-semibold text-slate-600 dark:border-slate-700 dark:text-slate-300">
+                  <Link
+                    href="/my-appointments"
+                    className="inline-flex items-center gap-1.5 rounded-lg transition hover:text-slate-950 dark:hover:text-white"
+                  >
+                    <CalendarDays size={17} className="text-slate-400" />
+                    <span className="font-extrabold text-slate-950 dark:text-white">
+                      {appointmentCount}
+                    </span>
+                    {lang === "tr" ? "Randevu" : "Appointments"}
+                  </Link>
+                  <span aria-hidden="true" className="text-slate-300 dark:text-slate-600">
+                    ·
+                  </span>
+                  <Link
+                    href="/favorites"
+                    className="inline-flex items-center gap-1.5 rounded-lg transition hover:text-slate-950 dark:hover:text-white"
+                  >
+                    <Heart size={17} className="text-slate-400" />
+                    <span className="font-extrabold text-slate-950 dark:text-white">
+                      {favoriteIds.length}
+                    </span>
+                    {lang === "tr" ? "Favori" : "Favorites"}
+                  </Link>
+                </div>
+              </section>
+
+              <section className="rounded-[30px] border border-slate-200/80 bg-white p-5 shadow-[0_8px_24px_-18px_rgba(15,23,42,0.3)] sm:p-6 dark:border-white/10 dark:bg-slate-900">
+                <h2 className="mb-5 text-sm font-extrabold uppercase tracking-[0.12em] text-slate-400">
+                  {lang === "tr" ? "Kişisel Bilgiler" : "Personal information"}
+                </h2>
+
+                <div className="space-y-5">
+                  <div>
+                    <label
+                      htmlFor="fullName"
+                      className="mb-2 block text-[15px] font-bold text-slate-900 dark:text-white"
+                    >
+                      {t("profile.name")}
+                    </label>
+                    <div className="relative">
+                      <UserRound
+                        size={19}
+                        className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+                      />
+                      <input
+                        id="fullName"
+                        name="name"
+                        autoComplete="name"
+                        type="text"
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        placeholder={t("profile.name_placeholder")}
+                        className="h-[58px] w-full rounded-2xl border border-slate-200 bg-slate-50 pl-12 pr-4 text-[16px] font-semibold text-slate-900 outline-none transition placeholder:font-medium placeholder:text-slate-400 focus:border-slate-400 focus:bg-white focus:ring-4 focus:ring-slate-900/5 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:focus:border-slate-500 dark:focus:bg-slate-800"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="phone"
+                      className="mb-2 block text-[15px] font-bold text-slate-900 dark:text-white"
+                    >
+                      {t("profile.phone")}
+                    </label>
+                    <div className="relative">
+                      <Phone
+                        size={19}
+                        className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+                      />
+                      <input
+                        id="phone"
+                        name="phone"
+                        type="tel"
+                        inputMode="tel"
+                        autoComplete="tel"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        placeholder={TR_MOBILE_PLACEHOLDER}
+                        className="h-[58px] w-full rounded-2xl border border-slate-200 bg-slate-50 pl-12 pr-4 text-[16px] font-semibold text-slate-900 outline-none transition placeholder:font-medium placeholder:text-slate-400 focus:border-slate-400 focus:bg-white focus:ring-4 focus:ring-slate-900/5 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:focus:border-slate-500 dark:focus:bg-slate-800"
+                      />
+                    </div>
+                    <p className="mt-2.5 flex items-start gap-2 text-sm leading-5 text-slate-500 dark:text-slate-400">
+                      <ShieldCheck
+                        size={17}
+                        className="mt-0.5 shrink-0 text-slate-400"
+                      />
+                      <span>{t("profile.phone_note")}</span>
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="mt-6 flex min-h-[60px] w-full items-center justify-center gap-2.5 rounded-2xl bg-[var(--brand)] px-5 py-4 text-[16px] font-extrabold text-white shadow-[0_8px_20px_var(--brand-shadow)] transition hover:bg-[var(--brand-strong)] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {saving ? (
+                    <>
+                      <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                      {t("profile.saving")}
+                    </>
                   ) : (
-                    fullName.charAt(0).toUpperCase() || "U"
+                    <>
+                      <Check size={19} strokeWidth={2.8} />
+                      {t("profile.save")}
+                    </>
                   )}
-                </div>
-                <label
-                  htmlFor="avatar"
-                  aria-label={t("profile.photo_add")}
-                  className="absolute -bottom-1.5 -right-1.5 flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl border-[3px] border-white bg-slate-950 text-white shadow-lg transition duration-200 hover:scale-105 hover:bg-indigo-600 dark:border-slate-900 dark:bg-white dark:text-slate-900 dark:hover:bg-indigo-200"
-                >
-                  <Camera size={16} strokeWidth={2.4} />
-                </label>
-                <input
-                  id="avatar"
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFileChange}
-                  className="hidden"
-                />
-              </div>
-              <div className="min-w-0 pb-1">
-                <p className="truncate text-lg font-extrabold tracking-tight text-slate-900 dark:text-white">
-                  {fullName || (lang === "tr" ? "Adını ekle" : "Add your name")}
-                </p>
-              </div>
+                </button>
+              </section>
             </div>
-
-            <div className="grid gap-5 sm:grid-cols-2">
-              <div>
-                <label
-                  htmlFor="fullName"
-                  className="mb-2 block text-sm font-bold text-slate-700 dark:text-slate-200"
-                >
-                  {t("profile.name")}
-                </label>
-                <div className="relative">
-                  <UserRound
-                    size={18}
-                    className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
-                  />
-                  <input
-                    id="fullName"
-                    name="name"
-                    autoComplete="name"
-                    type="text"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    placeholder={t("profile.name_placeholder")}
-                    className="h-14 w-full rounded-2xl border border-slate-200 bg-slate-50/80 pl-11 pr-4 text-[15px] font-medium text-slate-900 outline-none transition placeholder:font-normal placeholder:text-slate-400 hover:border-slate-300 focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 dark:border-white/10 dark:bg-slate-950/45 dark:text-white dark:hover:border-white/20 dark:focus:border-indigo-400 dark:focus:bg-slate-950"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label
-                  htmlFor="phone"
-                  className="mb-2 block text-sm font-bold text-slate-700 dark:text-slate-200"
-                >
-                  {t("profile.phone")}
-                </label>
-                <div className="relative">
-                  <Phone
-                    size={18}
-                    className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
-                  />
-                  <input
-                    id="phone"
-                    name="phone"
-                    type="tel"
-                    inputMode="tel"
-                    autoComplete="tel"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder={TR_MOBILE_PLACEHOLDER}
-                    className="h-14 w-full rounded-2xl border border-slate-200 bg-slate-50/80 pl-11 pr-4 text-[15px] font-medium text-slate-900 outline-none transition placeholder:font-normal placeholder:text-slate-400 hover:border-slate-300 focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 dark:border-white/10 dark:bg-slate-950/45 dark:text-white dark:hover:border-white/20 dark:focus:border-indigo-400 dark:focus:bg-slate-950"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-4 flex items-start gap-2.5 rounded-2xl border border-slate-200/70 bg-slate-50/70 px-4 py-3 text-xs leading-5 text-slate-500 dark:border-white/[0.06] dark:bg-white/[0.03] dark:text-slate-400 sm:mt-5">
-              <ShieldCheck size={16} className="mt-0.5 shrink-0 text-indigo-500 dark:text-indigo-300" />
-              <span>{t("profile.phone_note")}</span>
-            </div>
-
-            <button
-              type="submit"
-              disabled={saving}
-              className="mt-6 flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-600 px-5 py-3.5 text-sm font-extrabold text-white shadow-lg shadow-indigo-600/25 transition duration-200 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-indigo-600/30 active:translate-y-0 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:translate-y-0 dark:shadow-indigo-950/40"
-            >
-              {saving ? (
-                <>
-                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/40 border-t-white" />
-                  {t("profile.saving")}
-                </>
-              ) : (
-                <>
-                  <Check size={18} strokeWidth={2.8} />
-                  {t("profile.save")}
-                </>
-              )}
-            </button>
-        </form>
-        )}
+          )}
         </Presence>
-      </div>
+      </form>
 
-      <div
-        className={`mt-4 grid gap-3 sm:mt-5 ${
-          role === "owner" || role === "staff" ? "sm:grid-cols-2" : ""
-        }`}
-      >
+      <div className="mt-4 overflow-hidden rounded-[30px] border border-slate-200/80 bg-white shadow-[0_8px_24px_-18px_rgba(15,23,42,0.3)] dark:border-white/10 dark:bg-slate-900">
         {(role === "owner" || role === "staff") && (
           <Link
             href="/dashboard"
-            className="group flex min-h-[58px] w-full items-center justify-center gap-2.5 rounded-2xl border border-indigo-200/80 bg-indigo-50/80 px-4 py-3.5 text-sm font-extrabold text-indigo-700 transition duration-200 hover:-translate-y-0.5 hover:border-indigo-300 hover:bg-indigo-100 active:scale-[0.98] dark:border-indigo-400/20 dark:bg-indigo-400/10 dark:text-indigo-200 dark:hover:bg-indigo-400/15"
+            className="flex min-h-[88px] items-center gap-4 border-b border-slate-200 px-5 py-4 transition hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800/70 sm:px-6"
           >
-            <LayoutDashboard size={18} strokeWidth={2.2} />
-            <span>{t("profile.back_to_business")}</span>
+            <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 dark:bg-indigo-400/10 dark:text-indigo-300">
+              <LayoutDashboard size={23} />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block font-extrabold text-slate-900 dark:text-white">
+                {t("profile.back_to_business")}
+              </span>
+              <span className="mt-0.5 block text-sm text-slate-500 dark:text-slate-400">
+                {lang === "tr"
+                  ? "Randevu ve takvim yönetimine geç"
+                  : "Manage appointments and your calendar"}
+              </span>
+            </span>
+            <ChevronRight size={21} className="shrink-0 text-slate-400" />
           </Link>
         )}
 
@@ -379,12 +434,22 @@ export default function ProfilePage() {
           type="button"
           onClick={handleLogout}
           disabled={loggingOut}
-          className="flex min-h-[58px] w-full cursor-pointer items-center justify-center gap-2.5 rounded-2xl border border-rose-200/80 bg-rose-50/70 px-4 py-3.5 text-sm font-bold text-rose-600 transition duration-200 hover:-translate-y-0.5 hover:border-rose-300 hover:bg-rose-100 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 dark:border-rose-400/20 dark:bg-rose-400/[0.07] dark:text-rose-300 dark:hover:bg-rose-400/[0.12]"
+          className="flex min-h-[88px] w-full cursor-pointer items-center gap-4 px-5 py-4 text-left transition hover:bg-rose-50/70 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-rose-400/[0.06] sm:px-6"
         >
-          <LogOut size={18} strokeWidth={2.2} />
-          <span>
-            {loggingOut ? t("profile.logging_out") : t("nav.logout")}
+          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-rose-50 text-rose-600 dark:bg-rose-400/10 dark:text-rose-300">
+            <LogOut size={23} />
           </span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-extrabold text-rose-600 dark:text-rose-300">
+              {loggingOut ? t("profile.logging_out") : t("nav.logout")}
+            </span>
+            <span className="mt-0.5 block text-sm text-slate-500 dark:text-slate-400">
+              {lang === "tr"
+                ? "Mevcut oturumu sonlandır"
+                : "End your current session"}
+            </span>
+          </span>
+          <ChevronRight size={21} className="shrink-0 text-rose-500" />
         </button>
       </div>
     </div>

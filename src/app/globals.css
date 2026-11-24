@@ -551,11 +551,7 @@ html, body {
   }
 }
 
-/* Placeholder Font: SF Pro */
-::placeholder {
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", sans-serif !important;
-  opacity: 0.6;
-}
+/* Placeholder Font: Geist — uygulama fontuyla tutarlı olur (placeholder ayrı fontlı olmamalı). */
 
 
 /* Modern macOS style Custom Scrollbar */
@@ -728,6 +724,15 @@ pre,
   --brand-soft-hover: oklch(35.9% 0.144 278.697);
   --brand-text: oklch(78.5% 0.115 274.713);
   --brand-border: oklch(39.8% 0.195 277.366);
+}
+
+/* Keşfet haritası: kart ve mor fiyat pinlerini öne çıkaran sakin harita tonu. */
+.discover-map .leaflet-tile-pane {
+  filter: saturate(0.68) contrast(0.96);
+}
+
+.dark .discover-map .leaflet-tile-pane {
+  filter: saturate(0.48) brightness(0.72) contrast(1.08);
 }
 
 /* Tema değişimi View Transition'ı: varsayılan tam ekran snapshot geçişi

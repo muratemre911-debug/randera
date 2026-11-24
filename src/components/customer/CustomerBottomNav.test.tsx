@@ -140,14 +140,14 @@ describe("CustomerBottomNav", () => {
       pointerId: 1,
       pointerType: "touch",
       isPrimary: true,
-      clientX: 250,
+      clientX: 220,
       clientY: 20,
     });
 
     expect(navBar).toHaveAttribute("data-dragging", "true");
     expect(
       Number.parseFloat(navBar.style.getPropertyValue("--shell-nav-x")),
-    ).toBeGreaterThan(100);
+    ).toBe(174);
     expect(navBar.style.getPropertyValue("--shell-nav-stretch")).toBe("1");
     expect(navBar.style.getPropertyValue("--shell-nav-body-scale-x")).toBe("");
     expect(navBar.style.getPropertyValue("--shell-nav-body-scale-y")).toBe("");
@@ -157,12 +157,58 @@ describe("CustomerBottomNav", () => {
       pointerId: 1,
       pointerType: "touch",
       isPrimary: true,
-      clientX: 250,
+      clientX: 220,
       clientY: 20,
     });
 
     expect(nav.routerPush).toHaveBeenCalledWith("/my-appointments");
     expect(navBar).not.toHaveAttribute("data-dragging");
+  });
+
+  it("sekme değiştirip geri dönünce gösterge URL ile eşleşen sekmede kalır", () => {
+    nav.pathname = "/discover";
+    mockMobileViewport();
+
+    const { container, rerender } = render(<CustomerBottomNav tabs={tabs} />);
+    const navBar = container.querySelector(
+      ".shell-bottomnav-inner",
+    ) as HTMLDivElement;
+    const tabLinks = links(container);
+    mockNavGeometry(navBar, tabLinks);
+
+    dispatchPointer(tabLinks[0], "pointerdown", {
+      pointerId: 20,
+      pointerType: "touch",
+      isPrimary: true,
+      clientX: 25,
+      clientY: 20,
+    });
+    dispatchPointer(navBar, "pointermove", {
+      pointerId: 20,
+      pointerType: "touch",
+      isPrimary: true,
+      clientX: 250,
+      clientY: 20,
+    });
+    dispatchPointer(navBar, "pointerup", {
+      pointerId: 20,
+      pointerType: "touch",
+      isPrimary: true,
+      clientX: 250,
+      clientY: 20,
+    });
+    expect(nav.routerPush).toHaveBeenCalledWith("/my-appointments");
+
+    nav.pathname = "/my-appointments";
+    rerender(<CustomerBottomNav tabs={tabs} />);
+    expect(tabLinks[2]).toHaveAttribute("aria-current", "page");
+    expect(navBar.style.getPropertyValue("--shell-nav-x")).toBe("204px");
+
+    nav.pathname = "/discover";
+    rerender(<CustomerBottomNav tabs={tabs} />);
+    expect(tabLinks[0]).toHaveAttribute("aria-current", "page");
+    expect(tabLinks[2]).not.toHaveAttribute("aria-current");
+    expect(navBar.style.getPropertyValue("--shell-nav-x")).toBe("4px");
   });
 
   it("küçük parmak titremesinde (<= 8px) sürüklemeyi başlatmaz", () => {

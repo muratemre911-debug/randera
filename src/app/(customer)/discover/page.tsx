@@ -376,6 +376,10 @@ export default function DiscoverPage() {
     availability,
   ]);
 
+  const availableTodayCount = filtered.filter(
+    (tenant) => availability[tenant.id]?.hasFreeSlot,
+  ).length;
+
   return (
     <PullToRefresh
       onRefresh={fetchData}
@@ -392,45 +396,22 @@ export default function DiscoverPage() {
     <div className="w-full max-w-6xl mx-auto space-y-6 pb-20 font-sans select-none">
       {/* Üst Başlık & Arama / Filtre Bölümü */}
       <div className="flex flex-col gap-4">
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white sm:text-3xl lg:text-4xl lg:tracking-normal">
-              {lang === "tr" ? "Keşfet" : "Discover"}
-            </h1>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400 lg:text-base">
-              {lang === "tr"
-                ? "Size en uygun işletmeyi bulun ve anında randevu alın."
-                : "Find the best business for you and book instantly."}
-            </p>
-          </div>
-
-          {/* Segmented Control (iOS tarzı kayan kapsül) */}
-          <SegmentedControl
-            className="w-full sm:w-auto sm:min-w-72"
-            value={viewMode}
-            onChange={setViewMode}
-            options={[
-              {
-                value: "list",
-                icon: List,
-                label: lang === "tr" ? "Liste" : "List",
-                ariaLabel: lang === "tr" ? "Liste Görünümü" : "List View",
-              },
-              {
-                value: "map",
-                icon: MapIcon,
-                label: lang === "tr" ? "Harita" : "Map",
-                ariaLabel: lang === "tr" ? "Harita Görünümü" : "Map View",
-              },
-            ]}
-          />
+        <div>
+          <h1 className="text-3xl font-black tracking-tight text-slate-950 dark:text-white sm:text-4xl">
+            {lang === "tr" ? "Keşfet" : "Discover"}
+          </h1>
+          <p className="mt-1 text-sm font-medium text-slate-500 dark:text-slate-400">
+            {lang === "tr"
+              ? "Anında onaylı randevu"
+              : "Instantly confirmed appointments"}
+          </p>
         </div>
       </div>
 
       {/* Arama çubuğu kaydırma sırasında üstte sabitlenir (native his).
           Kök içeriğin doğrudan çocuğu olmalı: sticky, ancak ebeveynin sınırları
           içinde çalışır; başlık grubunun içinde olsaydı liste kayarken kaybolurdu. */}
-      <div className="sticky -top-3 z-20 -mx-3 -mt-2 flex items-center gap-2.5 bg-white/90 px-3 py-2 backdrop-blur-xl sm:-top-6 sm:-mx-6 sm:gap-3 sm:px-6 md:-top-8 md:-mx-8 md:px-8 dark:bg-slate-900/90">
+      <div className="sticky -top-3 z-20 -mx-3 -mt-2 flex items-center gap-2.5 bg-white px-3 py-2 sm:-top-6 sm:-mx-6 sm:gap-3 sm:px-6 md:-top-8 md:-mx-8 md:px-8 dark:bg-slate-950">
           {/* Arama Kutusu */}
           <div className="relative flex-1 group min-w-0">
             <div className="pointer-events-none absolute left-2.5 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-xl text-slate-400 transition-all lg:bg-indigo-50 lg:text-indigo-600 lg:dark:bg-indigo-950/70 lg:dark:text-indigo-400 lg:group-focus-within:bg-indigo-600 lg:group-focus-within:text-white lg:group-focus-within:shadow-md lg:group-focus-within:shadow-indigo-500/20">
@@ -445,7 +426,7 @@ export default function DiscoverPage() {
               }
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-2xl border border-slate-200/80 bg-white py-3.5 pl-13 pr-10 text-sm font-medium text-slate-800 shadow-[0_1px_2px_rgb(15,23,42,0.04),0_10px_30px_rgb(15,23,42,0.05)] transition-all placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[var(--brand)] dark:border-slate-800 dark:bg-slate-900 dark:text-white lg:bg-white/80 lg:shadow-sm lg:backdrop-blur-2xl lg:focus:ring-indigo-500 lg:dark:bg-slate-900/70"
+              className="w-full rounded-2xl border border-slate-200/80 bg-white py-3.5 pl-13 pr-10 text-sm font-medium text-slate-800 shadow-[0_1px_2px_rgb(15,23,42,0.04),0_10px_30px_rgb(15,23,42,0.05)] transition-all placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[var(--brand)] dark:border-slate-800 dark:bg-slate-900 dark:text-white lg:bg-white lg:shadow-sm lg:focus:ring-indigo-500 lg:dark:bg-slate-900"
             />
             {search && (
               <button
@@ -467,8 +448,8 @@ export default function DiscoverPage() {
             onClick={() => setIsFilterSheetOpen(true)}
             className={`flex shrink-0 cursor-pointer items-center gap-2 rounded-xl border px-4 py-3 text-sm font-bold transition-all duration-200 active:scale-[0.98] lg:rounded-2xl lg:px-5 lg:py-3.5 lg:active:scale-95 ${
               activeFilterCount > 0
-                ? "border-[var(--brand-border)] bg-[var(--brand-soft)] text-[var(--brand-text)] shadow-[0_1px_2px_rgb(15,23,42,0.04)] lg:border-slate-900 lg:bg-slate-900 lg:text-white lg:shadow-md lg:dark:border-white lg:dark:bg-white lg:dark:text-slate-900"
-                : "border-transparent bg-slate-100 text-slate-700 shadow-[0_1px_2px_rgb(15,23,42,0.04)] dark:bg-slate-800 dark:text-slate-200 lg:border-slate-200/80 lg:bg-white/80 lg:text-slate-700 lg:shadow-sm lg:backdrop-blur-2xl lg:hover:border-slate-300 lg:dark:border-slate-800 lg:dark:bg-slate-900/70 lg:dark:text-slate-200 lg:dark:hover:border-slate-700"
+                ? "border-[var(--brand-border)] bg-[var(--brand-soft)] text-[var(--brand-text)] shadow-[0_1px_2px_rgb(15,23,42,0.04)] lg:border-[var(--brand)] lg:bg-[var(--brand)] lg:text-white lg:shadow-md"
+                : "border-transparent bg-slate-100 text-slate-700 shadow-[0_1px_2px_rgb(15,23,42,0.04)] dark:bg-slate-800 dark:text-slate-200 lg:border-slate-200/80 lg:bg-white lg:text-slate-700 lg:shadow-sm lg:hover:border-slate-300 lg:dark:border-slate-800 lg:dark:bg-slate-900 lg:dark:text-slate-200 lg:dark:hover:border-slate-700"
             }`}
           >
             <SlidersHorizontal size={17} strokeWidth={2.2} />
@@ -479,7 +460,7 @@ export default function DiscoverPage() {
               <span
                 className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-extrabold ${
                   activeFilterCount > 0
-                    ? "bg-[var(--brand)] text-white lg:bg-indigo-600 lg:text-white lg:dark:bg-indigo-600 lg:dark:text-white"
+                    ? "bg-[var(--brand)] text-white"
                     : ""
                 }`}
               >
@@ -515,8 +496,8 @@ export default function DiscoverPage() {
               onClick={() => setFilterSector("")}
               className={`inline-flex shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-bold transition-all duration-200 sm:px-5 sm:py-2 sm:text-sm ${
                 filterSector === ""
-                  ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900 lg:shadow-md lg:ring-2 lg:ring-indigo-500/20"
-                  : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 lg:border lg:border-slate-200/60 lg:bg-white/70 lg:backdrop-blur-2xl lg:hover:bg-slate-100 lg:dark:border-slate-700/60 lg:dark:bg-slate-800/60 lg:dark:text-slate-300 lg:dark:hover:bg-slate-700/80"
+                  ? "bg-[var(--brand)] text-white shadow-[0_4px_14px_var(--brand-shadow)]"
+                  : "border border-slate-200 bg-white text-slate-600 hover:border-[var(--brand-border)] hover:bg-[var(--brand-soft)] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
               }`}
             >
               {lang === "tr" ? "Tümü" : "All"}
@@ -531,8 +512,8 @@ export default function DiscoverPage() {
                 }
                 className={`inline-flex shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-bold transition-all duration-200 sm:px-5 sm:py-2 sm:text-sm ${
                   filterSector === s.value
-                    ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900 lg:shadow-md lg:ring-2 lg:ring-indigo-500/20"
-                    : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 lg:border lg:border-slate-200/60 lg:bg-white/70 lg:backdrop-blur-2xl lg:hover:bg-slate-100 lg:dark:border-slate-700/60 lg:dark:bg-slate-800/60 lg:dark:text-slate-300 lg:dark:hover:bg-slate-700/80"
+                    ? "bg-[var(--brand)] text-white shadow-[0_4px_14px_var(--brand-shadow)]"
+                    : "border border-slate-200 bg-white text-slate-600 hover:border-[var(--brand-border)] hover:bg-[var(--brand-soft)] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
                 }`}
               >
                 {s.name}
@@ -586,6 +567,50 @@ export default function DiscoverPage() {
         )}
       </div>
 
+      <div className="flex items-center justify-between gap-3 pt-1">
+        <p className="min-w-0 text-xs text-slate-500 dark:text-slate-400 sm:text-sm">
+          <span className="font-bold text-slate-900 dark:text-white">
+            {filtered.length}{" "}
+            {lang === "tr"
+              ? "işletme"
+              : filtered.length === 1
+                ? "business"
+                : "businesses"}
+          </span>
+          {availableTodayCount > 0 && (
+            <>
+              <span className="mx-1.5 text-slate-300 dark:text-slate-600">
+                ·
+              </span>
+              <span className="inline-flex items-center gap-1 font-medium text-slate-500 dark:text-slate-400">
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
+                {availableTodayCount}{" "}
+                {lang === "tr" ? "bugün müsait" : "available today"}
+              </span>
+            </>
+          )}
+        </p>
+        <SegmentedControl
+          className="w-[46%] shrink-0 sm:w-64"
+          value={viewMode}
+          onChange={setViewMode}
+          options={[
+            {
+              value: "list",
+              icon: List,
+              label: lang === "tr" ? "Liste" : "List",
+              ariaLabel: lang === "tr" ? "Liste Görünümü" : "List View",
+            },
+            {
+              value: "map",
+              icon: MapIcon,
+              label: lang === "tr" ? "Harita" : "Map",
+              ariaLabel: lang === "tr" ? "Harita Görünümü" : "Map View",
+            },
+          ]}
+        />
+      </div>
+
       {/* Ana İçerik: Harita veya Liste Görünümü */}
       {viewMode === "map" ? (
         /* HARİTA GÖRÜNÜMÜ (Apple Maps Deneyimi) */
@@ -598,6 +623,10 @@ export default function DiscoverPage() {
             getTenantRating={getTenantRating}
             getSectorLabel={getSectorLabel}
             getCoverImage={getCoverImage}
+            areaLabel={
+              [filterDistrict, filterProvince].filter(Boolean).join(", ") ||
+              (lang === "tr" ? "Türkiye genelinde" : "Across Türkiye")
+            }
             lang={lang}
           />
         </div>
@@ -605,7 +634,7 @@ export default function DiscoverPage() {
         /* LİSTE GÖRÜNÜMÜ (Airbnb Seviyesi Zengin Keşfet Kartları) */
         <div>
           {filtered.length === 0 ? (
-            <div className="rounded-3xl border border-slate-200/80 bg-white p-8 text-center shadow-[0_1px_2px_rgb(15,23,42,0.04),0_10px_30px_rgb(15,23,42,0.05)] dark:border-slate-800 dark:bg-slate-900 dark:shadow-[0_1px_2px_rgb(0,0,0,0.35),0_10px_30px_rgb(0,0,0,0.4)] lg:rounded-[32px] lg:border-slate-200/50 lg:bg-white/40 lg:px-4 lg:py-28 lg:text-slate-400 lg:shadow-sm lg:backdrop-blur-3xl lg:dark:border-slate-800/50 lg:dark:bg-slate-900/40">
+            <div className="rounded-3xl border border-slate-200/80 bg-white p-8 text-center shadow-[0_1px_2px_rgb(15,23,42,0.04),0_10px_30px_rgb(15,23,42,0.05)] dark:border-slate-800 dark:bg-slate-900 dark:shadow-[0_1px_2px_rgb(0,0,0,0.35),0_10px_30px_rgb(0,0,0,0.4)] lg:rounded-[32px] lg:border-slate-200/50 lg:bg-white lg:px-4 lg:py-28 lg:text-slate-400 lg:shadow-sm lg:dark:border-slate-800/50 lg:dark:bg-slate-900">
               <Building2
                 size={56}
                 className="mx-auto mb-4 text-slate-300 dark:text-slate-700"
@@ -630,13 +659,6 @@ export default function DiscoverPage() {
             </div>
           ) : (
             <>
-              <div className="flex items-center justify-between mb-3 px-1 lg:mb-4">
-                <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 lg:text-sm">
-                  {filtered.length}{" "}
-                  {lang === "tr" ? "işletme listeleniyor" : "businesses found"}
-                </p>
-              </div>
-
               <div className="stagger-list grid grid-cols-1 gap-3 lg:grid-cols-3 lg:gap-7">
                 {filtered.map((tenant) => {
                   const sectorLabel = getSectorLabel(tenant.sector);
@@ -649,30 +671,43 @@ export default function DiscoverPage() {
                   return (
                     <Fragment key={tenant.id}>
                       {/* ---------------------------------------------- */}
-                      {/* MOBİL: liste satırı (72x72 görsel + bilgi + eylem) */}
+                      {/* MOBİL: geniş görselli işletme kartı */}
                       {/* ---------------------------------------------- */}
-                      <div className="pressable relative flex items-center gap-3 rounded-2xl border border-slate-200/80 bg-white p-3 shadow-[0_1px_2px_rgb(15,23,42,0.04),0_10px_30px_rgb(15,23,42,0.05)] dark:border-slate-800 dark:bg-slate-900 dark:shadow-[0_1px_2px_rgb(0,0,0,0.35),0_10px_30px_rgb(0,0,0,0.4)] lg:hidden">
-                        {/* Satırın tamamı gerçek bağlantı (stretched link) */}
+                      <div className="pressable relative flex flex-col overflow-hidden rounded-[26px] border border-slate-200/80 bg-white shadow-[0_1px_2px_rgb(15,23,42,0.04),0_10px_30px_rgb(15,23,42,0.05)] dark:border-slate-800 dark:bg-slate-900 dark:shadow-[0_1px_2px_rgb(0,0,0,0.35),0_10px_30px_rgb(0,0,0,0.4)] lg:hidden">
+                        {/* Kartın tamamı gerçek bağlantı (stretched link) */}
                         <Link
                           href={`/b/${tenant.slug}`}
                           aria-label={tenant.name}
-                          className="absolute inset-0 z-[1] rounded-2xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand)]"
+                          className="absolute inset-0 z-[1] rounded-[26px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand)]"
                         />
 
-                        {/* 72x72 kare görsel + favori butonu */}
-                        <div className="relative flex h-[72px] w-[72px] shrink-0 items-center justify-center">
+                        {/* Geniş kapak görseli, müsaitlik, fiyat ve favori */}
+                        <div className="relative h-[210px] w-full bg-slate-100 dark:bg-slate-800 sm:h-[260px]">
                           <SafeImage
                             src={coverImage}
                             alt={tenant.name}
                             fallbackSrc={getSectorImage(tenant)}
                             fallbackIcon={
                               <Building2
-                                size={26}
-                                className="text-[var(--brand-text)]"
+                                size={40}
+                                className="text-[var(--brand)]"
                               />
                             }
-                            className="h-[72px] w-[72px] rounded-xl object-cover"
+                            className="h-full w-full object-cover"
                           />
+                          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-black/10" />
+                          {tenantAvailability?.hasFreeSlot && (
+                            <div className="pointer-events-none absolute left-4 top-4 z-[2] inline-flex items-center gap-2 rounded-full bg-white/95 px-3.5 py-2 text-xs font-bold text-slate-900 shadow-md backdrop-blur">
+                              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                              {tenantAvailability.nextSlot
+                                ? lang === "tr"
+                                  ? `Bugün ${tenantAvailability.nextSlot} müsait`
+                                  : `Available today at ${tenantAvailability.nextSlot}`
+                                : lang === "tr"
+                                  ? "Bugün müsait"
+                                  : "Available today"}
+                            </div>
+                          )}
                           <button
                             type="button"
                             onClick={(e) => {
@@ -688,96 +723,88 @@ export default function DiscoverPage() {
                                   ? "Favorilere Ekle"
                                   : "Add to favorites"
                             }
-                            title={
-                              isFavorited
-                                ? "Favorilerden Çıkar"
-                                : "Favorilere Ekle"
-                            }
-                            className="absolute -right-1.5 -top-1.5 z-10 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-white text-slate-400 shadow-sm ring-1 ring-slate-200/80 transition-transform active:scale-90 dark:bg-slate-800 dark:ring-slate-700"
+                            title={isFavorited ? "Favorilerden Çıkar" : "Favorilere Ekle"}
+                            className="absolute right-4 top-4 z-10 flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-white/95 text-slate-500 shadow-md backdrop-blur transition-transform active:scale-90 dark:bg-slate-900/90 dark:text-slate-300"
                           >
                             <Heart
                               key={isFavorited ? "on" : "off"}
-                              size={14}
+                              size={18}
                               className={`transition-colors ${
                                 isFavorited
                                   ? "animate-heart-pop fill-rose-500 text-rose-500 stroke-rose-500"
-                                  : "text-slate-400 stroke-[2.2]"
+                                  : "stroke-[2.2]"
                               }`}
                             />
                           </button>
-                        </div>
-
-                        {/* Ad, sektör/mesafe, puan ve fiyat */}
-                        <div className="min-w-0 flex-1">
-                          <h3 className="truncate text-[15px] font-bold text-slate-900 dark:text-white">
-                            {tenant.name}
-                          </h3>
-                          <p className="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400">
-                            {sectorLabel} ·{" "}
-                            {tenant.district ||
-                              tenant.province ||
-                              (lang === "tr"
-                                ? "Konum belirtilmedi"
-                                : "No location")}
-                          </p>
-                          <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                            {rating.hasReviews ? (
-                              <>
-                                <span className="inline-flex items-center gap-1 text-xs font-bold text-slate-700 dark:text-slate-200">
-                                  <Star
-                                    size={12}
-                                    className="fill-amber-400 text-amber-400"
-                                  />
-                                  {rating.score}
-                                </span>
-                                <span className="text-[11px] text-slate-400">
-                                  ({rating.reviews})
-                                </span>
-                              </>
-                            ) : (
-                              <span className="text-[11px] font-semibold text-slate-400">
-                                {lang === "tr"
-                                  ? "Henüz değerlendirilmedi"
-                                  : "No reviews yet"}
+                          {price != null && (
+                            <span className="pointer-events-none absolute bottom-4 left-4 z-[2] rounded-xl bg-[var(--brand)] px-3 py-2 text-xs font-extrabold text-white shadow-lg">
+                              ₺{price}
+                              <span className="ml-1 font-medium text-white/80">
+                                {lang === "tr" ? "'den başlayan" : "starting"}
                               </span>
-                            )}
-                            {price != null && (
-                              <span className="text-xs font-extrabold tabular-nums text-[var(--brand-text)]">
-                                ₺{price}
-                                {lang === "tr" ? "'den" : ""}
-                              </span>
-                            )}
-                          </div>
-                          {tenantAvailability?.hasFreeSlot && (
-                            <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400">
-                              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                              {tenantAvailability.nextSlot
-                                ? lang === "tr"
-                                  ? `Bugün ${tenantAvailability.nextSlot} müsait`
-                                  : `Today ${tenantAvailability.nextSlot}`
-                                : lang === "tr"
-                                  ? "Bugün Müsait"
-                                  : "Available Today"}
                             </span>
                           )}
                         </div>
 
-                        {/* Randevu butonu (gerçek bağlantı) */}
-                        <Link
-                          href={`/b/${tenant.slug}/randevu`}
-                          aria-label={`${tenant.name} — ${
-                            lang === "tr" ? "Randevu" : "Book"
-                          }`}
-                          className="relative z-10 shrink-0 rounded-xl bg-[var(--brand)] px-3 py-2 text-xs font-extrabold text-white shadow-[0_4px_12px_var(--brand-shadow)] transition-all active:scale-[0.98]"
-                        >
-                          {lang === "tr" ? "Randevu" : "Book"}
-                        </Link>
+                        <div className="p-4 sm:p-5">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <h3 className="truncate text-lg font-extrabold tracking-tight text-slate-950 dark:text-white">
+                                {tenant.name}
+                              </h3>
+                              <p className="mt-1 truncate text-sm font-medium text-slate-500 dark:text-slate-400">
+                                {sectorLabel} ·{" "}
+                                {tenant.district ||
+                                  tenant.province ||
+                                  (lang === "tr"
+                                    ? "Konum belirtilmedi"
+                                    : "No location")}
+                              </p>
+                            </div>
+                            <span className="inline-flex shrink-0 items-center gap-1 rounded-xl border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-sm font-extrabold text-slate-900 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-white">
+                              <Star size={14} className="fill-amber-400 text-amber-400" />
+                              {rating.score}
+                              {rating.hasReviews && (
+                                <span className="font-medium text-slate-500 dark:text-slate-400">
+                                  ({rating.reviews})
+                                </span>
+                              )}
+                            </span>
+                          </div>
+
+                          <div className="mt-4 flex items-center justify-between gap-3 border-t border-slate-100 pt-3 dark:border-slate-800">
+                            <div className="min-w-0">
+                              {rating.hasReviews ? (
+                                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                                  {rating.reviews}{" "}
+                                  {lang === "tr" ? "değerlendirme" : "reviews"}
+                                </span>
+                              ) : (
+                                <span className="text-xs font-semibold text-slate-400">
+                                  {lang === "tr"
+                                    ? "Henüz değerlendirilmedi"
+                                    : "No reviews yet"}
+                                </span>
+                              )}
+                            </div>
+                            <Link
+                              href={`/b/${tenant.slug}/randevu`}
+                              aria-label={`${tenant.name} — ${
+                                lang === "tr" ? "Randevu Al" : "Book"
+                              }`}
+                              className="relative z-10 inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-[var(--brand)] px-4 py-2.5 text-xs font-extrabold text-white shadow-[0_4px_12px_var(--brand-shadow)] transition-all active:scale-[0.98]"
+                            >
+                              {lang === "tr" ? "Randevu Al" : "Book now"}
+                              <ChevronRight size={15} />
+                            </Link>
+                          </div>
+                        </div>
                       </div>
 
                       {/* ------------------------------------------- */}
                       {/* MASAÜSTÜ: mevcut Airbnb tarzı zengin kart */}
                       {/* ------------------------------------------- */}
-                      <div className="group relative hidden lg:flex flex-col bg-white/70 dark:bg-slate-900/60 backdrop-blur-3xl rounded-[28px] border border-slate-200/70 dark:border-slate-800/70 shadow-sm hover:shadow-xl hover:-translate-y-1 hover:border-slate-300/90 dark:hover:border-slate-700/90 transition-all duration-300 cursor-pointer overflow-hidden">
+                      <div className="group relative hidden lg:flex flex-col bg-white dark:bg-slate-900 rounded-[28px] border border-slate-200/70 dark:border-slate-800/70 shadow-sm hover:shadow-xl hover:-translate-y-1 hover:border-slate-300/90 dark:hover:border-slate-700/90 transition-all duration-300 cursor-pointer overflow-hidden">
                       {/*
                         Kartın tamamı GERÇEK bir bağlantıdır (stretched link):
                         klavye ile odaklanabilir, uzun basıp/ctrl ile yeni
@@ -1055,7 +1082,7 @@ export default function DiscoverPage() {
                       }}
                       className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                         filterProvince === ""
-                          ? "bg-indigo-600 text-white shadow-xs"
+                          ? "bg-[var(--brand)] text-white shadow-xs"
                           : "bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100"
                       }`}
                     >
@@ -1076,7 +1103,7 @@ export default function DiscoverPage() {
                         }}
                         className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                           filterProvince === prov
-                            ? "bg-indigo-600 text-white shadow-xs"
+                            ? "bg-[var(--brand)] text-white shadow-xs"
                             : "bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100"
                         }`}
                       >
@@ -1098,7 +1125,7 @@ export default function DiscoverPage() {
                           onClick={() => setFilterDistrict("")}
                           className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
                             filterDistrict === ""
-                              ? "bg-indigo-600 text-white shadow-xs"
+                              ? "bg-[var(--brand)] text-white shadow-xs"
                               : "bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100"
                           }`}
                         >
@@ -1115,7 +1142,7 @@ export default function DiscoverPage() {
                             }
                             className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
                               filterDistrict === dist
-                                ? "bg-indigo-600 text-white shadow-xs"
+                                ? "bg-[var(--brand)] text-white shadow-xs"
                                 : "bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100"
                             }`}
                           >
@@ -1138,7 +1165,7 @@ export default function DiscoverPage() {
                       onClick={() => setFilterSector("")}
                       className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
                         filterSector === ""
-                          ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-sm"
+                          ? "bg-[var(--brand)] text-white shadow-sm"
                           : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200"
                       }`}
                     >
@@ -1155,7 +1182,7 @@ export default function DiscoverPage() {
                         }
                         className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
                           filterSector === s.value
-                            ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-sm"
+                            ? "bg-[var(--brand)] text-white shadow-sm"
                             : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200"
                         }`}
                       >
@@ -1240,7 +1267,7 @@ export default function DiscoverPage() {
                       onClick={() => setFilterAvailability("all")}
                       className={`flex-1 py-3 px-4 rounded-2xl border text-xs sm:text-sm font-bold transition-all text-center ${
                         filterAvailability === "all"
-                          ? "border-slate-900 bg-slate-900 text-white dark:border-white dark:bg-white dark:text-slate-900 shadow-sm"
+                          ? "border-[var(--brand)] bg-[var(--brand)] text-white shadow-sm"
                           : "border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300"
                       }`}
                     >
